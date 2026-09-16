@@ -6,9 +6,8 @@
 (function () {
   "use strict";
 
-  // 仓库地址：填上之后导航栏的 GitHub 链接才可点
-  // 例如 "https://github.com/xiaochangbai/whaletool"
-  const REPO_URL = "";
+  // 仓库地址：导航栏 GitHub 链接指向这里
+  const REPO_URL = "https://github.com/imalasong/whaletool";
 
   const $grid    = document.getElementById("grid");
   const $filters = document.getElementById("filters");
