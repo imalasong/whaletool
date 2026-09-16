@@ -2,7 +2,8 @@
 
 一个纯前端的在线小工具合辑 —— 免安装、免登录、数据不出本地。打开网页就能用。
 
-> 在线访问：`https://<你的用户名>.github.io/whaletool/`
+- 🌐 **在线访问**：<https://imalasong.github.io/whaletool/>
+- 📦 **仓库地址**：<https://github.com/imalasong/whaletool>
 
 ---
 
@@ -81,24 +82,32 @@ python -m http.server 8080
 
 ## 部署到 GitHub Pages
 
+已经部署好了，日常更新只需要三步：
+
+```bash
+git add .
+git commit -m "feat: 新增 xxx 工具"
+git push
+```
+
+GitHub Pages 会在 1～2 分钟内自动重新构建，访问地址不变：
+<https://imalasong.github.io/whaletool/>
+
+<details>
+<summary>首次部署是怎么做的（备查）</summary>
+
 ```bash
 git init
 git add .
 git commit -m "init: WhaleTool 工具合辑"
 git branch -M main
-git remote add origin https://github.com/<你的用户名>/whaletool.git
+git remote add origin https://github.com/imalasong/whaletool.git
 git push -u origin main
 ```
 
-推上去之后，在仓库 **Settings → Pages** 里：
+然后仓库 **Settings → Pages**：Source 选 `Deploy from a branch`，Branch 选 `main` + `/ (root)`，保存。
 
-- **Source** 选 `Deploy from a branch`
-- **Branch** 选 `main`，目录选 `/ (root)`
-- 保存，等 1～2 分钟
-
-访问地址就是 `https://<你的用户名>.github.io/whaletool/`。
-
-> 首次部署可能需要 1～2 分钟；如果 404，先确认 Pages 里显示的是绿色的 "Your site is live at ..."。
+</details>
 
 ---
 
