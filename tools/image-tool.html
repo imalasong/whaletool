@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>批量图片展示工具 · WhaleTool</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🖼</text></svg>">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+    background: linear-gradient(135deg, #e0f7fa 0%, #e8eaf6 100%);
+    color: #263238;
+    padding: 24px;
+    min-height: 100vh;
+  }
+
+  /* ---- 返回工具合辑 ---- */
+  .topbar {
+    max-width: 1000px; margin: 0 auto 20px;
+    display: flex; align-items: center; gap: 12px;
+  }
+  .back {
+    display: inline-flex; align-items: center; gap: 7px;
+    font-size: 13px; font-weight: 600; color: #00695c;
+    background: rgba(255,255,255,.8); border: 1px solid rgba(0,105,92,.18);
+    padding: 8px 16px; border-radius: 999px; text-decoration: none;
+    box-shadow: 0 2px 8px rgba(0,0,0,.06);
+    transition: transform .18s, box-shadow .2s, background .2s;
+  }
+  .back:hover { transform: translateX(-3px); background: #fff; box-shadow: 0 5px 14px rgba(0,105,92,.18); }
+  .topbar .crumb { font-size: 12px; color: #78909c; }
+
+  header { text-align: center; margin-bottom: 20px; }
+  header h1 { font-size: 24px; color: #00695c; letter-spacing: 1px; }
+  header p { margin-top: 6px; font-size: 13px; color: #607d8b; }
+
+  .panel {
+    max-width: 1000px; margin: 0 auto 22px;
+    background: #fff; border-radius: 14px;
+    box-shadow: 0 6px 20px rgba(0,0,0,.10);
+    padding: 18px;
+  }
+  .panel label { font-size: 14px; color: #00695c; font-weight: 600; display: block; margin-bottom: 8px; }
+  textarea {
+    width: 100%; height: 180px; resize: vertical;
+    border: 2px dashed #b2dfdb; border-radius: 10px;
+    padding: 12px; font-size: 13px; line-height: 1.6;
+    font-family: "SFMono-Regular", Consolas, monospace;
+    color: #37474f; background: #fafdfd; outline: none;
+    transition: border-color .2s;
+  }
+  textarea:focus { border-color: #00695c; }
+
+  .actions { display: flex; gap: 12px; margin-top: 14px; flex-wrap: wrap; align-items: center; }
+  button {
+    padding: 10px 22px; border: none; border-radius: 22px;
+    font-size: 14px; cursor: pointer; transition: transform .15s, box-shadow .2s;
+  }
+  .btn-primary { background: #00695c; color: #fff; box-shadow: 0 4px 12px rgba(0,105,92,.3); }
+  .btn-primary:hover { transform: translateY(-2px); }
+  .btn-ghost { background: #eceff1; color: #546e7a; }
+  .btn-ghost:hover { background: #cfd8dc; }
+  .count { font-size: 13px; color: #78909c; margin-left: auto; }
+
+  .grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+    gap: 14px; max-width: 1200px; margin: 0 auto;
+  }
+  .card {
+    background: #fff; border-radius: 12px; overflow: hidden;
+    box-shadow: 0 3px 12px rgba(0,0,0,.10); cursor: pointer;
+    transition: transform .2s, box-shadow .2s; position: relative;
+  }
+  .card:hover { transform: translateY(-4px); box-shadow: 0 8px 22px rgba(0,0,0,.18); }
+  .card img { width: 100%; height: 190px; object-fit: cover; display: block; background: #eceff1; }
+  .card .cap {
+    padding: 7px 9px; font-size: 11px; color: #78909c;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .empty { text-align: center; color: #90a4ae; font-size: 14px; padding: 40px 0; }
+
+  /* 灯箱 */
+  .lightbox {
+    position: fixed; inset: 0; background: rgba(0,0,0,.85);
+    display: none; align-items: center; justify-content: center;
+    flex-direction: column; z-index: 999; padding: 20px;
+  }
+  .lightbox.open { display: flex; }
+  .lightbox img { max-width: 92vw; max-height: 82vh; border-radius: 8px; box-shadow: 0 0 30px rgba(0,0,0,.6); }
+  .lightbox .lb-cap { color: #fff; margin-top: 14px; font-size: 13px; }
+  .lightbox .close { position: absolute; top: 18px; right: 24px; font-size: 30px; color: #fff; cursor: pointer; line-height: 1; }
+  .lightbox .nav { position: absolute; top: 50%; transform: translateY(-50%); font-size: 44px; color: #fff; cursor: pointer; user-select: none; padding: 10px 18px; }
+  .lightbox .prev { left: 10px; }
+  .lightbox .next { right: 10px; }
+  footer { text-align: center; margin-top: 28px; font-size: 12px; color: #90a4ae; }
+
+  @media (max-width: 640px) {
+    body { padding: 16px; }
+    .topbar .crumb { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <a class="back" href="../index.html">← 工具合辑</a>
+  <span class="crumb">WhaleTool / 图片 / 批量图片展示</span>
+</div>
+
+<header>
+  <h1>🐳 批量图片展示工具</h1>
+  <p>把图片 URL 一股脑粘进来，逗号 / 换行 / 空格混着用也行，点「生成画廊」就完事</p>
+</header>
+
+<div class="panel">
+  <label for="urls">📥 图片 URL 输入区（支持逗号、换行、空格分隔）</label>
+  <textarea id="urls" placeholder="例如：&#10;https://a.com/1.jpg, https://a.com/2.jpg&#10;https://a.com/3.jpg&#10;https://a.com/4.jpg"></textarea>
+  <div class="actions">
+    <button class="btn-primary" id="gen">🎨 生成画廊</button>
+    <button class="btn-ghost" id="clear">🧹 清空</button>
+    <button class="btn-ghost" id="demo">✨ 塞点示例</button>
+    <span class="count" id="count">已识别 0 张</span>
+  </div>
+</div>
+
+<div class="grid" id="grid">
+  <div class="empty" id="empty">还没有图片，先在上面粘贴 URL 吧～</div>
+</div>
+
+<div class="lightbox" id="lightbox">
+  <span class="close" id="lbClose">&times;</span>
+  <span class="nav prev" id="lbPrev">&#10094;</span>
+  <img id="lbImg" src="" alt="">
+  <span class="nav next" id="lbNext">&#10095;</span>
+  <div class="lb-cap" id="lbCap"></div>
+</div>
+
+<footer>Generated with 💤 by a lazy but smart whale girl.</footer>
+
+<script>
+  const DEMO = [
+    "https://static.fantopia.io/ticketimg/a7dcdc8d-5557-4c17-910a-ca81fbbb06af.png",
+    "https://static.fantopia.io/ticketimg/22bb99c7-1122-46b1-a0a2-8f1706829dc5.png",
+    "https://static.fantopia.io/app-upload004a70b6-cdb0-42e4-80ee-9435781a7eb5.jpg",
+    "https://static.fantopia.io/app-upload0195138e-e061-4046-8cb2-bdfa9ef9895b.jpg"
+  ];
+
+  const urlsEl = document.getElementById("urls");
+  const grid = document.getElementById("grid");
+  const empty = document.getElementById("empty");
+  const countEl = document.getElementById("count");
+  let images = [];
+
+  function parse(){
+    const raw = urlsEl.value;
+    // 用逗号、换行、空格、分号切分，再去空白与空项，并做简单 URL 校验
+    const parts = raw.split(/[\n,;]+|\s+/).map(s => s.trim()).filter(Boolean);
+    const urls = [];
+    const seen = new Set();
+    parts.forEach(p => {
+      // 容错：去掉可能被一起粘进来的引号
+      let u = p.replace(/^["']|["']$/g, "");
+      if (!/^https?:\/\//i.test(u)) return; // 只收 http(s) 链接
+      if (seen.has(u)) return;
+      seen.add(u);
+      urls.push(u);
+    });
+    return urls;
+  }
+
+  function render(){
+    const urls = parse();
+    images = urls;
+    countEl.textContent = "已识别 " + urls.length + " 张";
+    grid.innerHTML = "";
+    if (urls.length === 0){
+      grid.appendChild(empty);
+      empty.style.display = "block";
+      return;
+    }
+    urls.forEach((u, idx) => {
+      const card = document.createElement("div");
+      card.className = "card";
+      const name = u.split("/").pop().split("?")[0] || ("图 " + (idx+1));
+      card.innerHTML = `<img loading="lazy" src="${u}" alt="${name}" onerror="this.style.background='#ffcdd2';this.alt='加载失败';">
+        <div class="cap">${name}</div>`;
+      card.addEventListener("click", () => openLightbox(idx));
+      grid.appendChild(card);
+    });
+  }
+
+  // 灯箱
+  const lb = document.getElementById("lightbox");
+  const lbImg = document.getElementById("lbImg");
+  const lbCap = document.getElementById("lbCap");
+  let current = 0;
+  function openLightbox(idx){
+    if (!images.length) return;
+    current = idx; showLb();
+  }
+  function showLb(){
+    const u = images[current];
+    const name = u.split("/").pop().split("?")[0] || ("图 " + (current+1));
+    lbImg.src = u;
+    lbCap.textContent = name + "  (" + (current+1) + "/" + images.length + ")";
+    lb.classList.add("open");
+  }
+  function closeLb(){ lb.classList.remove("open"); }
+  function step(d){ current = (current + d + images.length) % images.length; showLb(); }
+
+  document.getElementById("gen").addEventListener("click", render);
+  document.getElementById("clear").addEventListener("click", () => { urlsEl.value=""; render(); });
+  document.getElementById("demo").addEventListener("click", () => { urlsEl.value = DEMO.join("\n"); render(); });
+
+  document.getElementById("lbClose").addEventListener("click", closeLb);
+  document.getElementById("lbPrev").addEventListener("click", () => step(-1));
+  document.getElementById("lbNext").addEventListener("click", () => step(1));
+  lb.addEventListener("click", e => { if (e.target === lb) closeLb(); });
+  document.addEventListener("keydown", e => {
+    if (!lb.classList.contains("open")) return;
+    if (e.key === "Escape") closeLb();
+    if (e.key === "ArrowLeft") step(-1);
+    if (e.key === "ArrowRight") step(1);
+  });
+
+  // 输入时实时显示识别数量
+  urlsEl.addEventListener("input", () => {
+    countEl.textContent = "已识别 " + parse().length + " 张";
+  });
+
+  render();
+</script>
+</body>
+</html>

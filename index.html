@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WhaleTool · 工具合辑</title>
+<meta name="description" content="一个轻量的在线工具合辑，纯前端、免安装、开箱即用。">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐳</text></svg>">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+
+<!-- ================= 顶部导航 ================= -->
+<nav class="nav">
+  <div class="nav-inner">
+    <a class="brand" href="./">
+      <span class="brand-mark">🐳</span>
+      <span class="brand-name">WhaleTool<small>工具合辑</small></span>
+    </a>
+    <span class="nav-spacer"></span>
+    <a class="nav-link" href="#howto">如何加工具</a>
+    <a class="nav-link" id="repoLink" href="#" target="_blank" rel="noopener">GitHub ↗</a>
+  </div>
+</nav>
+
+<!-- ================= Hero ================= -->
+<header class="hero">
+  <span class="hero-pill">✦ 纯前端 · 免安装 · 数据不出本地</span>
+  <h1>工具箱都在这儿了，<span class="grad">打开就能用</span></h1>
+  <p>不装客户端、不传服务器。<code style="font-size:13px;background:rgba(15,118,110,.09);color:#0b5d57;padding:2px 6px;border-radius:5px;">Cmd/Ctrl + D</code> 收藏一下，随时来找工具。</p>
+
+  <div class="search-wrap">
+    <span class="ico">🔍</span>
+    <input id="search" type="search" placeholder="搜工具名、描述或标签…" autocomplete="off" spellcheck="false">
+    <span class="kbd">/</span>
+  </div>
+</header>
+
+<!-- ================= 分类 ================= -->
+<div class="filters" id="filters"></div>
+
+<!-- ================= 工具网格 ================= -->
+<main class="main">
+  <div class="result-line">
+    <b id="resultCount">0 个工具</b>
+    <span id="resultHint"></span>
+  </div>
+  <div class="grid" id="grid"></div>
+</main>
+
+<!-- ================= 如何添加 ================= -->
+<section class="howto" id="howto">
+  <div class="howto-box">
+    <h3>🛠 怎么往这个合辑里加新工具？</h3>
+    <p>
+      1. 把工具页面丢进 <code>tools/</code> 目录（单个 HTML 文件就行，自包含最好）；<br>
+      2. 打开 <code>assets/tools.js</code>，在 <code>TOOLS</code> 数组里加一条记录：<br>
+      &nbsp;&nbsp;&nbsp;<code>{ id, name, desc, icon, href: "tools/xxx.html", tags: [], category, badge }</code><br>
+      3. 刷新页面即可，卡片、搜索、分类计数都会自动更新。
+    </p>
+  </div>
+</section>
+
+<footer class="footer">
+  <p>Built with <span class="heart">♥</span> by 小白 &amp; 小七 · 想加工具直接往 <code style="font-family:ui-monospace,monospace">tools.js</code> 里塞就行</p>
+</footer>
+
+<script src="assets/tools.js"></script>
+<script src="assets/app.js"></script>
+</body>
+</html>
