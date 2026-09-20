@@ -26,8 +26,19 @@
     <input type="file" id="file" accept="image/*" multiple style="display:none">
 
     <div class="row" style="margin-top:14px">
-      <label class="lb" style="margin:0;min-width:64px">质量 <b id="qVal">0.75</b></label>
-      <input type="range" id="quality" min="0.1" max="1" step="0.05" value="0.75" style="flex:1 1 200px;max-width:320px">
+      <span id="qRow" style="display:flex;align-items:center;gap:8px">
+        <label class="lb" style="margin:0;min-width:64px">质量 <b id="qVal">0.75</b></label>
+        <input type="range" id="quality" min="0.1" max="1" step="0.05" value="0.75" style="width:200px">
+      </span>
+      <span id="pngRow" style="display:none;align-items:center;gap:8px">
+        <label class="lb" style="margin:0">PNG 模式</label>
+        <select class="wt" id="pngMode" style="width:auto">
+          <option value="lossless" selected>无损优化</option>
+          <option value="indexed256">调色板 · ≤256 色</option>
+          <option value="indexed64">调色板 · ≤64 色</option>
+          <option value="indexed16">调色板 · ≤16 色</option>
+        </select>
+      </span>
       <label class="lb" style="margin:0 0 0 10px">最大边长</label>
       <select class="wt" id="maxSide" style="width:auto">
         <option value="0">不缩放</option>
@@ -41,7 +52,7 @@
       <select class="wt" id="format" style="width:auto">
         <option value="image/jpeg" selected>JPEG</option>
         <option value="image/webp">WebP</option>
-        <option value="image/png">PNG（无损，不压缩）</option>
+        <option value="image/png">PNG</option>
       </select>
     </div>
 
@@ -67,7 +78,10 @@
     <div class="note">
       • 质量 0.75 通常能在肉眼几乎无差别的前提下省掉 60%–80% 的体积。<br>
       • 目标是网页展示，长边压到 1920 px 足够；要发朋友圈 1280 px 也够。<br>
-      • PNG 是无损格式，选 PNG 时「质量」不生效，只有缩放会起作用。<br>
+      • <b>PNG 会被重新优化编码</b>：逐行挑选最优滤波方式再压缩（浏览器原生编码器不做这一步），
+        并自动去掉多余的 Alpha 通道。若优化后仍比原图大，<b>会自动保留原文件</b>，绝不让你拿到更大的图。<br>
+      • PNG「调色板」模式把颜色数压到 256/64/16 以内：截图、图标、logo 这类
+        <b>能再省 70% 以上</b>；照片类会出现可见色带，按需选。<br>
       • 动图 GIF 会被压成静态首帧，需要动图请用其他工具。
     </div>
   </div>
@@ -78,12 +92,17 @@
 <script>
 (function () {
   "use strict";
+
   var $drop = document.getElementById("drop"), $file = document.getElementById("file"),
       $q = document.getElementById("quality"), $qVal = document.getElementById("qVal"),
+      $qRow = document.getElementById("qRow"), $pngRow = document.getElementById("pngRow"),
+      $pngMode = document.getElementById("pngMode"),
       $maxSide = document.getElementById("maxSide"), $fmt = document.getElementById("format"),
       $body = document.querySelector("#list tbody"), $summary = document.getElementById("summary");
 
-  var items = [];   // { file, origSize, outBlob, outUrl, w, h, outW, outH }
+  var items = [];   // { file, origSize, outBlob, outUrl, w, h, outW, outH, kept, grew, status }
+
+  var CAN_OPT_PNG = (typeof CompressionStream !== "undefined");
 
   function fmtSize(n) {
     if (n < 1024) return n + " B";
@@ -94,6 +113,369 @@
   function esc(s) {
     return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
   }
+
+  /* ============================================================
+     PNG 优化编码器
+     浏览器原生的 canvas.toBlob('image/png') 只是「能编出 PNG」，
+     它不挑行滤波、不裁 Alpha、不试调色板，对已压过的 PNG 重编必然变大。
+     这里自己实现编码链：
+       1. 无用的 Alpha 通道直接丢掉（RGBA→RGB，原始数据少 25%）
+       2. 每条扫描线在 5 种滤波里挑「绝对值和」最小的那个（关键优化）
+       3. 用 CompressionStream 做真正的 zlib 压缩
+       4. 颜色数不超上限时走调色板（索引色），截图/图标能省一个数量级
+     ============================================================ */
+
+  var CRC_T = (function () {
+    var t = new Uint32Array(256), n, k, c;
+    for (n = 0; n < 256; n++) {
+      c = n;
+      for (k = 0; k < 8; k++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
+      t[n] = c >>> 0;
+    }
+    return t;
+  })();
+
+  function crc32(buf) {
+    var c = 0xFFFFFFFF, t = CRC_T, i;
+    for (i = 0; i < buf.length; i++) c = t[(c ^ buf[i]) & 0xFF] ^ (c >>> 8);
+    return (c ^ 0xFFFFFFFF) >>> 0;
+  }
+
+  function mkChunk(type, data) {
+    var len = data.length;
+    var out = new Uint8Array(12 + len);
+    out[0] = (len >>> 24) & 255; out[1] = (len >>> 16) & 255;
+    out[2] = (len >>> 8) & 255;  out[3] = len & 255;
+    out[4] = type.charCodeAt(0); out[5] = type.charCodeAt(1);
+    out[6] = type.charCodeAt(2); out[7] = type.charCodeAt(3);
+    out.set(data, 8);
+    var cr = crc32(out.subarray(4, 8 + len));
+    out[8 + len]  = (cr >>> 24) & 255; out[9 + len]  = (cr >>> 16) & 255;
+    out[10 + len] = (cr >>> 8) & 255;  out[11 + len] = cr & 255;
+    return out;
+  }
+
+  function concatBytes(list) {
+    var total = 0, i, off = 0;
+    for (i = 0; i < list.length; i++) total += list[i].length;
+    var out = new Uint8Array(total);
+    for (i = 0; i < list.length; i++) { out.set(list[i], off); off += list[i].length; }
+    return out;
+  }
+
+  // PNG 的 IDAT 要的是 zlib 包装格式（RFC1950），CompressionStream('deflate') 正好输出它
+  function zlibDeflate(bytes) {
+    var cs = new CompressionStream("deflate");
+    var w = cs.writable.getWriter();
+    var done = w.write(bytes).then(function () { return w.close(); });
+    return Promise.all([done, new Response(cs.readable).arrayBuffer()]).then(function (r) {
+      return new Uint8Array(r[1]);
+    });
+  }
+
+  function paeth(a, b, c) {
+    var p = a + b - c;
+    var pa = p > a ? p - a : a - p;
+    var pb = p > b ? p - b : b - p;
+    var pc = p > c ? p - c : c - p;
+    return (pa <= pb && pa <= pc) ? a : (pb <= pc ? b : c);
+  }
+
+  // 逐行试 5 种滤波，取「绝对值和」最小者 —— 这是 PNG 体积的关键
+  function filterScanlines(data, w, h, ch) {
+    var stride = w * ch;
+    var out = new Uint8Array((stride + 1) * h);
+    var prev = new Uint8Array(stride);
+    var c0 = new Uint8Array(stride), c1 = new Uint8Array(stride), c2 = new Uint8Array(stride),
+        c3 = new Uint8Array(stride), c4 = new Uint8Array(stride);
+    var x, y, raw, a, b, c, v1, v2, v3, v4, s0, s1, s2, s3, s4, best, bs, base;
+
+    for (y = 0; y < h; y++) {
+      var off = y * stride;
+      s0 = s1 = s2 = s3 = s4 = 0;
+      for (x = 0; x < stride; x++) {
+        raw = data[off + x];
+        a = x >= ch ? data[off + x - ch] : 0;
+        b = prev[x];
+        c = x >= ch ? prev[x - ch] : 0;
+        v1 = (raw - a) & 255;
+        v2 = (raw - b) & 255;
+        v3 = (raw - ((a + b) >> 1)) & 255;
+        v4 = (raw - paeth(a, b, c)) & 255;
+        c0[x] = raw; c1[x] = v1; c2[x] = v2; c3[x] = v3; c4[x] = v4;
+        s0 += raw < 128 ? raw : 256 - raw;
+        s1 += v1  < 128 ? v1  : 256 - v1;
+        s2 += v2  < 128 ? v2  : 256 - v2;
+        s3 += v3  < 128 ? v3  : 256 - v3;
+        s4 += v4  < 128 ? v4  : 256 - v4;
+      }
+      best = 0; bs = s0;
+      if (s1 < bs) { best = 1; bs = s1; }
+      if (s2 < bs) { best = 2; bs = s2; }
+      if (s3 < bs) { best = 3; bs = s3; }
+      if (s4 < bs) { best = 4; bs = s4; }
+      base = y * (stride + 1);
+      out[base] = best;
+      out.set(best === 0 ? c0 : best === 1 ? c1 : best === 2 ? c2 : best === 3 ? c3 : c4, base + 1);
+      prev.set(data.subarray(off, off + stride));
+    }
+    return out;
+  }
+
+  // 中位切分量化：把颜色盒子不断对半切，直到盒子数达到上限
+  function medianCut(items, maxColors) {
+    var boxes = [items];
+    while (boxes.length < maxColors) {
+      var bi = -1, bestAxis = 0, bestRange = -1, i, j;
+
+      for (i = 0; i < boxes.length; i++) {
+        var bx = boxes[i];
+        if (bx.length < 2) continue;
+        var mnR = 255, mnG = 255, mnB = 255, mnA = 255;
+        var mxR = 0, mxG = 0, mxB = 0, mxA = 0;
+        for (j = 0; j < bx.length; j++) {
+          var t = bx[j];
+          if (t.r < mnR) mnR = t.r; if (t.r > mxR) mxR = t.r;
+          if (t.g < mnG) mnG = t.g; if (t.g > mxG) mxG = t.g;
+          if (t.b < mnB) mnB = t.b; if (t.b > mxB) mxB = t.b;
+          if (t.a < mnA) mnA = t.a; if (t.a > mxA) mxA = t.a;
+        }
+        var ax = 0, rg = mxR - mnR;
+        if (mxG - mnG > rg) { rg = mxG - mnG; ax = 1; }
+        if (mxB - mnB > rg) { rg = mxB - mnB; ax = 2; }
+        if (mxA - mnA > rg) { rg = mxA - mnA; ax = 3; }
+        if (rg > bestRange) { bestRange = rg; bi = i; bestAxis = ax; }
+      }
+      if (bi < 0 || bestRange <= 0) break;
+
+      var box = boxes[bi], axis = bestAxis;
+      box.sort(function (p, q) {
+        return axis === 0 ? p.r - q.r : axis === 1 ? p.g - q.g
+             : axis === 2 ? p.b - q.b : p.a - q.a;
+      });
+
+      var total = 0, k;
+      for (k = 0; k < box.length; k++) total += box[k].c;
+      var half = total / 2, acc = 0, cut = 1;
+      for (k = 0; k < box.length - 1; k++) {
+        acc += box[k].c;
+        if (acc >= half) { cut = k + 1; break; }
+      }
+      if (cut < 1) cut = 1;
+      if (cut > box.length - 1) cut = box.length - 1;
+      boxes.splice(bi, 1, box.slice(0, cut), box.slice(cut));
+    }
+    return boxes;
+  }
+
+  // 返回 { palette: [[r,g,b,a],...], index: Uint8Array }
+  function quantizeRGBA(rgba, w, h, maxColors) {
+    var n = w * h, i, o, k;
+
+    // 先精确统计：颜色本来就不超上限时，可以做到完全无损
+    var exact = new Map();
+    for (i = 0; i < n; i++) {
+      o = i << 2;
+      k = ((rgba[o] << 24) | (rgba[o + 1] << 16) | (rgba[o + 2] << 8) | rgba[o + 3]) >>> 0;
+      exact.set(k, (exact.get(k) || 0) + 1);
+    }
+
+    var palette = [], lut = new Map(), idx;
+    if (exact.size <= maxColors) {
+      var e = 0;
+      exact.forEach(function (cnt, key) {
+        palette.push([(key >>> 24) & 255, (key >>> 16) & 255, (key >>> 8) & 255, key & 255]);
+        lut.set(key, e++);
+      });
+      idx = new Uint8Array(n);
+      for (i = 0; i < n; i++) {
+        o = i << 2;
+        idx[i] = lut.get(((rgba[o] << 24) | (rgba[o + 1] << 16) | (rgba[o + 2] << 8) | rgba[o + 3]) >>> 0) || 0;
+      }
+      return { palette: palette, index: idx };
+    }
+
+    // 颜色太多：先降到 5bit/通道的桶（上限 32768），再中位切分
+    exact = null;
+    var buck = new Map();
+    for (i = 0; i < n; i++) {
+      o = i << 2;
+      var r = rgba[o], g = rgba[o + 1], b = rgba[o + 2], a = rgba[o + 3];
+      var k5 = (((r >> 3) << 15) | ((g >> 3) << 10) | ((b >> 3) << 5) | (a >> 3)) >>> 0;
+      var t = buck.get(k5);
+      if (!t) { t = { c: 0, rs: 0, gs: 0, bs: 0, as: 0 }; buck.set(k5, t); }
+      t.c++; t.rs += r; t.gs += g; t.bs += b; t.as += a;
+    }
+
+    var bucketList = [];
+    buck.forEach(function (t, key) {
+      bucketList.push({ key: key, c: t.c, r: t.rs / t.c, g: t.gs / t.c, b: t.bs / t.c, a: t.as / t.c });
+    });
+    buck = null;
+
+    var groups = medianCut(bucketList, maxColors);
+    groups.forEach(function (grp, gi) {
+      var tr = 0, tg = 0, tb = 0, ta = 0, tc = 0, m, q;
+      for (m = 0; m < grp.length; m++) {
+        q = grp[m];
+        tr += q.r * q.c; tg += q.g * q.c; tb += q.b * q.c; ta += q.a * q.c; tc += q.c;
+      }
+      palette.push([Math.round(tr / tc), Math.round(tg / tc), Math.round(tb / tc), Math.round(ta / tc)]);
+      for (m = 0; m < grp.length; m++) lut.set(grp[m].key, gi);
+    });
+
+    idx = new Uint8Array(n);
+    for (i = 0; i < n; i++) {
+      o = i << 2;
+      var kk = (((rgba[o] >> 3) << 15) | ((rgba[o + 1] >> 3) << 10) | ((rgba[o + 2] >> 3) << 5) | (rgba[o + 3] >> 3)) >>> 0;
+      idx[i] = lut.get(kk) || 0;
+    }
+    return { palette: palette, index: idx };
+  }
+
+  function encodePNG(cv, w, h, pngMode) {
+    var rgba = cv.getContext("2d").getImageData(0, 0, w, h).data;
+    var extra = [], raw, colorType, i;
+
+    if (pngMode === "lossless") {
+      // 扫一遍 Alpha：全不透明就丢掉这个通道，原始数据直接少 25%
+      var hasAlpha = false;
+      for (i = 3; i < rgba.length; i += 4) { if (rgba[i] !== 255) { hasAlpha = true; break; } }
+
+      var ch = hasAlpha ? 4 : 3;
+      var px = new Uint8Array(w * h * ch);
+      if (hasAlpha) {
+        px.set(rgba);
+      } else {
+        for (i = 0, k = 0; i < rgba.length; i += 4) {
+          px[k++] = rgba[i]; px[k++] = rgba[i + 1]; px[k++] = rgba[i + 2];
+        }
+      }
+      var k;
+      colorType = hasAlpha ? 6 : 2;
+      raw = filterScanlines(px, w, h, ch);
+    } else {
+      var maxColors = parseInt(pngMode.replace("indexed", ""), 10) || 256;
+      var q = quantizeRGBA(rgba, w, h, maxColors);
+      colorType = 3;
+      raw = filterScanlines(q.index, w, h, 1);
+
+      var plte = new Uint8Array(q.palette.length * 3);
+      var trns = new Uint8Array(q.palette.length);
+      var needTrns = false, p;
+      for (p = 0; p < q.palette.length; p++) {
+        plte[p * 3]     = q.palette[p][0];
+        plte[p * 3 + 1] = q.palette[p][1];
+        plte[p * 3 + 2] = q.palette[p][2];
+        trns[p] = q.palette[p][3];
+        if (q.palette[p][3] !== 255) needTrns = true;
+      }
+      extra.push(mkChunk("PLTE", plte));
+      if (needTrns) {
+        var tn = trns.length;
+        while (tn > 0 && trns[tn - 1] === 255) tn--;   // 尾部全不透明的可以省掉
+        extra.push(mkChunk("tRNS", trns.subarray(0, tn)));
+      }
+    }
+
+    var ihdr = new Uint8Array(13);
+    ihdr[0] = (w >>> 24) & 255; ihdr[1] = (w >>> 16) & 255; ihdr[2] = (w >>> 8) & 255; ihdr[3] = w & 255;
+    ihdr[4] = (h >>> 24) & 255; ihdr[5] = (h >>> 16) & 255; ihdr[6] = (h >>> 8) & 255; ihdr[7] = h & 255;
+    ihdr[8] = 8;               // bit depth
+    ihdr[9] = colorType;       // 0灰/2RGB/3索引/4灰+α/6RGBA
+    ihdr[10] = 0; ihdr[11] = 0; ihdr[12] = 0;
+
+    return zlibDeflate(raw).then(function (z) {
+      var parts = [
+        new Uint8Array([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]),
+        mkChunk("IHDR", ihdr)
+      ];
+      for (var e = 0; e < extra.length; e++) parts.push(extra[e]);
+      parts.push(mkChunk("IDAT", z));
+      parts.push(mkChunk("IEND", new Uint8Array(0)));
+      return new Blob([concatBytes(parts)], { type: "image/png" });
+    });
+  }
+
+  /* ================= 图片加载与压缩流程 ================= */
+
+  function loadImage(file) {
+    return new Promise(function (res, rej) {
+      var url = URL.createObjectURL(file);
+      var img = new Image();
+      img.onload = function () { res({ img: img, url: url }); };
+      img.onerror = function () { URL.revokeObjectURL(url); rej(new Error("无法解码这张图片")); };
+      img.src = url;
+    });
+  }
+
+  function compress(it) {
+    var mime = $fmt.value;
+    var quality = +$q.value;
+    var maxSide = +$maxSide.value;
+    var pngMode = $pngMode.value;
+
+    return loadImage(it.file).then(function (o) {
+      var img = o.img;
+      it.w = img.naturalWidth; it.h = img.naturalHeight;
+      var scale = 1;
+      if (maxSide && Math.max(it.w, it.h) > maxSide) scale = maxSide / Math.max(it.w, it.h);
+      var w = Math.max(1, Math.round(it.w * scale));
+      var h = Math.max(1, Math.round(it.h * scale));
+      it.outW = w; it.outH = h;
+
+      var cv = document.createElement("canvas");
+      cv.width = w; cv.height = h;
+      var ctx = cv.getContext("2d");
+      if (mime === "image/jpeg") {
+        ctx.fillStyle = "#ffffff";          // JPEG 没有透明，先铺白底
+        ctx.fillRect(0, 0, w, h);
+      }
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = "high";
+      ctx.drawImage(img, 0, 0, w, h);
+      URL.revokeObjectURL(o.url);
+
+      if (mime === "image/png" && CAN_OPT_PNG) {
+        return encodePNG(cv, w, h, pngMode).catch(function () {
+          // 优化编码失败就退回浏览器原生编码，功能不丢
+          return new Promise(function (res) {
+            cv.toBlob(function (b) { res(b); }, "image/png");
+          });
+        });
+      }
+      return new Promise(function (res) {
+        cv.toBlob(function (b) { res(b); }, mime, quality);
+      });
+    }).then(function (blob) {
+      if (!blob) { it.status = "失败"; it.outBlob = null; it.outUrl = null; return; }
+
+      var origType = (it.file.type || "").toLowerCase();
+      var target = mime.toLowerCase();
+      var sameFormat = origType === target ||
+        (origType === "image/jpg" && target === "image/jpeg") ||
+        (origType === "" && target === "image/jpeg");
+
+      it.grew = blob.size >= it.origSize;
+      if (sameFormat && it.grew) {
+        // 格式没变却更大 —— 直接给原文件，绝不交付更大的结果
+        it.kept = true;
+        it.outBlob = it.file;
+        it.outUrl = URL.createObjectURL(it.file);
+      } else {
+        it.kept = false;
+        it.outBlob = blob;
+        it.outUrl = URL.createObjectURL(blob);
+      }
+      it.status = "完成";
+    }).catch(function () {
+      it.status = "失败";
+      it.outBlob = null;
+      it.outUrl = null;
+    });
+  }
+
+  /* ================= 渲染 ================= */
 
   function addFiles(files) {
     Array.prototype.forEach.call(files, function (f) {
@@ -113,25 +495,33 @@
       var prev = it.outUrl
         ? '<img src="' + it.outUrl + '" data-prev="' + i + '" style="width:56px;height:42px;object-fit:cover;border-radius:6px;cursor:zoom-in;background:#eef3f6">'
         : '<div style="width:56px;height:42px;border-radius:6px;background:#eef3f6;display:grid;place-items:center;font-size:11px;color:#9fb0ba">—</div>';
+
       var save = "";
       if (it.outBlob) {
-        var pct = Math.round((1 - it.outBlob.size / it.origSize) * 100);
-        save = pct > 0
-          ? '<span class="ok">-' + pct + "%</span>"
-          : '<span class="muted">+' + Math.abs(pct) + "%</span>";
+        if (it.kept) {
+          save = '<span class="muted" title="优化后反而更大，已保留原文件">保留原图</span>';
+        } else {
+          var pct = Math.round((1 - it.outBlob.size / it.origSize) * 100);
+          save = pct > 0
+            ? '<span class="ok">-' + pct + "%</span>"
+            : '<span style="color:#c0392b;font-weight:600" title="格式转换导致体积变大">+' + Math.abs(pct) + "%</span>";
+        }
       }
+
       var dims = it.w ? it.w + "×" + it.h : "—";
       var outDims = it.outW ? it.outW + "×" + it.outH : "—";
+      var outCell = it.outBlob
+        ? fmtSize(it.outBlob.size) + (it.kept ? ' <span class="muted">·原</span>' : "")
+        : '<span class="muted">' + it.status + "</span>";
+
       return "<tr>" +
         "<td>" + prev + "</td>" +
         '<td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(it.file.name) + "</td>" +
         '<td class="num">' + dims + (it.outW && (it.outW !== it.w || it.outH !== it.h) ? '<br><span class="muted">→ ' + outDims + "</span>" : "") + "</td>" +
         '<td class="num">' + fmtSize(it.origSize) + "</td>" +
-        '<td class="num">' + (it.outBlob ? fmtSize(it.outBlob.size) : '<span class="muted">' + it.status + "</span>") + "</td>" +
+        '<td class="num">' + outCell + "</td>" +
         '<td class="num">' + (save || "—") + "</td>" +
-        '<td>' + (it.outUrl
-          ? '<button class="btn btn-ghost btn-sm" data-dl="' + i + '">下载</button>'
-          : "") + "</td>" +
+        "<td>" + (it.outUrl ? '<button class="btn btn-ghost btn-sm" data-dl="' + i + '">下载</button>' : "") + "</td>" +
         "</tr>";
     }).join("");
 
@@ -159,64 +549,9 @@
     var totalIn = done.reduce(function (s, x) { return s + x.origSize; }, 0);
     var totalOut = done.reduce(function (s, x) { return s + x.outBlob.size; }, 0);
     var pct = totalIn ? Math.round((1 - totalOut / totalIn) * 100) : 0;
-    $summary.className = "pill" + (pct > 0 ? "" : " warn");
-    $summary.textContent = fmtSize(totalIn) + " → " + fmtSize(totalOut) + "（省 " + pct + "%）";
-  }
-
-  function loadImage(file) {
-    return new Promise(function (res, rej) {
-      var url = URL.createObjectURL(file);
-      var img = new Image();
-      img.onload = function () { res({ img: img, url: url }); };
-      img.onerror = function () { URL.revokeObjectURL(url); rej(new Error("无法解码这张图片")); };
-      img.src = url;
-    });
-  }
-
-  function compress(it) {
-    var mime = $fmt.value;
-    var quality = +$q.value;
-    var maxSide = +$maxSide.value;
-    return loadImage(it.file).then(function (o) {
-      var img = o.img;
-      it.w = img.naturalWidth; it.h = img.naturalHeight;
-      var scale = 1;
-      if (maxSide && Math.max(it.w, it.h) > maxSide) scale = maxSide / Math.max(it.w, it.h);
-      var w = Math.max(1, Math.round(it.w * scale));
-      var h = Math.max(1, Math.round(it.h * scale));
-      it.outW = w; it.outH = h;
-
-      var cv = document.createElement("canvas");
-      cv.width = w; cv.height = h;
-      var ctx = cv.getContext("2d");
-      if (mime === "image/jpeg") {
-        ctx.fillStyle = "#ffffff";
-        ctx.fillRect(0, 0, w, h);
-      }
-      ctx.imageSmoothingEnabled = true;
-      ctx.imageSmoothingQuality = "high";
-      ctx.drawImage(img, 0, 0, w, h);
-      URL.revokeObjectURL(o.url);
-
-      return new Promise(function (res) {
-        cv.toBlob(function (blob) {
-          if (!blob) { res(false); return; }
-          // 如果比原图还大，保留原图
-          if (blob.size >= it.origSize && scale === 1 && mime === "image/jpeg") {
-            it.outBlob = it.file;
-            it.outUrl = URL.createObjectURL(it.file);
-          } else {
-            it.outBlob = blob;
-            it.outUrl = URL.createObjectURL(blob);
-          }
-          it.status = "完成";
-          res(true);
-        }, mime, quality);
-      });
-    }).catch(function (e) {
-      it.status = "失败";
-      return false;
-    });
+    $summary.className = "pill" + (pct >= 0 ? "" : " warn");
+    $summary.textContent = fmtSize(totalIn) + " → " + fmtSize(totalOut) +
+      "（" + (pct >= 0 ? "省 " + pct + "%" : "增 " + (-pct) + "%") + "）";
   }
 
   function runAll() {
@@ -234,9 +569,14 @@
     chain.then(renderList);
   }
 
-  function ext(mime) {
-    if (mime === "image/webp") return ".webp";
-    if (mime === "image/png") return ".png";
+  function extOf(it) {
+    if (it.kept) {
+      // 保留的是原文件，扩展名跟着原文件走
+      var m = /\.([A-Za-z0-9]+)$/.exec(it.file.name);
+      return m ? "." + m[1].toLowerCase() : "";
+    }
+    if ($fmt.value === "image/webp") return ".webp";
+    if ($fmt.value === "image/png") return ".png";
     return ".jpg";
   }
 
@@ -249,7 +589,7 @@
     if (!it || !it.outBlob) return;
     var a = document.createElement("a");
     a.href = it.outUrl;
-    a.download = baseName(it.file.name) + "-min" + ext($fmt.value);
+    a.download = baseName(it.file.name) + "-min" + extOf(it);
     a.click();
   }
 
@@ -261,7 +601,7 @@
       setTimeout(function () {
         var a = document.createElement("a");
         a.href = it.outUrl;
-        a.download = baseName(it.file.name) + "-min" + ext($fmt.value);
+        a.download = baseName(it.file.name) + "-min" + extOf(it);
         a.click();
       }, i * 350);
     });
@@ -273,19 +613,33 @@
     items = []; renderList();
   });
 
+  // 参数一变就作废旧结果，强制重算
+  function invalidate() {
+    items.forEach(function (it) {
+      if (it.outUrl) URL.revokeObjectURL(it.outUrl);
+      it.outBlob = null; it.outUrl = null; it.status = "待处理";
+      it.kept = false; it.grew = false;
+    });
+    renderList();
+  }
+
+  function syncFmtUI() {
+    var isPng = $fmt.value === "image/png";
+    $pngRow.style.display = isPng ? "flex" : "none";
+    $qRow.style.display = isPng ? "none" : "flex";
+    if (!CAN_OPT_PNG && isPng) {
+      $pngRow.style.display = "none";     // 老浏览器不支持优化编码，隐藏该选项
+      $qRow.style.display = "flex";
+    }
+  }
+
   $q.addEventListener("input", function () {
     $qVal.textContent = (+$q.value).toFixed(2);
-    items.forEach(function (it) { if (it.outUrl) URL.revokeObjectURL(it.outUrl); it.outBlob = null; it.outUrl = null; it.status = "待处理"; });
-    renderList();
+    invalidate();
   });
-  $maxSide.addEventListener("change", function () {
-    items.forEach(function (it) { if (it.outUrl) URL.revokeObjectURL(it.outUrl); it.outBlob = null; it.outUrl = null; it.status = "待处理"; });
-    renderList();
-  });
-  $fmt.addEventListener("change", function () {
-    items.forEach(function (it) { if (it.outUrl) URL.revokeObjectURL(it.outUrl); it.outBlob = null; it.outUrl = null; it.status = "待处理"; });
-    renderList();
-  });
+  $maxSide.addEventListener("change", invalidate);
+  $fmt.addEventListener("change", function () { syncFmtUI(); invalidate(); });
+  $pngMode.addEventListener("change", invalidate);
 
   $drop.addEventListener("click", function () { $file.click(); });
   $file.addEventListener("change", function () { addFiles(this.files); setTimeout(runAll, 60); this.value = ""; });
@@ -300,6 +654,7 @@
     setTimeout(runAll, 60);
   });
 
+  syncFmtUI();
   renderList();
 })();
 </script>

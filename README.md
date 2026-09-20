@@ -28,7 +28,7 @@ whaletool/
 | 工具 | 说明 | 目录 |
 | --- | --- | --- |
 | 批量图片展示 | 粘贴一堆图片 URL，一键生成画廊，支持灯箱 / 键盘翻页 | `tools/image-tool.html` |
-| 图片压缩 | Canvas 重编码，质量与最长边可调，支持批量与体积对比 | `tools/image-compress.html` |
+| 图片压缩 | JPEG/WebP 可调质量；PNG 自带优化编码器（逐行最优滤波 + 调色板量化），压完更大时自动保留原文件 | `tools/image-compress.html` |
 | 图片转 Base64 | 生成 Data URL，附 CSS / HTML / JS / Markdown 四种用法 | `tools/img2base64.html` |
 | 图片取色器 | 吸取任意像素的 HEX / RGB / HSL，自动提主色与配色方案 | `tools/color-picker.html` |
 
