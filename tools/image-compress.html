@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>图片压缩 · WhaleTool</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐳</text></svg>">
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+
+<div class="wt-back"><a href="../">← 工具合辑</a></div>
+
+<div class="tool-head">
+  <h1>🗜 图片压缩</h1>
+  <p>纯本地压缩，图片不会上传到任何服务器。可调质量和最大边长，压缩前后体积实时对比。</p>
+</div>
+
+<div class="wrap">
+  <div class="panel">
+    <div class="drop" id="drop">
+      <div class="di">🖼</div>
+      <p>把图片拖到这里，或点击选择</p>
+      <small>支持 JPG / PNG / WebP / GIF，可一次选多张</small>
+    </div>
+    <input type="file" id="file" accept="image/*" multiple style="display:none">
+
+    <div class="row" style="margin-top:14px">
+      <label class="lb" style="margin:0;min-width:64px">质量 <b id="qVal">0.75</b></label>
+      <input type="range" id="quality" min="0.1" max="1" step="0.05" value="0.75" style="flex:1 1 200px;max-width:320px">
+      <label class="lb" style="margin:0 0 0 10px">最大边长</label>
+      <select class="wt" id="maxSide" style="width:auto">
+        <option value="0">不缩放</option>
+        <option value="3840">3840 px</option>
+        <option value="2560">2560 px</option>
+        <option value="1920" selected>1920 px</option>
+        <option value="1280">1280 px</option>
+        <option value="800">800 px</option>
+      </select>
+      <label class="lb" style="margin:0 0 0 10px">输出格式</label>
+      <select class="wt" id="format" style="width:auto">
+        <option value="image/jpeg" selected>JPEG</option>
+        <option value="image/webp">WebP</option>
+        <option value="image/png">PNG（无损，不压缩）</option>
+      </select>
+    </div>
+
+    <div class="row" style="margin-top:12px">
+      <button class="btn btn-primary" id="btnRun">开始压缩</button>
+      <button class="btn btn-ghost" id="btnDownloadAll">下载全部</button>
+      <button class="btn btn-ghost" id="btnClear">清空列表</button>
+      <span class="spacer"></span>
+      <span class="pill" id="summary">还没选择图片</span>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-title"><span>压缩结果</span><span class="hint">点缩略图可看大图</span></div>
+    <table class="wt" id="list">
+      <thead><tr><th style="width:64px">预览</th><th>文件名</th><th class="num">尺寸</th><th class="num">原体积</th><th class="num">压缩后</th><th class="num">节省</th><th style="width:86px"></th></tr></thead>
+      <tbody><tr><td colspan="7" class="muted">还没有图片。</td></tr></tbody>
+    </table>
+  </div>
+
+  <div class="panel">
+    <div class="panel-title"><span>说明</span></div>
+    <div class="note">
+      • 质量 0.75 通常能在肉眼几乎无差别的前提下省掉 60%–80% 的体积。<br>
+      • 目标是网页展示，长边压到 1920 px 足够；要发朋友圈 1280 px 也够。<br>
+      • PNG 是无损格式，选 PNG 时「质量」不生效，只有缩放会起作用。<br>
+      • 动图 GIF 会被压成静态首帧，需要动图请用其他工具。
+    </div>
+  </div>
+</div>
+
+<div class="tool-foot">图片始终留在你的设备上，不会上传 · <a href="../">返回工具合辑</a></div>
+
+<script>
+(function () {
+  "use strict";
+  var $drop = document.getElementById("drop"), $file = document.getElementById("file"),
+      $q = document.getElementById("quality"), $qVal = document.getElementById("qVal"),
+      $maxSide = document.getElementById("maxSide"), $fmt = document.getElementById("format"),
+      $body = document.querySelector("#list tbody"), $summary = document.getElementById("summary");
+
+  var items = [];   // { file, origSize, outBlob, outUrl, w, h, outW, outH }
+
+  function fmtSize(n) {
+    if (n < 1024) return n + " B";
+    if (n < 1048576) return (n / 1024).toFixed(1) + " KB";
+    return (n / 1048576).toFixed(2) + " MB";
+  }
+
+  function esc(s) {
+    return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  }
+
+  function addFiles(files) {
+    Array.prototype.forEach.call(files, function (f) {
+      if (!/^image\//.test(f.type)) return;
+      items.push({ file: f, origSize: f.size, status: "待处理" });
+    });
+    renderList();
+  }
+
+  function renderList() {
+    if (!items.length) {
+      $body.innerHTML = '<tr><td colspan="7" class="muted">还没有图片。</td></tr>';
+      $summary.className = "pill"; $summary.textContent = "还没选择图片";
+      return;
+    }
+    $body.innerHTML = items.map(function (it, i) {
+      var prev = it.outUrl
+        ? '<img src="' + it.outUrl + '" data-prev="' + i + '" style="width:56px;height:42px;object-fit:cover;border-radius:6px;cursor:zoom-in;background:#eef3f6">'
+        : '<div style="width:56px;height:42px;border-radius:6px;background:#eef3f6;display:grid;place-items:center;font-size:11px;color:#9fb0ba">—</div>';
+      var save = "";
+      if (it.outBlob) {
+        var pct = Math.round((1 - it.outBlob.size / it.origSize) * 100);
+        save = pct > 0
+          ? '<span class="ok">-' + pct + "%</span>"
+          : '<span class="muted">+' + Math.abs(pct) + "%</span>";
+      }
+      var dims = it.w ? it.w + "×" + it.h : "—";
+      var outDims = it.outW ? it.outW + "×" + it.outH : "—";
+      return "<tr>" +
+        "<td>" + prev + "</td>" +
+        '<td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(it.file.name) + "</td>" +
+        '<td class="num">' + dims + (it.outW && (it.outW !== it.w || it.outH !== it.h) ? '<br><span class="muted">→ ' + outDims + "</span>" : "") + "</td>" +
+        '<td class="num">' + fmtSize(it.origSize) + "</td>" +
+        '<td class="num">' + (it.outBlob ? fmtSize(it.outBlob.size) : '<span class="muted">' + it.status + "</span>") + "</td>" +
+        '<td class="num">' + (save || "—") + "</td>" +
+        '<td>' + (it.outUrl
+          ? '<button class="btn btn-ghost btn-sm" data-dl="' + i + '">下载</button>'
+          : "") + "</td>" +
+        "</tr>";
+    }).join("");
+
+    Array.prototype.forEach.call($body.querySelectorAll("[data-dl]"), function (b) {
+      b.addEventListener("click", function () { downloadOne(+this.dataset.dl); });
+    });
+    Array.prototype.forEach.call($body.querySelectorAll("[data-prev]"), function (img) {
+      img.addEventListener("click", function () {
+        var it = items[+this.dataset.prev];
+        var w = window.open("", "_blank");
+        if (w) {
+          w.document.write('<title>' + esc(it.file.name) + '</title><body style="margin:0;background:#1a1f24;display:grid;place-items:center;min-height:100vh"><img src="' + it.outUrl + '" style="max-width:96vw;max-height:96vh"></body>');
+        } else {
+          window.open(it.outUrl, "_blank");
+        }
+      });
+    });
+
+    var done = items.filter(function (x) { return x.outBlob; });
+    if (!done.length) {
+      $summary.className = "pill warn";
+      $summary.textContent = items.length + " 张待处理";
+      return;
+    }
+    var totalIn = done.reduce(function (s, x) { return s + x.origSize; }, 0);
+    var totalOut = done.reduce(function (s, x) { return s + x.outBlob.size; }, 0);
+    var pct = totalIn ? Math.round((1 - totalOut / totalIn) * 100) : 0;
+    $summary.className = "pill" + (pct > 0 ? "" : " warn");
+    $summary.textContent = fmtSize(totalIn) + " → " + fmtSize(totalOut) + "（省 " + pct + "%）";
+  }
+
+  function loadImage(file) {
+    return new Promise(function (res, rej) {
+      var url = URL.createObjectURL(file);
+      var img = new Image();
+      img.onload = function () { res({ img: img, url: url }); };
+      img.onerror = function () { URL.revokeObjectURL(url); rej(new Error("无法解码这张图片")); };
+      img.src = url;
+    });
+  }
+
+  function compress(it) {
+    var mime = $fmt.value;
+    var quality = +$q.value;
+    var maxSide = +$maxSide.value;
+    return loadImage(it.file).then(function (o) {
+      var img = o.img;
+      it.w = img.naturalWidth; it.h = img.naturalHeight;
+      var scale = 1;
+      if (maxSide && Math.max(it.w, it.h) > maxSide) scale = maxSide / Math.max(it.w, it.h);
+      var w = Math.max(1, Math.round(it.w * scale));
+      var h = Math.max(1, Math.round(it.h * scale));
+      it.outW = w; it.outH = h;
+
+      var cv = document.createElement("canvas");
+      cv.width = w; cv.height = h;
+      var ctx = cv.getContext("2d");
+      if (mime === "image/jpeg") {
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(0, 0, w, h);
+      }
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = "high";
+      ctx.drawImage(img, 0, 0, w, h);
+      URL.revokeObjectURL(o.url);
+
+      return new Promise(function (res) {
+        cv.toBlob(function (blob) {
+          if (!blob) { res(false); return; }
+          // 如果比原图还大，保留原图
+          if (blob.size >= it.origSize && scale === 1 && mime === "image/jpeg") {
+            it.outBlob = it.file;
+            it.outUrl = URL.createObjectURL(it.file);
+          } else {
+            it.outBlob = blob;
+            it.outUrl = URL.createObjectURL(blob);
+          }
+          it.status = "完成";
+          res(true);
+        }, mime, quality);
+      });
+    }).catch(function (e) {
+      it.status = "失败";
+      return false;
+    });
+  }
+
+  function runAll() {
+    var todo = items.filter(function (x) { return !x.outBlob; });
+    if (!todo.length) { renderList(); return; }
+    $summary.className = "pill"; $summary.textContent = "压缩中…";
+    var chain = Promise.resolve();
+    todo.forEach(function (it) {
+      chain = chain.then(function () {
+        it.status = "处理中";
+        // 逐个处理，避免同时解码太多大图把内存吃爆
+        return compress(it).then(function () { renderList(); });
+      });
+    });
+    chain.then(renderList);
+  }
+
+  function ext(mime) {
+    if (mime === "image/webp") return ".webp";
+    if (mime === "image/png") return ".png";
+    return ".jpg";
+  }
+
+  function baseName(n) {
+    return n.replace(/\.[^.]+$/, "");
+  }
+
+  function downloadOne(i) {
+    var it = items[i];
+    if (!it || !it.outBlob) return;
+    var a = document.createElement("a");
+    a.href = it.outUrl;
+    a.download = baseName(it.file.name) + "-min" + ext($fmt.value);
+    a.click();
+  }
+
+  document.getElementById("btnDownloadAll").addEventListener("click", function () {
+    var done = items.filter(function (x) { return x.outBlob; });
+    if (!done.length) { alert("还没有压缩完成的图片"); return; }
+    // 浏览器没有批量打包下载能力，这里串行触发下载
+    done.forEach(function (it, i) {
+      setTimeout(function () {
+        var a = document.createElement("a");
+        a.href = it.outUrl;
+        a.download = baseName(it.file.name) + "-min" + ext($fmt.value);
+        a.click();
+      }, i * 350);
+    });
+  });
+
+  document.getElementById("btnRun").addEventListener("click", runAll);
+  document.getElementById("btnClear").addEventListener("click", function () {
+    items.forEach(function (it) { if (it.outUrl) URL.revokeObjectURL(it.outUrl); });
+    items = []; renderList();
+  });
+
+  $q.addEventListener("input", function () {
+    $qVal.textContent = (+$q.value).toFixed(2);
+    items.forEach(function (it) { if (it.outUrl) URL.revokeObjectURL(it.outUrl); it.outBlob = null; it.outUrl = null; it.status = "待处理"; });
+    renderList();
+  });
+  $maxSide.addEventListener("change", function () {
+    items.forEach(function (it) { if (it.outUrl) URL.revokeObjectURL(it.outUrl); it.outBlob = null; it.outUrl = null; it.status = "待处理"; });
+    renderList();
+  });
+  $fmt.addEventListener("change", function () {
+    items.forEach(function (it) { if (it.outUrl) URL.revokeObjectURL(it.outUrl); it.outBlob = null; it.outUrl = null; it.status = "待处理"; });
+    renderList();
+  });
+
+  $drop.addEventListener("click", function () { $file.click(); });
+  $file.addEventListener("change", function () { addFiles(this.files); setTimeout(runAll, 60); this.value = ""; });
+  ["dragenter", "dragover"].forEach(function (ev) {
+    $drop.addEventListener(ev, function (e) { e.preventDefault(); $drop.classList.add("over"); });
+  });
+  ["dragleave", "drop"].forEach(function (ev) {
+    $drop.addEventListener(ev, function (e) { e.preventDefault(); $drop.classList.remove("over"); });
+  });
+  $drop.addEventListener("drop", function (e) {
+    addFiles(e.dataTransfer.files);
+    setTimeout(runAll, 60);
+  });
+
+  renderList();
+})();
+</script>
+</body>
+</html>

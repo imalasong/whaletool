@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>全屏时钟 · WhaleTool</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐳</text></svg>">
+<link rel="stylesheet" href="../assets/style.css">
+<style>
+  #stage {
+    background: #0d1418; border-radius: 20px; padding: 46px 24px;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    min-height: 340px; color: #eaf4f6; position: relative; overflow: hidden;
+    transition: background .3s;
+  }
+  #stage.light { background: #f7fafa; color: #0d1418; }
+  #clock { font-size: clamp(56px, 15vw, 168px); font-weight: 800; letter-spacing: -2px; line-height: 1; font-variant-numeric: tabular-nums; }
+  #clock .sec { font-size: .48em; color: #4dc9b0; margin-left: 6px; }
+  #stage.light #clock .sec { color: #0f766e; }
+  #dateLine { margin-top: 14px; font-size: 17px; opacity: .72; letter-spacing: 2px; }
+  #cdLine { margin-top: 22px; font-size: clamp(28px, 6vw, 56px); font-weight: 700; font-variant-numeric: tabular-nums; color: #ffb86b; display: none; }
+  #cdLine.on { display: block; }
+  #cdLine.alarm { animation: blink 1s steps(2) infinite; }
+  @keyframes blink { 50% { opacity: .25; } }
+  .ctl { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; justify-content: center; margin-top: 22px; }
+  .stage-btn {
+    background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.16); color: inherit;
+    font-family: inherit; font-size: 12.5px; padding: 7px 15px; border-radius: 999px; cursor: pointer;
+    transition: background .18s;
+  }
+  #stage.light .stage-btn { background: rgba(0,0,0,.05); border-color: rgba(0,0,0,.12); }
+  .stage-btn:hover { background: rgba(255,255,255,.18); }
+  #stage.light .stage-btn:hover { background: rgba(0,0,0,.1); }
+</style>
+</head>
+<body>
+
+<div class="wt-back"><a href="../">← 工具合辑</a></div>
+
+<div class="tool-head">
+  <h1>🕐 全屏时钟</h1>
+  <p>大字号时钟，带倒计时和番茄钟。适合桌面摆着看，也能当演讲计时器。</p>
+</div>
+
+<div class="wrap">
+  <div class="panel" style="padding:0;overflow:hidden">
+    <div id="stage">
+      <div id="clock">--:--</div>
+      <div id="dateLine">—</div>
+      <div id="cdLine"></div>
+      <div class="ctl">
+        <button class="stage-btn" id="btnFull">全屏</button>
+        <button class="stage-btn" id="btnTheme">浅色 / 深色</button>
+        <button class="stage-btn" id="btn24">24 小时制</button>
+        <button class="stage-btn" id="btnSec">显示秒</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid2">
+    <div class="panel">
+      <div class="panel-title"><span>倒计时</span><span class="spacer"></span>
+        <span class="pill" id="cdStatus">未启动</span></div>
+      <div class="row">
+        <label class="lb" style="margin:0">时</label>
+        <input class="wt" id="h" type="number" min="0" max="99" value="0" style="width:72px">
+        <label class="lb" style="margin:0 0 0 4px">分</label>
+        <input class="wt" id="m" type="number" min="0" max="59" value="25" style="width:72px">
+        <label class="lb" style="margin:0 0 0 4px">秒</label>
+        <input class="wt" id="s" type="number" min="0" max="59" value="0" style="width:72px">
+      </div>
+      <div class="row tight" style="margin-top:10px">
+        <button class="btn btn-primary btn-sm" id="btnStart">开始倒计时</button>
+        <button class="btn btn-ghost btn-sm" id="btnPause">暂停 / 继续</button>
+        <button class="btn btn-ghost btn-sm" id="btnStop">停止</button>
+      </div>
+      <div class="row tight" style="margin-top:12px">
+        <button class="btn btn-ghost btn-sm" data-preset="25:0">番茄 25 分</button>
+        <button class="btn btn-ghost btn-sm" data-preset="5:0">休息 5 分</button>
+        <button class="btn btn-ghost btn-sm" data-preset="45:0">专注 45 分</button>
+        <button class="btn btn-ghost btn-sm" data-preset="0:3">3 分钟</button>
+        <button class="btn btn-ghost btn-sm" data-preset="0:1">1 分钟</button>
+      </div>
+      <label class="lb" style="margin-top:14px;font-weight:500"><input type="checkbox" id="beep" checked> 结束时提示音</label>
+    </div>
+
+    <div class="panel">
+      <div class="panel-title"><span>番茄钟</span><span class="hint">自动轮换工作与休息</span></div>
+      <div class="stat-row">
+        <div class="stat"><div class="k">已完成番茄</div><div class="v" id="pomoCount">0</div></div>
+        <div class="stat"><div class="k">当前阶段</div><div class="v sm" id="pomoPhase">—</div></div>
+        <div class="stat"><div class="k">累计专注</div><div class="v sm" id="pomoTotal">0 分钟</div></div>
+      </div>
+      <div class="row" style="margin-top:14px">
+        <label class="lb" style="margin:0">工作</label>
+        <input class="wt" id="workMin" type="number" value="25" min="1" max="120" style="width:76px">
+        <label class="lb" style="margin:0 0 0 6px">休息</label>
+        <input class="wt" id="restMin" type="number" value="5" min="1" max="60" style="width:76px">
+      </div>
+      <div class="row" style="margin-top:12px">
+        <button class="btn btn-primary btn-sm" id="btnPomo">开始番茄钟</button>
+        <button class="btn btn-ghost btn-sm" id="btnPomoReset">重置计数</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-title"><span>北京时间与全球时区</span></div>
+    <table class="wt" id="zones">
+      <thead><tr><th>城市</th><th class="num">当前时间</th><th class="num">与本地时差</th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </div>
+</div>
+
+<div class="tool-foot">· <a href="../">返回工具合辑</a></div>
+
+<script>
+(function () {
+  "use strict";
+  var $clock = document.getElementById("clock"), $date = document.getElementById("dateLine"),
+      $cd = document.getElementById("cdLine"), $cdStatus = document.getElementById("cdStatus"),
+      $stage = document.getElementById("stage");
+  var use24 = true, showSec = true, light = false;
+
+  var ZONES = [
+    ["深圳 / 北京", "Asia/Shanghai"],
+    ["中国香港", "Asia/Hong_Kong"],
+    ["东京", "Asia/Tokyo"],
+    ["首尔", "Asia/Seoul"],
+    ["新加坡", "Asia/Singapore"],
+    ["伦敦", "Europe/London"],
+    ["纽约", "America/New_York"],
+    ["洛杉矶", "America/Los_Angeles"]
+  ];
+
+  function pad2(n) { return n < 10 ? "0" + n : "" + n; }
+
+  function renderClock() {
+    var d = new Date();
+    var h = d.getHours(), m = d.getMinutes(), s = d.getSeconds();
+    var hh;
+    if (use24) hh = pad2(h);
+    else { var ap = h < 12 ? "AM" : "PM"; var h12 = h % 12; if (h12 === 0) h12 = 12; hh = h12 + " " + ap; }
+    $clock.innerHTML = hh + ":" + pad2(m) + (showSec ? '<span class="sec">' + pad2(s) + "</span>" : "");
+
+    var WEEK = ["星期日", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六"];
+    $date.textContent = d.getFullYear() + " 年 " + (d.getMonth() + 1) + " 月 " + d.getDate() + " 日 · " + WEEK[d.getDay()];
+  }
+
+  function renderZones() {
+    var local = new Date();
+    var localOffsetMin = -local.getTimezoneOffset();
+    var rows = ZONES.map(function (z) {
+      var t;
+      try {
+        t = new Intl.DateTimeFormat("zh-CN", {
+          timeZone: z[1], hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false
+        }).format(new Date());
+      } catch (e) { t = "—"; }
+      var diff = "—";
+      try {
+        var parts = new Intl.DateTimeFormat("en-US", {
+          timeZone: z[1], timeZoneName: "shortOffset"
+        }).formatToParts(new Date());
+        var off = parts.filter(function (p) { return p.type === "timeZoneName"; })[0];
+        var m2 = /GMT([+-]?\d+)(?::(\d+))?/.exec(off ? off.value : "");
+        if (m2) {
+          var zoneMin = (+m2[1]) * 60 + (m2[1][0] === "-" ? -(+(m2[2] || 0)) : (+(m2[2] || 0)));
+          var delta = (zoneMin - localOffsetMin) / 60;
+          diff = delta === 0 ? "同本地" : (delta > 0 ? "+" : "") + (Math.round(delta * 10) / 10) + " 小时";
+        }
+      } catch (e) {}
+      return "<tr><td>" + z[0] + '</td><td class="num" style="font-weight:600">' + t + '</td><td class="num muted">' + diff + "</td></tr>";
+    });
+    document.querySelector("#zones tbody").innerHTML = rows.join("");
+  }
+
+  /* ---------------- 倒计时 ---------------- */
+  var cdEnd = 0, cdTimer = null, cdPaused = false, cdRemain = 0, cdActive = false;
+  var pomo = { phase: "", running: false, count: 0, totalMin: 0 };
+
+  function fmtCd(ms) {
+    if (ms < 0) ms = 0;
+    var t = Math.ceil(ms / 1000);
+    var h = Math.floor(t / 3600), m = Math.floor((t % 3600) / 60), s = t % 60;
+    return (h > 0 ? h + ":" + pad2(m) : pad2(m)) + ":" + pad2(s);
+  }
+
+  function tickCd() {
+    if (cdPaused) return;
+    var left = cdEnd - Date.now();
+    if (left <= 0) {
+      $cd.textContent = "00:00";
+      $cd.classList.add("alarm");
+      $cdStatus.className = "pill bad";
+      $cdStatus.textContent = "时间到";
+      cdActive = false;
+      if (document.getElementById("beep").checked) beep();
+      clearInterval(cdTimer); cdTimer = null;
+      if (pomo.running) nextPomoPhase();
+      return;
+    }
+    $cd.textContent = fmtCd(left);
+    $cdStatus.className = "pill";
+    $cdStatus.textContent = "倒计时中";
+  }
+
+  var audioCtx = null;
+  function beep() {
+    try {
+      if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      [0, 0.35, 0.7].forEach(function (delay) {
+        var osc = audioCtx.createOscillator(), gain = audioCtx.createGain();
+        osc.type = "sine";
+        osc.frequency.value = 880;
+        gain.gain.setValueAtTime(0.0001, audioCtx.currentTime + delay);
+        gain.gain.exponentialRampToValueAtTime(0.25, audioCtx.currentTime + delay + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + delay + 0.25);
+        osc.connect(gain); gain.connect(audioCtx.destination);
+        osc.start(audioCtx.currentTime + delay);
+        osc.stop(audioCtx.currentTime + delay + 0.3);
+      });
+    } catch (e) {}
+    // 标题闪烁提醒
+    var orig = document.title, n = 0;
+    var t = setInterval(function () {
+      document.title = n % 2 ? "⏰ 时间到！" : orig;
+      if (++n > 12) { clearInterval(t); document.title = orig; }
+    }, 700);
+  }
+
+  function startCd(ms) {
+    cdEnd = Date.now() + ms;
+    cdRemain = ms;
+    cdPaused = false;
+    cdActive = true;
+    $cd.classList.add("on");
+    $cd.classList.remove("alarm");
+    if (cdTimer) clearInterval(cdTimer);
+    tickCd();
+    cdTimer = setInterval(tickCd, 200);
+  }
+
+  function nextPomoPhase() {
+    if (pomo.phase === "work") {
+      pomo.count++;
+      pomo.totalMin += (+document.getElementById("workMin").value || 25);
+      renderPomo();
+      setTimeout(function () {
+        pomo.phase = "rest";
+        renderPomo();
+        startCd((+document.getElementById("restMin").value || 5) * 60000);
+      }, 1400);
+    } else {
+      setTimeout(function () {
+        pomo.phase = "work";
+        renderPomo();
+        startCd((+document.getElementById("workMin").value || 25) * 60000);
+      }, 1400);
+    }
+  }
+
+  function renderPomo() {
+    document.getElementById("pomoCount").textContent = pomo.count;
+    document.getElementById("pomoPhase").textContent =
+      pomo.phase === "work" ? "专注中 🍅" : (pomo.phase === "rest" ? "休息中 ☕" : "—");
+    document.getElementById("pomoTotal").textContent = pomo.totalMin + " 分钟";
+  }
+
+  document.getElementById("btnStart").addEventListener("click", function () {
+    pomo.running = false; pomo.phase = "";
+    renderPomo();
+    var h = +document.getElementById("h").value || 0;
+    var m = +document.getElementById("m").value || 0;
+    var s = +document.getElementById("s").value || 0;
+    var ms = (h * 3600 + m * 60 + s) * 1000;
+    if (ms <= 0) { alert("请设置一个大于 0 的时间"); return; }
+    startCd(ms);
+  });
+
+  document.getElementById("btnPause").addEventListener("click", function () {
+    if (!cdActive && !cdTimer) return;
+    cdPaused = !cdPaused;
+    if (cdPaused) {
+      cdRemain = cdEnd - Date.now();
+      $cdStatus.className = "pill warn";
+      $cdStatus.textContent = "已暂停";
+    } else {
+      cdEnd = Date.now() + cdRemain;
+      $cdStatus.className = "pill";
+      $cdStatus.textContent = "倒计时中";
+    }
+  });
+
+  document.getElementById("btnStop").addEventListener("click", function () {
+    if (cdTimer) clearInterval(cdTimer);
+    cdTimer = null; cdActive = false; cdPaused = false;
+    pomo.running = false; pomo.phase = "";
+    $cd.classList.remove("on", "alarm");
+    $cd.textContent = "";
+    $cdStatus.className = "pill";
+    $cdStatus.textContent = "未启动";
+    renderPomo();
+  });
+
+  Array.prototype.forEach.call(document.querySelectorAll("[data-preset]"), function (b) {
+    b.addEventListener("click", function () {
+      var p = this.dataset.preset.split(":");
+      document.getElementById("m").value = p[0];
+      document.getElementById("s").value = p[1];
+      document.getElementById("h").value = 0;
+      document.getElementById("btnStart").click();
+    });
+  });
+
+  document.getElementById("btnPomo").addEventListener("click", function () {
+    pomo.running = true;
+    pomo.phase = "work";
+    renderPomo();
+    startCd((+document.getElementById("workMin").value || 25) * 60000);
+  });
+
+  document.getElementById("btnPomoReset").addEventListener("click", function () {
+    pomo.count = 0; pomo.totalMin = 0; renderPomo();
+  });
+
+  /* ---------------- 显示控制 ---------------- */
+  document.getElementById("btnFull").addEventListener("click", function () {
+    var el = $stage;
+    if (!document.fullscreenElement) {
+      (el.requestFullscreen || el.webkitRequestFullscreen || function () {}).call(el);
+    } else {
+      (document.exitFullscreen || document.webkitExitFullscreen || function () {}).call(document);
+    }
+  });
+
+  document.getElementById("btnTheme").addEventListener("click", function () {
+    light = !light;
+    $stage.classList.toggle("light", light);
+  });
+
+  document.getElementById("btn24").addEventListener("click", function () {
+    use24 = !use24;
+    this.textContent = use24 ? "24 小时制" : "12 小时制";
+    renderClock();
+  });
+
+  document.getElementById("btnSec").addEventListener("click", function () {
+    showSec = !showSec;
+    this.textContent = showSec ? "显示秒" : "隐藏秒";
+    renderClock();
+  });
+
+  renderClock();
+  renderZones();
+  setInterval(renderClock, 500);
+  setInterval(renderZones, 10000);
+})();
+</script>
+</body>
+</html>

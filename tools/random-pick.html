@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>随机抽签 · WhaleTool</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐳</text></svg>">
+<link rel="stylesheet" href="../assets/style.css">
+<style>
+  .winner { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; }
+  .win-card {
+    background: linear-gradient(140deg, rgba(15,118,110,.1), rgba(8,145,178,.1));
+    border: 1.5px solid rgba(15,118,110,.25); border-radius: 14px;
+    padding: 18px 14px; text-align: center; font-size: 17px; font-weight: 700;
+    color: var(--primary-ink); animation: pop .4s cubic-bezier(.2,.8,.3,1.2) backwards;
+  }
+  @keyframes pop { from { opacity:0; transform: scale(.75); } to { opacity:1; transform: scale(1); } }
+  .roll { font-size: 30px; font-weight: 800; text-align: center; color: var(--primary); letter-spacing: 1px; min-height: 44px; }
+  .pool-item { display:inline-flex; align-items:center; gap:6px; }
+  .pool-item.done { opacity: .38; }
+</style>
+</head>
+<body>
+
+<div class="wt-back"><a href="../">← 工具合辑</a></div>
+
+<div class="tool-head">
+  <h1>🎯 随机抽签</h1>
+  <p>一行一个候选项，随机抽 N 个。支持「抽过的不再抽」模式，用来排班、分组、决定顺序都行。</p>
+</div>
+
+<div class="wrap">
+  <div class="grid2">
+    <div class="panel">
+      <div class="panel-title"><span>候选项</span><span class="hint">一行一个</span>
+        <span class="spacer"></span>
+        <span class="pill" id="poolInfo">0 项</span></div>
+      <textarea class="wt mono" id="pool" style="min-height:250px" spellcheck="false" placeholder="小七&#10;小白&#10;老王&#10;大鹏"></textarea>
+      <div class="row" style="margin-top:12px">
+        <button class="btn btn-ghost btn-sm" id="btnShuffle">打乱顺序</button>
+        <button class="btn btn-ghost btn-sm" id="btnSample">示例</button>
+        <button class="btn btn-ghost btn-sm" id="btnClear">清空</button>
+        <button class="btn btn-ghost btn-sm" id="btnReset">重置抽签历史</button>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-title"><span>抽签设置</span></div>
+      <div class="row">
+        <label class="lb" style="margin:0">每次抽</label>
+        <input class="wt" id="count" type="number" value="1" min="1" style="width:88px">
+        <span class="muted" style="font-size:12.5px">个</span>
+      </div>
+      <div class="row" style="margin-top:10px">
+        <label class="lb" style="margin:0;font-weight:500"><input type="checkbox" id="noRepeat"> 抽过的就不再抽（无放回）</label>
+      </div>
+      <div class="row" style="margin-top:10px">
+        <label class="lb" style="margin:0;font-weight:500"><input type="checkbox" id="dedupe" checked> 自动去重、忽略空行</label>
+      </div>
+
+      <div class="row" style="margin-top:16px;justify-content:center">
+        <button class="btn btn-primary" id="btnDraw" style="font-size:15px;padding:13px 34px">🎲 抽 一 次</button>
+      </div>
+
+      <div class="roll" id="roll"></div>
+
+      <div class="stat-row" style="margin-top:14px">
+        <div class="stat"><div class="k">剩余可抽</div><div class="v" id="sLeft">—</div></div>
+        <div class="stat"><div class="k">已抽中</div><div class="v" id="sDone">0</div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-title"><span>抽签结果</span><span class="spacer"></span>
+      <button class="btn btn-ghost btn-sm" id="btnCopyR">复制结果</button></div>
+    <div class="winner" id="winners"><span class="muted" style="font-size:13px">还没抽过。</span></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-title"><span>候选池状态</span><span class="hint">灰色表示已抽中</span></div>
+    <div class="row tight" id="poolView"><span class="muted" style="font-size:13px">—</span></div>
+  </div>
+</div>
+
+<div class="tool-foot">随机数由浏览器加密随机源生成 · <a href="../">返回工具合辑</a></div>
+
+<script>
+(function () {
+  "use strict";
+  var $pool = document.getElementById("pool"), $poolInfo = document.getElementById("poolInfo"),
+      $poolView = document.getElementById("poolView"), $winners = document.getElementById("winners"),
+      $roll = document.getElementById("roll"), $count = document.getElementById("count"),
+      $noRepeat = document.getElementById("noRepeat"), $dedupe = document.getElementById("dedupe"),
+      $sLeft = document.getElementById("sLeft"), $sDone = document.getElementById("sDone");
+
+  var drawn = [];       // 已抽中的项
+  var results = [];     // 历史结果（每次一行）
+
+  function poolItems() {
+    var lines = $pool.value.split("\n");
+    var arr = lines.map(function (l) { return l.trim(); });
+    if ($dedupe.checked) {
+      arr = arr.filter(function (x) { return x.length; });
+      var seen = {};
+      arr = arr.filter(function (x) { if (seen[x]) return false; seen[x] = 1; return true; });
+    } else {
+      arr = arr.filter(function (x) { return x.length; });
+    }
+    return arr;
+  }
+
+  function esc(s) {
+    return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  }
+
+  function rnd(max) {
+    var a = new Uint32Array(1);
+    crypto.getRandomValues(a);
+    return a[0] % max;
+  }
+
+  function render() {
+    var items = poolItems();
+    $poolInfo.textContent = items.length + " 项";
+    var available = $noRepeat.checked
+      ? items.filter(function (x) { return drawn.indexOf(x) < 0; })
+      : items;
+    $sLeft.textContent = available.length;
+    $sDone.textContent = drawn.length;
+
+    $poolView.innerHTML = items.length
+      ? items.map(function (x) {
+          var d = drawn.indexOf(x) >= 0;
+          return '<span class="tag pool-item' + (d ? " done" : "") + '">' + (d ? "✓ " : "") + esc(x) + "</span>";
+        }).join("")
+      : '<span class="muted" style="font-size:13px">候选项是空的。</span>';
+
+    $winners.innerHTML = results.length
+      ? results.map(function (row, ri) {
+          return row.map(function (w, wi) {
+            return '<div class="win-card" style="animation-delay:' + (ri * 40 + wi * 70) + 'ms">' + esc(w) + "</div>";
+          }).join("");
+        }).join("")
+      : '<span class="muted" style="font-size:13px">还没抽过。</span>';
+  }
+
+  function draw() {
+    var items = poolItems();
+    if (!items.length) { $roll.textContent = "先填候选项"; return; }
+    var available = $noRepeat.checked
+      ? items.filter(function (x) { return drawn.indexOf(x) < 0; })
+      : items.slice();
+    if (!available.length) {
+      $roll.textContent = "都抽完了，点「重置抽签历史」";
+      return;
+    }
+
+    var n = Math.max(1, Math.min(+$count.value || 1, available.length));
+    var picked = [];
+    for (var i = 0; i < n; i++) {
+      var idx = rnd(available.length);
+      picked.push(available[idx]);
+      available.splice(idx, 1);
+    }
+
+    // 滚动动画
+    var tick = 0;
+    var timer = setInterval(function () {
+      var show = items[rnd(items.length)];
+      $roll.textContent = show;
+      if (++tick > 11) {
+        clearInterval(timer);
+        $roll.textContent = picked.join("  ·  ");
+        if ($noRepeat.checked) picked.forEach(function (p) { if (drawn.indexOf(p) < 0) drawn.push(p); });
+        results.unshift(picked);
+        render();
+      }
+    }, 55);
+  }
+
+  document.getElementById("btnDraw").addEventListener("click", draw);
+
+  document.getElementById("btnReset").addEventListener("click", function () {
+    drawn = []; results = []; $roll.textContent = ""; render();
+  });
+
+  document.getElementById("btnClear").addEventListener("click", function () {
+    $pool.value = ""; drawn = []; results = []; $roll.textContent = ""; render();
+  });
+
+  document.getElementById("btnShuffle").addEventListener("click", function () {
+    var items = poolItems();
+    for (var i = items.length - 1; i > 0; i--) {
+      var j = rnd(i + 1);
+      var t = items[i]; items[i] = items[j]; items[j] = t;
+    }
+    $pool.value = items.join("\n");
+    render();
+  });
+
+  document.getElementById("btnSample").addEventListener("click", function () {
+    $pool.value = ["小七", "小白", "老王", "大鹏", "阿珍", "阿强", "思思", "阿豪"].join("\n");
+    drawn = []; results = []; render();
+  });
+
+  document.getElementById("btnCopyR").addEventListener("click", function () {
+    if (!results.length) return;
+    var text = results.map(function (row, i) {
+      return "第 " + (results.length - i) + " 次：" + row.join("、");
+    }).reverse().join("\n");
+    var btn = this, old = btn.textContent;
+    var done = function () { btn.textContent = "已复制 ✓"; setTimeout(function () { btn.textContent = old; }, 1400); };
+    if (navigator.clipboard && location.protocol !== "file:") {
+      navigator.clipboard.writeText(text).then(done, function () { fb(text, done); });
+    } else { fb(text, done); }
+    function fb(v, cb) {
+      var ta = document.createElement("textarea");
+      ta.value = v; ta.style.position = "fixed"; ta.style.opacity = "0";
+      document.body.appendChild(ta); ta.select();
+      try { document.execCommand("copy"); cb(); } catch (e) {}
+      document.body.removeChild(ta);
+    }
+  });
+
+  $pool.addEventListener("input", function () { drawn = []; render(); });
+  $noRepeat.addEventListener("change", function () { drawn = []; render(); });
+  $dedupe.addEventListener("change", render);
+
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); draw(); }
+  });
+
+  $pool.value = ["小七", "小白", "老王", "大鹏", "阿珍", "阿强"].join("\n");
+  render();
+})();
+</script>
+</body>
+</html>

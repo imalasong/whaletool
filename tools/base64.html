@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Base64 编解码 · WhaleTool</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐳</text></svg>">
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+
+<div class="wt-back"><a href="../">← 工具合辑</a></div>
+
+<div class="tool-head">
+  <h1>🧬 Base64 编解码</h1>
+  <p>文本与 Base64 互转，中文按 UTF-8 正确处理。可切 URL-safe 变体（换掉 +/ 和去掉 =），也能直接生成 Data URL。</p>
+</div>
+
+<div class="wrap">
+  <div class="grid2">
+    <div class="panel">
+      <div class="panel-title"><span>输入</span><span class="spacer"></span>
+        <span class="pill" id="inInfo">0 字符</span></div>
+      <textarea class="wt mono" id="input" placeholder="要编码的文本，或要解码的 Base64…" spellcheck="false" style="min-height:230px"></textarea>
+    </div>
+    <div class="panel">
+      <div class="panel-title"><span>输出</span><span class="spacer"></span>
+        <span class="pill" id="outInfo">0 字符</span></div>
+      <textarea class="wt mono" id="output" readonly placeholder="结果会出现在这里…" spellcheck="false" style="min-height:230px"></textarea>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-title"><span>操作</span></div>
+    <div class="row">
+      <button class="btn btn-primary" id="btnEnc">编码 →</button>
+      <button class="btn btn-primary" id="btnDec">← 解码</button>
+      <button class="btn btn-ghost" id="btnSwap">结果转输入</button>
+      <button class="btn btn-ghost" id="btnCopy">复制结果</button>
+    </div>
+    <div class="row" style="margin-top:12px">
+      <label class="lb" style="margin:0"><input type="checkbox" id="urlSafe"> URL-safe（+ → -，/ → _，去掉 =）</label>
+      <label class="lb" style="margin:0 0 0 14px"><input type="checkbox" id="wrap"> 每 76 字符换行</label>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-title"><span>体积对照</span></div>
+    <div class="stat-row" id="stats">
+      <div class="stat"><div class="k">原始字节</div><div class="v" id="sRaw">—</div></div>
+      <div class="stat"><div class="k">Base64 长度</div><div class="v" id="sB64">—</div></div>
+      <div class="stat"><div class="k">膨胀率</div><div class="v" id="sGrow">—</div></div>
+    </div>
+    <div class="note" style="margin-top:12px">
+      Base64 用 4 个字符表示 3 字节，理论上体积会增加约 <b>33%</b>。图片转 Base64 内联进 HTML 会让页面变大，小图才划算。
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-title"><span>Data URL 生成</span><span class="hint">把 Base64 包成可直接放到 src 里的形式</span></div>
+    <div class="row">
+      <select class="wt" id="mime" style="width:auto">
+        <option value="text/plain">text/plain</option>
+        <option value="application/json">application/json</option>
+        <option value="text/html">text/html</option>
+        <option value="image/png">image/png</option>
+        <option value="image/jpeg">image/jpeg</option>
+        <option value="image/svg+xml">image/svg+xml</option>
+        <option value="application/octet-stream">application/octet-stream</option>
+      </select>
+      <button class="btn btn-ghost btn-sm" id="btnDataUrl">生成 Data URL</button>
+    </div>
+    <div class="out" id="dataurl" style="margin-top:12px;max-height:180px"></div>
+  </div>
+</div>
+
+<div class="tool-foot">编解码全部在浏览器本地进行 · <a href="../">返回工具合辑</a></div>
+
+<script>
+(function () {
+  "use strict";
+  var $in = document.getElementById("input"), $out = document.getElementById("output"),
+      $inInfo = document.getElementById("inInfo"), $outInfo = document.getElementById("outInfo"),
+      $us = document.getElementById("urlSafe"), $wrap = document.getElementById("wrap"),
+      $du = document.getElementById("dataurl");
+
+  function bytesOf(str) { return new TextEncoder().encode(str); }
+
+  function toB64(bytes) {
+    var bin = "";
+    for (var i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+    return btoa(bin);
+  }
+
+  function fromB64(b64) {
+    var bin = atob(b64);
+    var arr = new Uint8Array(bin.length);
+    for (var i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+    return new TextDecoder("utf-8", { fatal: false }).decode(arr);
+  }
+
+  function applyVariant(s) {
+    var t = s;
+    if ($us.checked) t = t.replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+    if ($wrap.checked) t = t.replace(/(.{76})/g, "$1\n").trim();
+    return t;
+  }
+
+  function setOut(text) {
+    $out.value = text;
+    $outInfo.textContent = text.length + " 字符";
+  }
+
+  function stat(rawLen) {
+    var b64 = $out.value.replace(/\s/g, "").length;
+    $sRaw.textContent = fmt(rawLen);
+    $sB64.textContent = b64 + " 字符";
+    $sGrow.textContent = rawLen ? "+" + Math.round((b64 / rawLen - 1) * 100) + "%" : "—";
+  }
+
+  function fmt(n) {
+    if (n < 1024) return n + " B";
+    if (n < 1048576) return (n / 1024).toFixed(1) + " KB";
+    return (n / 1048576).toFixed(2) + " MB";
+  }
+
+  var $sRaw = document.getElementById("sRaw"), $sB64 = document.getElementById("sB64"),
+      $sGrow = document.getElementById("sGrow");
+
+  function enc() {
+    var v = $in.value;
+    try {
+      var b = bytesOf(v);
+      setOut(applyVariant(toB64(b)));
+      stat(b.length);
+    } catch (e) {
+      setOut("❌ 编码失败：" + e.message);
+    }
+  }
+
+  function dec() {
+    var v = $in.value.replace(/\s/g, "");
+    try {
+      var t = v.replace(/-/g, "+").replace(/_/g, "/");
+      while (t.length % 4) t += "=";
+      var r = fromB64(t);
+      setOut(r);
+      stat(bytesOf(r).length);
+    } catch (e) {
+      setOut("❌ 解码失败：不是合法的 Base64 内容。原始错误：" + e.message);
+      $sRaw.textContent = $sB64.textContent = $sGrow.textContent = "—";
+    }
+  }
+
+  document.getElementById("btnEnc").addEventListener("click", enc);
+  document.getElementById("btnDec").addEventListener("click", dec);
+
+  document.getElementById("btnSwap").addEventListener("click", function () {
+    $in.value = $out.value;
+    $inInfo.textContent = $in.value.length + " 字符";
+    setOut("");
+  });
+
+  document.getElementById("btnCopy").addEventListener("click", function () {
+    if (!$out.value) return;
+    var btn = this, old = btn.textContent, text = $out.value;
+    var done = function () { btn.textContent = "已复制 ✓"; setTimeout(function () { btn.textContent = old; }, 1400); };
+    if (navigator.clipboard && location.protocol !== "file:") {
+      navigator.clipboard.writeText(text).then(done, function () { fb(text, done); });
+    } else { fb(text, done); }
+    function fb(v, cb) {
+      var ta = document.createElement("textarea");
+      ta.value = v; ta.style.position = "fixed"; ta.style.opacity = "0";
+      document.body.appendChild(ta); ta.select();
+      try { document.execCommand("copy"); cb(); } catch (e) {}
+      document.body.removeChild(ta);
+    }
+  });
+
+  document.getElementById("btnDataUrl").addEventListener("click", function () {
+    var b = $out.value.replace(/\s/g, "");
+    if (!b) { $du.textContent = "先在右边生成 Base64，再点这里。"; return; }
+    if (/^[A-Za-z0-9+/_-]+={0,2}$/.test(b)) {
+      $du.textContent = "data:" + document.getElementById("mime").value + ";base64," + b;
+    } else {
+      $du.textContent = "data:" + document.getElementById("mime").value + ";base64," + toB64(bytesOf($out.value));
+    }
+  });
+
+  $in.addEventListener("input", function () {
+    $inInfo.textContent = $in.value.length + " 字符";
+  });
+  $us.addEventListener("change", function () { if ($out.value) enc(); });
+  $wrap.addEventListener("change", function () { if ($out.value) enc(); });
+
+  $in.value = "WhaleTool 工具合辑 —— 中文测试";
+  enc();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>字数统计 · WhaleTool</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐳</text></svg>">
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+
+<div class="wt-back"><a href="../">← 工具合辑</a></div>
+
+<div class="tool-head">
+  <h1>🔢 字数统计</h1>
+  <p>中文字数、英文词数、字符数、行数一次算清，附阅读时长与朗读时长预估。</p>
+</div>
+
+<div class="wrap">
+  <div class="grid2">
+    <div class="panel">
+      <div class="panel-title"><span>文本</span><span class="spacer"></span>
+        <button class="btn btn-ghost btn-sm" id="btnPaste">从剪贴板粘贴</button>
+        <button class="btn btn-ghost btn-sm" id="btnClear">清空</button></div>
+      <textarea class="wt" id="text" style="min-height:400px" spellcheck="false" placeholder="把要统计的文本粘进来…"></textarea>
+    </div>
+
+    <div class="panel">
+      <div class="panel-title"><span>统计结果</span></div>
+      <div class="stat-row">
+        <div class="stat"><div class="k">总字符数（含空格）</div><div class="v" id="sTotal">0</div></div>
+        <div class="stat"><div class="k">字符数（不含空格）</div><div class="v" id="sNoSpace">0</div></div>
+        <div class="stat"><div class="k">中文字数</div><div class="v" id="sCn">0</div></div>
+        <div class="stat"><div class="k">英文词数</div><div class="v" id="sEn">0</div></div>
+        <div class="stat"><div class="k">数字个数</div><div class="v" id="sNum">0</div></div>
+        <div class="stat"><div class="k">标点符号</div><div class="v" id="sPunct">0</div></div>
+        <div class="stat"><div class="k">行数</div><div class="v" id="sLines">0</div></div>
+        <div class="stat"><div class="k">段落数</div><div class="v" id="sPara">0</div></div>
+        <div class="stat"><div class="k">预估阅读时长</div><div class="v sm" id="sRead">—</div></div>
+        <div class="stat"><div class="k">预估朗读时长</div><div class="v sm" id="sSpeak">—</div></div>
+      </div>
+      <div class="note" style="margin-top:14px">
+        阅读按中文 <b>400 字/分钟</b>、英文 <b>230 词/分钟</b>估算；朗读按中文 <b>250 字/分钟</b>、英文 <b>150 词/分钟</b>估算。实际会因内容难度浮动。
+      </div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-title"><span>高频词</span><span class="hint">英文单词 Top 20，忽略常见停用词</span></div>
+    <div id="topWords" class="row tight"><span class="muted" style="font-size:13px">输入文本后显示。</span></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-title"><span>字数口径对照</span><span class="hint">不同平台算法不一样，投稿前对一下</span></div>
+    <table class="wt">
+      <thead><tr><th>平台 / 场景</th><th>统计口径</th><th class="num">本文对应</th></tr></thead>
+      <tbody id="ruleBody"><tr><td colspan="3" class="muted">—</td></tr></tbody>
+    </table>
+  </div>
+</div>
+
+<div class="tool-foot">统计在浏览器本地完成 · <a href="../">返回工具合辑</a></div>
+
+<script>
+(function () {
+  "use strict";
+  var $t = document.getElementById("text"), $top = document.getElementById("topWords");
+
+  var STOP = ["the","a","an","and","or","but","if","of","at","by","for","with","about","against","between",
+    "into","through","during","before","after","above","below","to","from","up","down","in","out","on","off",
+    "over","under","again","further","then","once","here","there","when","where","why","how","all","any",
+    "both","each","few","more","most","other","some","such","no","nor","not","only","own","same","so",
+    "than","too","very","can","will","just","should","now","is","are","was","were","be","been","being",
+    "have","has","had","do","does","did","it","its","this","that","these","those","i","you","he","she",
+    "we","they","them","his","her","our","their","what","which","who","whom","as"];
+
+  function humanTime(mins) {
+    if (mins < 1 / 60) return "不到 1 秒";
+    if (mins < 1) return Math.round(mins * 60) + " 秒";
+    if (mins < 60) return Math.round(mins * 10) / 10 + " 分钟";
+    var h = Math.floor(mins / 60), m = Math.round(mins % 60);
+    return h + " 小时 " + m + " 分";
+  }
+
+  function run() {
+    var s = $t.value;
+
+    var total = [...s].length;
+    var noSpace = s.replace(/\s/g, "").length;
+    var cn = (s.match(/[\u4e00-\u9fa5]/g) || []).length;
+    var enWords = (s.match(/[a-zA-Z]+(?:['-][a-zA-Z]+)*/g) || []);
+    var nums = (s.match(/\d+(?:\.\d+)?/g) || []);
+    var punct = (s.match(/[，。！？、；：""''（）《》【】,.!?;:'"()\[\]{}<>—…\-_/\\@#$%^&*+=|~`]/g) || []).length;
+    var lines = s ? s.split("\n").length : 0;
+    var paras = s.trim() ? s.split(/\n\s*\n/).filter(function (p) { return p.trim(); }).length : 0;
+
+    document.getElementById("sTotal").textContent = total.toLocaleString();
+    document.getElementById("sNoSpace").textContent = noSpace.toLocaleString();
+    document.getElementById("sCn").textContent = cn.toLocaleString();
+    document.getElementById("sEn").textContent = enWords.length.toLocaleString();
+    document.getElementById("sNum").textContent = nums.length.toLocaleString();
+    document.getElementById("sPunct").textContent = punct.toLocaleString();
+    document.getElementById("sLines").textContent = lines.toLocaleString();
+    document.getElementById("sPara").textContent = paras.toLocaleString();
+
+    var readMin = cn / 400 + enWords.length / 230;
+    var speakMin = cn / 250 + enWords.length / 150;
+    document.getElementById("sRead").textContent = total ? humanTime(readMin) : "—";
+    document.getElementById("sSpeak").textContent = total ? humanTime(speakMin) : "—";
+
+    // 高频词
+    var freq = {};
+    enWords.forEach(function (w) {
+      var k = w.toLowerCase();
+      if (k.length < 3 || STOP.indexOf(k) >= 0) return;
+      freq[k] = (freq[k] || 0) + 1;
+    });
+    var top = Object.keys(freq).map(function (k) { return { w: k, n: freq[k] }; })
+      .sort(function (a, b) { return b.n - a.n || a.w.localeCompare(b.w); }).slice(0, 20);
+    $top.innerHTML = top.length
+      ? top.map(function (x) { return '<span class="tag" style="font-size:12px;padding:5px 11px">' + x.w + " · " + x.n + "</span>"; }).join("")
+      : '<span class="muted" style="font-size:13px">没有足够的英文词可统计。</span>';
+
+    // 口径对照
+    var rows = [
+      ["微信公众号", "汉字 + 数字 + 字母数（不含标点空格）", cn + enWords.length + nums.length],
+      ["小红书笔记", "全部字符（含标点空格）", total],
+      ["微博", "汉字算 1，英文按字符算", cn + enWords.join("").length],
+      ["知乎回答", "通常显示「字数」= 不含空格字符数", noSpace],
+      ["英文论文", "单词数（Word count）", enWords.length],
+      ["翻译报价", "中文按汉字数，英文按词数", cn + " 字 / " + enWords.length + " 词"]
+    ];
+    document.getElementById("ruleBody").innerHTML = rows.map(function (r) {
+      return "<tr><td>" + r[0] + "</td><td>" + r[1] + '</td><td class="num" style="font-weight:600">' +
+        (typeof r[2] === "number" ? r[2].toLocaleString() : r[2]) + "</td></tr>";
+    }).join("");
+  }
+
+  $t.addEventListener("input", run);
+
+  document.getElementById("btnClear").addEventListener("click", function () { $t.value = ""; run(); });
+
+  document.getElementById("btnPaste").addEventListener("click", function () {
+    if (navigator.clipboard && navigator.clipboard.readText) {
+      navigator.clipboard.readText().then(function (txt) {
+        $t.value = ($t.value ? $t.value + "\n" : "") + txt;
+        run();
+      }, function () { $t.focus(); alert("读不到剪贴板，请手动 Cmd/Ctrl + V 粘贴"); });
+    } else {
+      $t.focus();
+      alert("当前环境不支持读取剪贴板，请手动粘贴");
+    }
+  });
+
+  run();
+})();
+</script>
+</body>
+</html>

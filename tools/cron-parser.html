@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cron 表达式解析 · WhaleTool</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐳</text></svg>">
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+
+<div class="wt-back"><a href="../">← 工具合辑</a></div>
+
+<div class="tool-head">
+  <h1>⏰ Cron 表达式解析</h1>
+  <p>5 位（标准）和 6 位（带秒）都能解。给出人话翻译、字段拆解，以及从此刻起的未来 10 次执行时间。</p>
+</div>
+
+<div class="wrap">
+  <div class="panel">
+    <div class="panel-title"><span>表达式</span><span class="spacer"></span><span class="pill" id="status">—</span></div>
+    <div class="row">
+      <input class="wt mono" id="expr" value="0 9 * * 1-5" style="flex:1 1 260px" autocomplete="off" spellcheck="false">
+      <select class="wt" id="mode" style="width:auto">
+        <option value="auto">自动判断位数</option>
+        <option value="5">5 位（分 时 日 月 周）</option>
+        <option value="6">6 位（秒 分 时 日 月 周）</option>
+      </select>
+      <button class="btn btn-primary" id="btnRun">解析</button>
+    </div>
+    <div class="row tight" style="margin-top:12px" id="presets"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-title"><span>人话翻译</span></div>
+    <div class="out" id="human" style="font-family:inherit;font-size:14px"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-title"><span>字段拆解</span></div>
+    <table class="wt" id="fields">
+      <thead><tr><th>字段</th><th>值</th><th>含义</th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </div>
+
+  <div class="panel">
+    <div class="panel-title">
+      <span>未来 10 次执行</span>
+      <span class="hint">按浏览器本地时区计算</span>
+      <span class="spacer"></span>
+      <span class="pill" id="tzPill">—</span>
+    </div>
+    <table class="wt" id="next">
+      <thead><tr><th class="num">#</th><th>时间</th><th>距今</th><th>星期</th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </div>
+
+  <div class="panel">
+    <div class="panel-title"><span>字段取值范围</span></div>
+    <div class="grid3" id="ranges"></div>
+  </div>
+</div>
+
+<div class="tool-foot">解析在浏览器本地完成 · <a href="../">返回工具合辑</a></div>
+
+<script>
+(function () {
+  "use strict";
+  var $expr = document.getElementById("expr"), $mode = document.getElementById("mode"),
+      $st = document.getElementById("status"), $human = document.getElementById("human"),
+      $fields = document.querySelector("#fields tbody"),
+      $next = document.querySelector("#next tbody"),
+      $ranges = document.getElementById("ranges"),
+      $tzPill = document.getElementById("tzPill");
+
+  var NAMES = {
+    month: ["一月","二月","三月","四月","五月","六月","七月","八月","九月","十月","十一月","十二月"],
+    dow:   ["周日","周一","周二","周三","周四","周五","周六"]
+  };
+
+  var SPECS5 = [
+    { key: "min",   label: "分钟", min: 0, max: 59 },
+    { key: "hour",  label: "小时", min: 0, max: 23 },
+    { key: "dom",   label: "日",   min: 1, max: 31 },
+    { key: "month", label: "月",   min: 1, max: 12 },
+    { key: "dow",   label: "星期", min: 0, max: 7 }
+  ];
+  var SPECS6 = [{ key: "sec", label: "秒", min: 0, max: 59 }].concat(SPECS5);
+
+  /* 支持: *  a  a-b  a-b/s  */n  a,b,c  a/n */
+  function parseField(raw, spec) {
+    var text = raw.trim();
+    var step = 1, body = text;
+    var slash = text.indexOf("/");
+    if (slash >= 0) {
+      body = text.slice(0, slash);
+      var s = text.slice(slash + 1);
+      if (!/^\d+$/.test(s) || +s < 1) throw "步长「" + s + "」不合法";
+      step = +s;
+    }
+
+    var out = [], i;
+    if (body === "*" || body === "") {
+      for (i = spec.min; i <= spec.max; i += step) out.push(i);
+    } else {
+      var parts = body.split(",");
+      for (var p = 0; p < parts.length; p++) {
+        var seg = parts[p].trim();
+        if (!seg) continue;
+        var rng = seg.split("-");
+        if (rng.length === 2) {
+          var a = +rng[0], b = +rng[1];
+          if (isNaN(a) || isNaN(b)) throw "范围「" + seg + "」不合法";
+          if (a > b) { var t = a; a = b; b = t; }
+          for (i = a; i <= b; i += step) out.push(i);
+        } else if (rng.length === 1) {
+          if (!/^\d+$/.test(rng[0])) throw "「" + seg + "」不是数字";
+          var v = +rng[0];
+          for (i = v; i <= (step > 1 ? spec.max : v); i += step) out.push(i);
+        } else {
+          throw "「" + seg + "」格式不对";
+        }
+      }
+    }
+
+    out = out.filter(function (n) { return n >= spec.min && n <= spec.max; });
+    out = out.filter(function (n, idx, arr) { return arr.indexOf(n) === idx; });
+    out.sort(function (a, b) { return a - b; });
+    if (!out.length) throw spec.label + " 字段没有合法取值";
+    return out;
+  }
+
+  function rangeText(vals, spec) {
+    if (vals.length === spec.max - spec.min + 1) return "每" + spec.label;
+    if (spec.key === "dow" || spec.key === "month") {
+      var nameArr = spec.key === "dow" ? NAMES.dow : NAMES.month;
+      return vals.map(function (v) { return nameArr[spec.key === "dow" ? v % 7 : v - 1]; }).join("、");
+    }
+    return vals.map(function (v) {
+      return spec.key === "dom" ? v + " 号" : v;
+    }).join("、");
+  }
+
+  function isEvery(vals, spec) { return vals.length === spec.max - spec.min + 1; }
+
+  function humanize(f) {
+    var parts = [];
+    var s = f.sec, m = f.min, h = f.hour, dom = f.dom, mon = f.month, dow = f.dow;
+
+    var when = "";
+    if (isEvery(m, SPECS5[0]) && isEvery(h, SPECS5[1])) when = "每分钟";
+    else if (isEvery(h, SPECS5[1])) when = "每小时的第 " + m.join("、") + " 分";
+    else if (m.length === 1 && h.length === 1) when = h[0] + ":" + (m[0] < 10 ? "0" + m[0] : m[0]);
+    else if (m.length === 1) when = h.join("、") + " 点的第 " + m[0] + " 分";
+    else when = h.join("、") + " 点 的 " + m.join("、") + " 分";
+
+    if (s) {
+      if (isEvery(s, SPECS6[0])) when = "每" + when.replace(/^每/, "");
+      else when = when + " " + s.join("、") + " 秒";
+    }
+
+    var day = "";
+    if (!isEvery(dom, SPECS5[2])) day += "每月 " + dom.join("、") + " 号";
+    if (!isEvery(dow, SPECS5[4])) {
+      var dw = dow.map(function (v) { return NAMES.dow[v % 7]; }).join("、");
+      day += (day ? "，且" : "") + dw;
+    }
+    if (day) day += " 时";
+
+    var mon = "";
+    if (!isEvery(mon, SPECS5[3])) mon = mon + NAMES.month[mon[0] - 1] + (mon.length > 1 ? "等月" : "");
+
+    var base = (day ? day + " " : "每") + (mon ? mon + " " : "") + when;
+    return "每" + base.replace(/^每/, "").replace(/^个/, "");
+  }
+
+  function pad2(n) { return n < 10 ? "0" + n : "" + n; }
+
+  function nextRuns(f, count) {
+    var out = [];
+    var d = new Date();
+    d.setMilliseconds(0);
+    if (f.sec) d.setSeconds(d.getSeconds()); else d.setSeconds(0);
+    d.setTime(d.getTime() + 1000);
+
+    var limit = 366 * 24 * 60 * 60;  // 最多往后扫一年（按秒）
+    var guard = 0;
+    var maxGuard = f.sec ? 32000000 : 600000;
+
+    while (out.length < count && guard++ < maxGuard) {
+      var ok = true;
+      if (f.sec && f.sec.indexOf(d.getSeconds()) < 0) ok = false;
+      if (ok && f.min.indexOf(d.getMinutes()) < 0) ok = false;
+      if (ok && f.hour.indexOf(d.getHours()) < 0) ok = false;
+      if (ok && f.month.indexOf(d.getMonth() + 1) < 0) ok = false;
+
+      if (ok) {
+        var domOk = f.dom.indexOf(d.getDate()) >= 0;
+        var dowOk = f.dow.indexOf(d.getDay()) >= 0 || (d.getDay() === 0 && f.dow.indexOf(7) >= 0);
+        // 标准 cron：两个都受限时取「或」
+        var domEvery = isEvery(f.dom, SPECS5[2]);
+        var dowEvery = isEvery(f.dow, SPECS5[4]);
+        if (domEvery && dowEvery) ok = true;
+        else if (domEvery) ok = dowOk;
+        else if (dowEvery) ok = domOk;
+        else ok = domOk || dowOk;
+      }
+
+      if (ok) {
+        out.push(new Date(d.getTime()));
+        // 步进提速：命中后至少跳到下一秒
+        d.setTime(d.getTime() + 1000);
+      } else {
+        // 智能跳跃，避免逐秒硬扫
+        if (f.sec && f.sec.indexOf(d.getSeconds()) < 0) {
+          d.setTime(d.getTime() + 1000);
+        } else if (f.min.indexOf(d.getMinutes()) < 0) {
+          d.setTime(d.getTime() + 60000);
+          d.setSeconds(0);
+        } else if (f.hour.indexOf(d.getHours()) < 0) {
+          d.setTime(d.getTime() + 3600000);
+          d.setMinutes(0); d.setSeconds(0);
+        } else {
+          d.setTime(d.getTime() + 3600000);
+          d.setMinutes(0); d.setSeconds(0);
+        }
+      }
+    }
+    return out;
+  }
+
+  function rel(d) {
+    var diff = d.getTime() - Date.now();
+    var abs = Math.abs(diff);
+    if (abs < 60000) return Math.round(abs / 1000) + " 秒后";
+    if (abs < 3600000) return Math.round(abs / 60000) + " 分钟后";
+    if (abs < 86400000) return (abs / 3600000).toFixed(1) + " 小时后";
+    return (abs / 86400000).toFixed(1) + " 天后";
+  }
+
+  var WEEK = ["周日","周一","周二","周三","周四","周五","周六"];
+
+  function fail(msg) {
+    $st.className = "pill bad";
+    $st.textContent = "解析失败";
+    $human.textContent = "❌ " + msg;
+    $fields.innerHTML = "";
+    $next.innerHTML = '<tr><td colspan="4" class="muted">—</td></tr>';
+  }
+
+  function run() {
+    var text = $expr.value.trim().replace(/\s+/g, " ");
+    if (!text) { fail("表达式是空的"); return; }
+    var segs = text.split(" ");
+    var specs;
+    if ($mode.value === "5") specs = SPECS5;
+    else if ($mode.value === "6") specs = SPECS6;
+    else specs = segs.length === 6 ? SPECS6 : SPECS5;
+
+    if (segs.length !== specs.length) {
+      fail("字段数不对：按 " + specs.length + " 位解析，但收到 " + segs.length + " 个字段（" + text + "）");
+      return;
+    }
+
+    var f = {}, i;
+    try {
+      for (i = 0; i < specs.length; i++) {
+        f[specs[i].key] = parseField(segs[i], specs[i]);
+      }
+    } catch (e) {
+      fail(typeof e === "string" ? e : "字段解析出错");
+      return;
+    }
+
+    if (!f.sec) f.sec = null;
+
+    var hz = f.hour;
+    var hint = "";
+    if (isEvery(f.min, SPECS5[0]) && !isEvery(hz, SPECS5[1])) hint = "（每小时都会跑，注意频率）";
+
+    $st.className = "pill";
+    $st.textContent = specs.length + " 位 · 合法";
+
+    $human.textContent = humanize(f) + (hint ? "\n" + hint : "");
+
+    var rows = "";
+    var labels = [["sec","秒"],["min","分钟"],["hour","小时"],["dom","日"],["month","月"],["dow","星期"]];
+    labels.forEach(function (lb) {
+      var key = lb[0], spec = null;
+      for (i = 0; i < specs.length; i++) if (specs[i].key === key) spec = specs[i];
+      if (!spec) return;
+      var vals = f[key];
+      rows += "<tr><td>" + lb[1] + "</td><td class=\"mono\">" + segs[specs.indexOf(spec)] +
+        "</td><td>" + rangeText(vals, spec) + "</td></tr>";
+    });
+    $fields.innerHTML = rows;
+
+    var runs = nextRuns(f, 10);
+    if (!runs.length) {
+      $next.innerHTML = '<tr><td colspan="4" class="muted">未来一年内没有匹配的执行时间，检查一下表达式。</td></tr>';
+    } else {
+      $next.innerHTML = runs.map(function (d, idx) {
+        var ds = d.getFullYear() + "-" + pad2(d.getMonth() + 1) + "-" + pad2(d.getDate()) +
+          " " + pad2(d.getHours()) + ":" + pad2(d.getMinutes()) + ":" + pad2(d.getSeconds());
+        return '<tr><td class="num">' + (idx + 1) + "</td><td>" + ds +
+          "</td><td>" + rel(d) + "</td><td>" + WEEK[d.getDay()] + "</td></tr>";
+      }).join("");
+    }
+
+    try {
+      $tzPill.textContent = Intl.DateTimeFormat().resolvedOptions().timeZone || "本地时区";
+    } catch (e) { $tzPill.textContent = "本地时区"; }
+  }
+
+  var RANGES = [
+    ["秒", "0-59", "6 位表达式的第一位"],
+    ["分钟", "0-59", "*/5 表示每 5 分钟"],
+    ["小时", "0-23", "9-18 表示 9 点到 18 点"],
+    ["日", "1-31", "L 表示最后一天（部分平台）"],
+    ["月", "1-12", "1=一月，也可用 JAN"],
+    ["星期", "0-7", "0 和 7 都是周日，1=周一"]
+  ];
+  $ranges.innerHTML = RANGES.map(function (r) {
+    return '<div class="stat"><div class="k">' + r[0] + "</div><div class=\"v sm\">" + r[1] +
+      '</div><div class="k" style="margin-top:4px">' + r[2] + "</div></div>";
+  }).join("");
+
+  var PRESETS = [
+    ["每分钟", "* * * * *"],
+    ["每小时整点", "0 * * * *"],
+    ["每天 9 点", "0 9 * * *"],
+    ["工作日 9 点", "0 9 * * 1-5"],
+    ["每 5 分钟", "*/5 * * * *"],
+    ["每 30 秒（6 位）", "*/30 * * * * *"],
+    ["每月 1 号 0 点", "0 0 1 * *"],
+    ["每周一 8:30", "30 8 * * 1"],
+    ["每季度首日", "0 0 1 1,4,7,10 *"]
+  ];
+  var $presets = document.getElementById("presets");
+  PRESETS.forEach(function (p) {
+    var b = document.createElement("button");
+    b.className = "btn btn-ghost btn-sm";
+    b.textContent = p[0];
+    b.addEventListener("click", function () { $expr.value = p[1]; run(); });
+    $presets.appendChild(b);
+  });
+
+  $expr.addEventListener("input", run);
+  $mode.addEventListener("change", run);
+  document.getElementById("btnRun").addEventListener("click", run);
+
+  run();
+})();
+</script>
+</body>
+</html>

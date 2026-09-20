@@ -18,7 +18,6 @@
       <span class="brand-name">WhaleTool<small>工具合辑</small></span>
     </a>
     <span class="nav-spacer"></span>
-    <a class="nav-link" href="#howto">如何加工具</a>
     <a class="nav-link" id="repoLink" href="#" target="_blank" rel="noopener">GitHub ↗</a>
   </div>
 </nav>
@@ -27,7 +26,7 @@
 <header class="hero">
   <span class="hero-pill">✦ 纯前端 · 免安装 · 数据不出本地</span>
   <h1>工具箱都在这儿了，<span class="grad">打开就能用</span></h1>
-  <p>不装客户端、不传服务器。<code style="font-size:13px;background:rgba(15,118,110,.09);color:#0b5d57;padding:2px 6px;border-radius:5px;">Cmd/Ctrl + D</code> 收藏一下，随时来找工具。</p>
+  <p>不装客户端、不传服务器。所有计算都在浏览器本地完成，关掉网页什么都不留。</p>
 
   <div class="search-wrap">
     <span class="ico">🔍</span>
@@ -44,25 +43,21 @@
   <div class="result-line">
     <b id="resultCount">0 个工具</b>
     <span id="resultHint"></span>
+    <span class="sort-wrap">
+      <select id="sort" aria-label="排序方式">
+        <option value="default">默认排序</option>
+        <option value="pop">最常用</option>
+        <option value="new">最新上线</option>
+        <option value="name">按名称</option>
+      </select>
+    </span>
   </div>
   <div class="grid" id="grid"></div>
 </main>
 
-<!-- ================= 如何添加 ================= -->
-<section class="howto" id="howto">
-  <div class="howto-box">
-    <h3>🛠 怎么往这个合辑里加新工具？</h3>
-    <p>
-      1. 把工具页面丢进 <code>tools/</code> 目录（单个 HTML 文件就行，自包含最好）；<br>
-      2. 打开 <code>assets/tools.js</code>，在 <code>TOOLS</code> 数组里加一条记录：<br>
-      &nbsp;&nbsp;&nbsp;<code>{ id, name, desc, icon, href: "tools/xxx.html", tags: [], category, badge }</code><br>
-      3. 刷新页面即可，卡片、搜索、分类计数都会自动更新。
-    </p>
-  </div>
-</section>
-
 <footer class="footer">
-  <p>Built with <span class="heart">♥</span> by 小白 &amp; 小七 · 想加工具直接往 <code style="font-family:ui-monospace,monospace">tools.js</code> 里塞就行</p>
+  <p>纯前端工具合辑 · 所有计算都在你的浏览器里完成</p>
+  <p style="margin-top:6px"><a href="https://github.com/imalasong/whaletool" target="_blank" rel="noopener">GitHub 仓库</a></p>
 </footer>
 
 <script src="assets/tools.js"></script>

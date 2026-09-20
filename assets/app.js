@@ -6,27 +6,26 @@
 (function () {
   "use strict";
 
-  // 仓库地址：导航栏 GitHub 链接指向这里
   const REPO_URL = "https://github.com/imalasong/whaletool";
 
   const $grid    = document.getElementById("grid");
   const $filters = document.getElementById("filters");
   const $search  = document.getElementById("search");
+  const $sort    = document.getElementById("sort");
   const $count   = document.getElementById("resultCount");
   const $hint    = document.getElementById("resultHint");
   const $repo    = document.getElementById("repoLink");
 
-  if (REPO_URL) $repo.href = REPO_URL;
+  if ($repo && REPO_URL) $repo.href = REPO_URL;
 
   let activeCat = "all";
   let keyword   = "";
+  let sortBy    = "default";
 
-  /* ---------- 分类计数 ---------- */
   function countOf(key) {
     return key === "all" ? TOOLS.length : TOOLS.filter(t => t.category === key).length;
   }
 
-  /* ---------- 渲染分类 chips ---------- */
   function renderFilters() {
     $filters.innerHTML = "";
     CATEGORIES.forEach(c => {
@@ -34,7 +33,6 @@
       const btn = document.createElement("button");
       btn.className = "chip" + (c.key === activeCat ? " on" : "");
       btn.type = "button";
-      btn.dataset.cat = c.key;
       btn.innerHTML = `${c.icon} ${c.label}<span class="n">${n}</span>`;
       btn.addEventListener("click", () => {
         activeCat = c.key;
@@ -45,7 +43,6 @@
     });
   }
 
-  /* ---------- 匹配逻辑 ---------- */
   function matches(t) {
     if (activeCat !== "all" && t.category !== activeCat) return false;
     if (!keyword) return true;
@@ -53,9 +50,26 @@
     return hay.includes(keyword);
   }
 
-  /* ---------- 渲染卡片 ---------- */
+  function num(d) {
+    return d ? parseInt(String(d).replace(/-/g, ""), 10) : 0;
+  }
+
+  function sortList(list) {
+    const arr = list.slice();
+    if (sortBy === "pop")  return arr.sort((a, b) => (b.pop || 0) - (a.pop || 0));
+    if (sortBy === "new")  return arr.sort((a, b) => num(b.date) - num(a.date));
+    if (sortBy === "name") return arr.sort((a, b) => a.name.localeCompare(b.name, "zh-Hans-CN"));
+    return arr;
+  }
+
+  function esc(s) {
+    return String(s == null ? "" : s)
+      .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+  }
+
   function renderGrid() {
-    const list = TOOLS.filter(matches);
+    const list = sortList(TOOLS.filter(matches));
     $grid.innerHTML = "";
 
     $count.textContent = list.length + " 个工具";
@@ -77,15 +91,17 @@
     list.forEach((t, i) => {
       const card = document.createElement("article");
       card.className = "card";
-      card.style.animationDelay = Math.min(i * 45, 400) + "ms";
+      card.style.animationDelay = Math.min(i * 32, 420) + "ms";
 
       const tags = (t.tags || [])
         .slice(0, 5)
         .map(x => `<span class="tag">${esc(x)}</span>`)
         .join("");
 
+      const badgeCls = t.badge === "HOT" ? "card-badge hot" : "card-badge";
+
       card.innerHTML = `
-        ${t.badge ? `<span class="card-badge">${esc(t.badge)}</span>` : ""}
+        ${t.badge ? `<span class="${badgeCls}">${esc(t.badge)}</span>` : ""}
         <a class="card-hit" href="${esc(t.href)}" aria-label="${esc(t.name)}"></a>
         <div class="card-head">
           <div class="card-ico">${t.icon || "🧩"}</div>
@@ -104,14 +120,6 @@
     });
   }
 
-  /* ---------- 简单转义 ---------- */
-  function esc(s) {
-    return String(s == null ? "" : s)
-      .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
-      .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
-  }
-
-  /* ---------- 搜索 ---------- */
   let timer = null;
   $search.addEventListener("input", () => {
     clearTimeout(timer);
@@ -121,7 +129,13 @@
     }, 110);
   });
 
-  /* ---------- 快捷键：/ 聚焦搜索，Esc 清空 ---------- */
+  if ($sort) {
+    $sort.addEventListener("change", () => {
+      sortBy = $sort.value;
+      renderGrid();
+    });
+  }
+
   document.addEventListener("keydown", e => {
     const tag = (e.target.tagName || "").toLowerCase();
     const typing = tag === "input" || tag === "textarea";
@@ -137,7 +151,6 @@
     }
   });
 
-  /* ---------- 启动 ---------- */
   renderFilters();
   renderGrid();
 })();

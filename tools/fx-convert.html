@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>汇率换算 · WhaleTool</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐳</text></svg>">
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+
+<div class="wt-back"><a href="../">← 工具合辑</a></div>
+
+<div class="tool-head">
+  <h1>💱 汇率换算</h1>
+  <p>手填汇率算得准。支持股数 / 金额双模式，双边手续费可选，买港股美股算钱很方便。</p>
+</div>
+
+<div class="wrap">
+  <div class="panel">
+    <div class="panel-title"><span>常用汇率</span><span class="hint">点一下填入下方</span></div>
+    <div class="row tight" id="quickFx"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-title"><span>换算</span><span class="spacer"></span>
+      <span class="pill" id="fxPill">—</span></div>
+    <div class="row">
+      <select class="wt" id="from" style="flex:1 1 140px">
+        <option value="CNY">CNY 人民币</option>
+        <option value="HKD" selected>HKD 港币</option>
+        <option value="USD">USD 美元</option>
+        <option value="JPY">JPY 日元</option>
+        <option value="EUR">EUR 欧元</option>
+        <option value="GBP">GBP 英镑</option>
+        <option value="KRW">KRW 韩元</option>
+        <option value="SGD">SGD 新加坡元</option>
+        <option value="TWD">TWD 新台币</option>
+        <option value="AUD">AUD 澳元</option>
+      </select>
+      <button class="btn btn-ghost" id="btnSwap" style="padding:10px 14px">⇄</button>
+      <select class="wt" id="to" style="flex:1 1 140px">
+        <option value="CNY" selected>CNY 人民币</option>
+        <option value="HKD">HKD 港币</option>
+        <option value="USD">USD 美元</option>
+        <option value="JPY">JPY 日元</option>
+        <option value="EUR">EUR 欧元</option>
+        <option value="GBP">GBP 英镑</option>
+        <option value="KRW">KRW 韩元</option>
+        <option value="SGD">SGD 新加坡元</option>
+        <option value="TWD">TWD 新台币</option>
+        <option value="AUD">AUD 澳元</option>
+      </select>
+    </div>
+
+    <div class="row" style="margin-top:14px">
+      <label class="lb" style="margin:0;min-width:96px">汇率 1 <span id="lbFrom">HKD</span> =</label>
+      <input class="wt mono" id="rate" value="0.92" style="flex:1 1 140px">
+      <span class="muted" id="lbTo" style="font-size:13px">CNY</span>
+      <button class="btn btn-ghost btn-sm" id="btnAuto">自动取反</button>
+    </div>
+
+    <div class="row" style="margin-top:14px">
+      <label class="lb" style="margin:0;min-width:96px">换算模式</label>
+      <select class="wt" id="mode" style="width:auto">
+        <option value="amount">按金额</option>
+        <option value="shares">按股数 × 股价</option>
+      </select>
+    </div>
+
+    <div id="amountBox" class="row" style="margin-top:12px">
+      <label class="lb" style="margin:0;min-width:96px">金额</label>
+      <input class="wt mono" id="amount" value="100000" style="flex:1 1 200px">
+    </div>
+
+    <div id="shareBox" class="row" style="margin-top:12px;display:none">
+      <label class="lb" style="margin:0;min-width:96px">股数</label>
+      <input class="wt mono" id="shares" value="1000" style="flex:0 0 110px">
+      <label class="lb" style="margin:0 0 0 6px">股价</label>
+      <input class="wt mono" id="price" value="450" style="flex:1 1 130px">
+    </div>
+
+    <div class="row" style="margin-top:14px">
+      <label class="lb" style="margin:0">手续费</label>
+      <input class="wt mono" id="fee" value="0" style="width:100px">
+      <span class="muted" style="font-size:13px">%</span>
+      <label class="lb" style="margin:0 0 0 12px;font-weight:500"><input type="checkbox" id="feeBoth"> 双边都收</label>
+    </div>
+
+    <div class="row" style="margin-top:16px">
+      <button class="btn btn-primary" id="btnCalc">换算</button>
+      <button class="btn btn-ghost" id="btnCopy">复制结果</button>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-title"><span>结果</span></div>
+    <div class="stat-row" id="result">
+      <div class="muted" style="font-size:13px">点「换算」看结果。</div>
+    </div>
+    <div class="out" id="detail" style="margin-top:14px;display:none"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-title"><span>换汇速查</span><span class="hint">常用金额直接换算</span></div>
+    <table class="wt">
+      <thead><tr><th class="num">金额</th><th class="num">换出</th><th class="num">扣费后</th><th class="num">换入</th></tr></thead>
+      <tbody id="gridBody"><tr><td colspan="4" class="muted">—</td></tr></tbody>
+    </table>
+  </div>
+
+  <div class="panel">
+    <div class="panel-title"><span>手续费影响</span></div>
+    <table class="wt">
+      <thead><tr><th class="num">费率</th><th class="num">费用</th><th class="num">实际到手</th><th class="num">相对无费损耗</th></tr></thead>
+      <tbody id="feeBody"><tr><td colspan="4" class="muted">—</td></tr></tbody>
+    </table>
+    <div class="note" style="margin-top:14px">
+      券商换汇通常收 0.05%–0.3% 的点差或手续费。频繁小额换汇会被费率吃掉不少收益，尽量一次换够。
+    </div>
+  </div>
+</div>
+
+<div class="tool-foot">汇率由你手动录入，本工具不联网取数 · <a href="../">返回工具合辑</a></div>
+
+<script>
+(function () {
+  "use strict";
+
+  var PRESETS = [
+    { f: "HKD", t: "CNY", r: 0.92, label: "1 港币 ≈ 0.92 人民币" },
+    { f: "USD", t: "CNY", r: 7.12, label: "1 美元 ≈ 7.12 人民币" },
+    { f: "USD", t: "HKD", r: 7.78, label: "1 美元 ≈ 7.78 港币" },
+    { f: "JPY", t: "CNY", r: 0.047, label: "1 日元 ≈ 0.047 人民币" },
+    { f: "EUR", t: "CNY", r: 7.75, label: "1 欧元 ≈ 7.75 人民币" },
+    { f: "KRW", t: "CNY", r: 0.0051, label: "1 韩元 ≈ 0.0051 人民币" },
+    { f: "SGD", t: "CNY", r: 5.48, label: "1 新元 ≈ 5.48 人民币" }
+  ];
+
+  function num(id) { return parseFloat(document.getElementById(id).value) || 0; }
+  function fmt(n, d) {
+    d = d === undefined ? 2 : d;
+    return n.toLocaleString("zh-CN", { minimumFractionDigits: d, maximumFractionDigits: d });
+  }
+
+  function updateLabels() {
+    var f = document.getElementById("from").value, t = document.getElementById("to").value;
+    document.getElementById("lbFrom").textContent = f;
+    document.getElementById("lbTo").textContent = t;
+    document.getElementById("fxPill").textContent = "1 " + f + " = " + num("rate") + " " + t;
+  }
+
+  function calc() {
+    var f = document.getElementById("from").value, t = document.getElementById("to").value;
+    var rate = num("rate");
+    var mode = document.getElementById("mode").value;
+    var feePct = num("fee") / 100;
+    var both = document.getElementById("feeBoth").checked;
+
+    if (!rate) {
+      document.getElementById("result").innerHTML = '<div class="muted" style="font-size:13px">先填汇率。</div>';
+      return;
+    }
+
+    var src, note;
+    if (mode === "shares") {
+      var sh = num("shares"), pr = num("price");
+      src = sh * pr;
+      note = fmt(sh, 0) + " 股 × " + fmt(pr, 3) + " " + f + " = " + fmt(src, 2) + " " + f;
+    } else {
+      src = num("amount");
+      note = fmt(src, 2) + " " + f;
+    }
+
+    var fee1 = src * feePct;
+    var afterFee1 = src - fee1;
+    var mid = afterFee1 * rate;
+    var fee2 = both ? mid * feePct : 0;
+    var out = mid - fee2;
+    var totalFee = fee1 + (both ? fee2 / rate : 0);
+    var noFeeOut = src * rate;
+    var loss = (noFeeOut - out) / noFeeOut;
+
+    document.getElementById("result").innerHTML =
+      '<div class="stat"><div class="k">换出（' + f + "）</div><div class=\"v\">" + fmt(src, 2) + "</div></div>" +
+      '<div class="stat"><div class="k">汇率</div><div class="v sm">1 ' + f + " = " + rate + " " + t + "</div></div>" +
+      '<div class="stat"><div class="k">换入（' + t + "）</div><div class=\"v down\">" + fmt(out, 2) + "</div></div>" +
+      '<div class="stat"><div class="k">手续费合计</div><div class="v up">' + fmt(totalFee, 2) + " " + f + "</div></div>" +
+      '<div class="stat"><div class="k">较无费损耗</div><div class="v up">' + (loss * 100).toFixed(3) + "%</div></div>";
+
+    var d = document.getElementById("detail");
+    d.style.display = "block";
+    d.textContent =
+      note + "\n" +
+      (feePct ? "换出扣费 " + fmt(fee1, 2) + " " + f + "（" + (feePct * 100).toFixed(2) + "%）\n" : "") +
+      "按汇率换得 " + fmt(mid, 2) + " " + t + "\n" +
+      (both && fee2 ? "换入再扣费 " + fmt(fee2, 2) + " " + t + "\n" : "") +
+      "实际到手 " + fmt(out, 2) + " " + t + "\n" +
+      "如果没有任何手续费，应该能拿到 " + fmt(noFeeOut, 2) + " " + t +
+      (loss > 0 ? "，被吃掉 " + fmt(noFeeOut - out, 2) + " " + t + "（" + (loss * 100).toFixed(3) + "%）" : "");
+
+    // 速查表
+    var tiers = [1000, 5000, 10000, 50000, 100000, 500000, 1000000];
+    document.getElementById("gridBody").innerHTML = tiers.map(function (v) {
+      var a = v - v * feePct;
+      var m = a * rate;
+      var o = m - (both ? m * feePct : 0);
+      return '<tr><td class="num">' + fmt(v, 0) + " " + f + '</td><td class="num">' + fmt(v, 2) +
+        '</td><td class="num">' + fmt(a, 2) + '</td><td class="num" style="font-weight:600">' + fmt(o, 2) + " " + t + "</td></tr>";
+    }).join("");
+
+    // 费率影响
+    var rates = [0, 0.0005, 0.001, 0.002, 0.005, 0.01];
+    document.getElementById("feeBody").innerHTML = rates.map(function (r) {
+      var fe = src * r;
+      var o = (src - fe) * rate;
+      var oo = both ? o - o * r : o;
+      var l = (noFeeOut - oo) / noFeeOut;
+      return '<tr><td class="num">' + (r * 100).toFixed(2) + "%</td><td class=\"num up\">' + fmt(fe, 2) +
+        '</td><td class="num">' + fmt(oo, 2) + " " + t + '</td><td class="num">' + (l * 100).toFixed(3) + "%</td></tr>";
+    }).join("");
+  }
+
+  document.getElementById("quickFx").innerHTML = PRESETS.map(function (p, i) {
+    return '<button class="btn btn-ghost btn-sm" data-fx="' + i + '">' + p.label + "</button>";
+  }).join("");
+  Array.prototype.forEach.call(document.querySelectorAll("[data-fx]"), function (b) {
+    b.addEventListener("click", function () {
+      var p = PRESETS[+this.dataset.fx];
+      document.getElementById("from").value = p.f;
+      document.getElementById("to").value = p.t;
+      document.getElementById("rate").value = p.r;
+      updateLabels(); calc();
+    });
+  });
+
+  document.getElementById("btnSwap").addEventListener("click", function () {
+    var f = document.getElementById("from").value;
+    document.getElementById("from").value = document.getElementById("to").value;
+    document.getElementById("to").value = f;
+    document.getElementById("rate").value = (1 / (num("rate") || 1)).toFixed(6);
+    updateLabels(); calc();
+  });
+
+  document.getElementById("btnAuto").addEventListener("click", function () {
+    var r = num("rate");
+    if (r) document.getElementById("rate").value = (1 / r).toFixed(6);
+    updateLabels(); calc();
+  });
+
+  document.getElementById("mode").addEventListener("change", function () {
+    var shares = this.value === "shares";
+    document.getElementById("shareBox").style.display = shares ? "" : "none";
+    document.getElementById("amountBox").style.display = shares ? "none" : "";
+    calc();
+  });
+
+  document.getElementById("btnCalc").addEventListener("click", calc);
+  ["from", "to", "rate", "amount", "shares", "price", "fee"].forEach(function (id) {
+    document.getElementById(id).addEventListener("input", function () { updateLabels(); calc(); });
+  });
+  document.getElementById("feeBoth").addEventListener("change", calc);
+
+  document.getElementById("btnCopy").addEventListener("click", function () {
+    var text = document.getElementById("detail").textContent;
+    if (!text) return;
+    var btn = this, old = btn.textContent;
+    var done = function () { btn.textContent = "已复制 ✓"; setTimeout(function () { btn.textContent = old; }, 1400); };
+    if (navigator.clipboard && location.protocol !== "file:") {
+      navigator.clipboard.writeText(text).then(done, function () { fb(text, done); });
+    } else { fb(text, done); }
+    function fb(v, cb) {
+      var ta = document.createElement("textarea");
+      ta.value = v; ta.style.position = "fixed"; ta.style.opacity = "0";
+      document.body.appendChild(ta); ta.select();
+      try { document.execCommand("copy"); cb(); } catch (e) {}
+      document.body.removeChild(ta);
+    }
+  });
+
+  updateLabels();
+  calc();
+})();
+</script>
+</body>
+</html>

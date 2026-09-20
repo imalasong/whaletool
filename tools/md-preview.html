@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Markdown 预览 · WhaleTool</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐳</text></svg>">
+<link rel="stylesheet" href="../assets/style.css">
+<style>
+  .md { font-size: 14px; line-height: 1.75; color: var(--text); word-wrap: break-word; }
+  .md h1,.md h2,.md h3,.md h4 { margin: 20px 0 10px; font-weight: 700; line-height: 1.3; }
+  .md h1 { font-size: 24px; border-bottom: 2px solid var(--border); padding-bottom: 8px; }
+  .md h2 { font-size: 20px; border-bottom: 1px solid var(--border-soft); padding-bottom: 6px; }
+  .md h3 { font-size: 17px; }
+  .md h4 { font-size: 15px; color: var(--text-soft); }
+  .md h1:first-child,.md h2:first-child,.md h3:first-child { margin-top: 0; }
+  .md p { margin: 11px 0; }
+  .md ul,.md ol { margin: 11px 0; padding-left: 24px; }
+  .md li { margin: 5px 0; }
+  .md li input[type=checkbox] { margin-right: 6px; }
+  .md code {
+    font-family: ui-monospace, Consolas, monospace; font-size: 12.6px;
+    background: #eef4f6; color: #b0356b; padding: 2px 6px; border-radius: 5px;
+  }
+  .md pre {
+    background: #f6f9fa; border: 1px solid var(--border-soft);
+    border-radius: 10px; padding: 13px 15px; overflow-x: auto; margin: 13px 0;
+  }
+  .md pre code { background: none; color: var(--text-soft); padding: 0; font-size: 12.6px; line-height: 1.7; }
+  .md blockquote {
+    border-left: 3px solid rgba(15,118,110,.4); background: #f8fbfc;
+    padding: 9px 15px; margin: 13px 0; color: var(--text-soft); border-radius: 0 8px 8px 0;
+  }
+  .md blockquote p { margin: 4px 0; }
+  .md table { border-collapse: collapse; width: 100%; margin: 13px 0; font-size: 13px; }
+  .md th,.md td { border: 1px solid var(--border); padding: 7px 11px; text-align: left; }
+  .md th { background: #f4f8f9; font-weight: 600; }
+  .md a { color: var(--primary-ink); border-bottom: 1px solid rgba(15,118,110,.3); }
+  .md img { max-width: 100%; border-radius: 8px; }
+  .md hr { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
+  .md .task { list-style: none; margin-left: -20px; }
+</style>
+</head>
+<body>
+
+<div class="wt-back"><a href="../">← 工具合辑</a></div>
+
+<div class="tool-head">
+  <h1>📝 Markdown 预览</h1>
+  <p>左边写右边看，支持表格、代码块、任务清单、引用。可把 HTML 渲染回 Markdown 编辑器，也能导出成网页。</p>
+</div>
+
+<div class="wrap">
+  <div class="panel">
+    <div class="panel-title"><span>操作</span>
+      <span class="spacer"></span>
+      <span class="pill" id="stats">—</span></div>
+    <div class="row">
+      <button class="btn btn-primary" id="btnHtml">导出 HTML</button>
+      <button class="btn btn-ghost" id="btnCopyMd">复制 Markdown</button>
+      <button class="btn btn-ghost" id="btnCopyHtml">复制 HTML</button>
+      <button class="btn btn-ghost" id="btnSample">示例</button>
+      <button class="btn btn-ghost" id="btnClear">清空</button>
+      <span class="spacer"></span>
+      <label class="lb" style="margin:0"><input type="checkbox" id="sync" checked> 同步滚动</label>
+    </div>
+  </div>
+
+  <div class="grid2">
+    <div class="panel" style="margin-bottom:0">
+      <div class="panel-title"><span>Markdown 源码</span></div>
+      <textarea class="wt mono" id="md" style="min-height:460px" spellcheck="false"></textarea>
+    </div>
+    <div class="panel" style="margin-bottom:0">
+      <div class="panel-title"><span>预览</span></div>
+      <div class="out md" id="preview" style="min-height:460px;font-family:inherit;white-space:normal;background:#fff;border-color:var(--border)"></div>
+    </div>
+  </div>
+</div>
+
+<div class="tool-foot">渲染在浏览器本地完成 · <a href="../">返回工具合辑</a></div>
+
+<script>
+(function () {
+  "use strict";
+  var $md = document.getElementById("md"), $pv = document.getElementById("preview"),
+      $stats = document.getElementById("stats"), $sync = document.getElementById("sync");
+
+  function esc(s) {
+    return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+  }
+
+  function inline(s) {
+    s = esc(s);
+    s = s.replace(/`([^`]+)`/g, "<code>$1</code>");
+    s = s.replace(/!\[([^\]]*)\]\(([^)\s]+)\)/g, '<img src="$2" alt="$1">');
+    s = s.replace(/\[([^\]]+)\]\(([^)\s]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
+    s = s.replace(/\*\*\*([^*]+)\*\*\*/g, "<strong><em>$1</em></strong>");
+    s = s.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
+    s = s.replace(/(^|[^*\w])\*([^*\n]+)\*/g, "$1<em>$2</em>");
+    s = s.replace(/~~([^~]+)~~/g, "<del>$1</del>");
+    s = s.replace(/&lt;br\s*\/?&gt;/gi, "<br>");
+    return s;
+  }
+
+  function render(src) {
+    var lines = src.replace(/\r\n/g, "\n").split("\n");
+    var out = [], i = 0;
+
+    function isTableRow(l) { return /^\s*\|.*\|\s*$/.test(l); }
+
+    while (i < lines.length) {
+      var line = lines[i];
+
+      // 代码围栏
+      var fence = /^\s*(```|~~~)\s*([\w+-]*)\s*$/.exec(line);
+      if (fence) {
+        var lang = fence[2], buf = [];
+        i++;
+        while (i < lines.length && !/^\s*(```|~~~)\s*$/.test(lines[i])) { buf.push(lines[i]); i++; }
+        i++;
+        out.push('<pre><code' + (lang ? ' class="lang-' + esc(lang) + '"' : "") + ">" +
+          esc(buf.join("\n")) + "</code></pre>");
+        continue;
+      }
+
+      // 标题
+      var h = /^(#{1,6})\s+(.*)$/.exec(line);
+      if (h) {
+        var lv = h[1].length;
+        out.push("<h" + lv + ">" + inline(h[2].replace(/\s*#+\s*$/, "")) + "</h" + lv + ">");
+        i++; continue;
+      }
+
+      // 分隔线
+      if (/^\s*([-*_])\s*\1\s*\1[\s\1]*$/.test(line)) { out.push("<hr>"); i++; continue; }
+
+      // 引用
+      if (/^\s*>/.test(line)) {
+        var qbuf = [];
+        while (i < lines.length && /^\s*>/.test(lines[i])) { qbuf.push(lines[i].replace(/^\s*>\s?/, "")); i++; }
+        out.push("<blockquote>" + render(qbuf.join("\n")) + "</blockquote>");
+        continue;
+      }
+
+      // 表格
+      if (isTableRow(line) && i + 1 < lines.length && /^\s*\|[\s:|-]+\|\s*$/.test(lines[i + 1])) {
+        var head = line.trim().replace(/^\||\|$/g, "").split("|").map(function (x) { return x.trim(); });
+        i += 2;
+        var rows = [];
+        while (i < lines.length && isTableRow(lines[i])) {
+          rows.push(lines[i].trim().replace(/^\||\|$/g, "").split("|").map(function (x) { return x.trim(); }));
+          i++;
+        }
+        var t = "<table><thead><tr>" + head.map(function (x) { return "<th>" + inline(x) + "</th>"; }).join("") +
+          "</tr></thead><tbody>" + rows.map(function (r) {
+            return "<tr>" + head.map(function (_, ci) {
+              return "<td>" + inline(r[ci] === undefined ? "" : r[ci]) + "</td>";
+            }).join("") + "</tr>";
+          }).join("") + "</tbody></table>";
+        out.push(t);
+        continue;
+      }
+
+      // 列表（含任务清单）
+      if (/^\s*([-*+]|\d+\.)\s+/.test(line)) {
+        var ordered = /^\s*\d+\./.test(line);
+        var items = [], taskAll = false;
+        while (i < lines.length && /^\s*([-*+]|\d+\.)\s+/.test(lines[i])) {
+          var txt = lines[i].replace(/^\s*([-*+]|\d+\.)\s+/, "");
+          var task = /^\[([ xX])\]\s*(.*)$/.exec(txt);
+          if (task) {
+            taskAll = true;
+            items.push('<li class="task"><input type="checkbox" disabled' +
+              (task[1].toLowerCase() === "x" ? " checked" : "") + ">" + inline(task[2]) + "</li>");
+          } else {
+            items.push("<li>" + inline(txt) + "</li>");
+          }
+          i++;
+        }
+        out.push((ordered ? "<ol>" : "<ul>") + items.join("") + (ordered ? "</ol>" : "</ul>"));
+        continue;
+      }
+
+      // 空行
+      if (/^\s*$/.test(line)) { i++; continue; }
+
+      // 段落
+      var pbuf = [];
+      while (i < lines.length && !/^\s*$/.test(lines[i]) &&
+             !/^(#{1,6}\s|```|~~~|>|\s*([-*+]|\d+\.)\s)/.test(lines[i]) &&
+             !isTableRow(lines[i])) {
+        pbuf.push(lines[i]); i++;
+      }
+      if (pbuf.length) out.push("<p>" + inline(pbuf.join("\n").replace(/\n/g, "<br>")) + "</p>");
+    }
+    return out.join("\n");
+  }
+
+  function htmlDoc(body) {
+    return '<!DOCTYPE html>\n<html lang="zh-CN">\n<head>\n<meta charset="UTF-8">\n' +
+      '<meta name="viewport" content="width=device-width, initial-scale=1.0">\n<title>Markdown 导出</title>\n' +
+      "<style>\n" +
+      'body{font-family:"PingFang SC","Microsoft YaHei",system-ui,sans-serif;max-width:780px;margin:40px auto;padding:0 20px;line-height:1.75;color:#22303a}\n' +
+      "pre{background:#f5f8f9;padding:14px;border-radius:10px;overflow-x:auto}\n" +
+      "code{font-family:ui-monospace,Consolas,monospace;background:#eef4f6;padding:2px 6px;border-radius:4px;font-size:.9em}\n" +
+      "pre code{background:none;padding:0}\n" +
+      "table{border-collapse:collapse;width:100%;margin:14px 0}\n" +
+      "th,td{border:1px solid #dde5ea;padding:8px 12px;text-align:left}\n" +
+      "th{background:#f4f8f9}\n" +
+      "blockquote{border-left:3px solid #9cc;background:#f8fbfc;margin:14px 0;padding:10px 16px;color:#456}\n" +
+      "img{max-width:100%}\n" +
+      "a{color:#0b5d57}\n" +
+      "</style>\n</head>\n<body>\n" + body + "\n</body>\n</html>";
+  }
+
+  function run() {
+    var src = $md.value;
+    var body = render(src);
+    $pv.innerHTML = body || '<span class="muted">左边输入 Markdown，这里会实时渲染。</span>';
+    var chars = src.length;
+    var words = (src.match(/[a-zA-Z]+/g) || []).length;
+    var cn = (src.match(/[\u4e00-\u9fa5]/g) || []).length;
+    $stats.textContent = chars + " 字符 · " + cn + " 汉字 · " + words + " 英文词";
+  }
+
+  $md.addEventListener("input", run);
+
+  if ($sync) {
+    $md.addEventListener("scroll", function () {
+      if (!$sync.checked) return;
+      var r = $md.scrollTop / Math.max(1, $md.scrollHeight - $md.clientHeight);
+      $pv.scrollTop = r * ($pv.scrollHeight - $pv.clientHeight);
+    });
+  }
+
+  function copy(text, btn) {
+    var old = btn.textContent;
+    var done = function () { btn.textContent = "已复制 ✓"; setTimeout(function () { btn.textContent = old; }, 1400); };
+    if (navigator.clipboard && location.protocol !== "file:") {
+      navigator.clipboard.writeText(text).then(done, function () { fb(text, done); });
+    } else { fb(text, done); }
+  }
+  function fb(v, cb) {
+    var ta = document.createElement("textarea");
+    ta.value = v; ta.style.position = "fixed"; ta.style.opacity = "0";
+    document.body.appendChild(ta); ta.select();
+    try { document.execCommand("copy"); cb(); } catch (e) {}
+    document.body.removeChild(ta);
+  }
+
+  document.getElementById("btnCopyMd").addEventListener("click", function () { copy($md.value, this); });
+  document.getElementById("btnCopyHtml").addEventListener("click", function () { copy($pv.innerHTML, this); });
+
+  document.getElementById("btnHtml").addEventListener("click", function () {
+    var blob = new Blob([htmlDoc($pv.innerHTML)], { type: "text/html" });
+    var a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "markdown-export.html";
+    a.click();
+    setTimeout(function () { URL.revokeObjectURL(a.href); }, 3000);
+  });
+
+  document.getElementById("btnClear").addEventListener("click", function () {
+    $md.value = ""; run();
+  });
+
+  var SAMPLE = [
+    "# WhaleTool 工具合辑",
+    "",
+    "一个**纯前端**的小工具集合，所有计算都在浏览器里跑。",
+    "",
+    "## 已上线的工具",
+    "",
+    "| 工具 | 分类 | 状态 |",
+    "| --- | --- | --- |",
+    "| JSON 格式化 | 开发 | 已上线 |",
+    "| 时间戳转换 | 开发 | 已上线 |",
+    "| 图片压缩 | 图片 | 已上线 |",
+    "",
+    "## 待办",
+    "",
+    "- [x] 搭好首页骨架",
+    "- [x] 加上搜索和分类",
+    "- [ ] 补充金融类工具",
+    "- [ ] 加个暗色主题",
+    "",
+    "## 代码示例",
+    "",
+    "```go",
+    "func GetUser(ctx context.Context, id int) (*User, error) {",
+    "    if id <= 0 {",
+    "        return nil, ErrInvalidID",
+    "    }",
+    "    return db.WithContext(ctx).Find(id)",
+    "}",
+    "```",
+    "",
+    "> 引用块用来看重点内容。",
+    "> 这里可以放注意事项。",
+    "",
+    "行内代码长这样：`npm install`，还可以用 ~~删除线~~ 和 *斜体*。",
+    "",
+    "---",
+    "",
+    "### 链接与图片",
+    "",
+    "去看 [GitHub 仓库](https://github.com/imalasong/whaletool) 提需求。"
+  ].join("\n");
+
+  document.getElementById("btnSample").addEventListener("click", function () {
+    $md.value = SAMPLE; run();
+  });
+
+  $md.value = SAMPLE;
+  run();
+})();
+</script>
+</body>
+</html>

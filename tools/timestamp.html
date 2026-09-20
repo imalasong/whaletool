@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>时间戳转换 · WhaleTool</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐳</text></svg>">
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+
+<div class="wt-back"><a href="../">← 工具合辑</a></div>
+
+<div class="tool-head">
+  <h1>⏱ 时间戳转换</h1>
+  <p>秒 / 毫秒自动识别。支持本地时间 ⇄ 时间戳互转，也能换算成指定时区，顺带给出相对时间。</p>
+</div>
+
+<div class="wrap">
+  <div class="panel">
+    <div class="panel-title">
+      <span>当前时间</span>
+      <span class="spacer"></span>
+      <span class="pill" id="tick">每秒刷新</span>
+    </div>
+    <div class="stat-row">
+      <div class="stat"><div class="k">秒级时间戳</div><div class="v" id="nowSec">—</div></div>
+      <div class="stat"><div class="k">毫秒时间戳</div><div class="v" id="nowMs">—</div></div>
+      <div class="stat"><div class="k">本地时间</div><div class="v sm" id="nowLocal">—</div></div>
+      <div class="stat"><div class="k">UTC 时间</div><div class="v sm" id="nowUtc">—</div></div>
+    </div>
+    <div class="row" style="margin-top:12px">
+      <button class="btn btn-ghost btn-sm" id="useNow">把当前时间填到下面</button>
+    </div>
+  </div>
+
+  <div class="grid2">
+    <div class="panel">
+      <div class="panel-title"><span>① 时间戳 → 时间</span></div>
+      <label class="lb" for="tsIn">时间戳（秒或毫秒，自动识别）</label>
+      <input class="wt mono" id="tsIn" placeholder="1763600000 或 1763600000000" autocomplete="off">
+      <div class="row" style="margin-top:10px">
+        <label class="lb" style="margin:0" for="tz">显示时区</label>
+        <select class="wt" id="tz" style="width:auto">
+          <option value="local">本地时区</option>
+          <option value="UTC">UTC</option>
+          <option value="Asia/Shanghai">中国标准时间 UTC+8</option>
+          <option value="Asia/Hong_Kong">中国香港 UTC+8</option>
+          <option value="Asia/Tokyo">东京 UTC+9</option>
+          <option value="Asia/Seoul">首尔 UTC+9</option>
+          <option value="America/New_York">纽约</option>
+          <option value="Europe/London">伦敦</option>
+        </select>
+      </div>
+      <div class="stat-row" style="margin-top:14px" id="tsOut"></div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-title"><span>② 时间 → 时间戳</span></div>
+      <label class="lb" for="dtIn">日期时间（本地时区）</label>
+      <input class="wt" id="dtIn" type="datetime-local" step="1">
+      <div class="row" style="margin-top:10px">
+        <button class="btn btn-primary btn-sm" id="dtNow">用当前时间</button>
+        <button class="btn btn-ghost btn-sm" id="dtToTs">转时间戳</button>
+      </div>
+      <div class="stat-row" style="margin-top:14px" id="dtOut"></div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-title"><span>常用时间戳速查</span><span class="hint">点一下填到上面</span></div>
+    <div class="row tight" id="quick"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-title"><span>截图三件套</span><span class="hint">复制常用的几种格式</span></div>
+    <div class="out" id="formats"></div>
+  </div>
+</div>
+
+<div class="tool-foot">所有换算在浏览器完成 · <a href="../">返回工具合辑</a></div>
+
+<script>
+(function () {
+  "use strict";
+  var $nowSec = document.getElementById("nowSec"), $nowMs = document.getElementById("nowMs"),
+      $nowLocal = document.getElementById("nowLocal"), $nowUtc = document.getElementById("nowUtc"),
+      $tsIn = document.getElementById("tsIn"), $tsOut = document.getElementById("tsOut"),
+      $tz = document.getElementById("tz"),
+      $dtIn = document.getElementById("dtIn"), $dtOut = document.getElementById("dtOut"),
+      $formats = document.getElementById("formats");
+
+  function pad2(n) { return n < 10 ? "0" + n : "" + n; }
+
+  function fmtInTZ(date, tz) {
+    if (tz === "local") {
+      return date.getFullYear() + "-" + pad2(date.getMonth() + 1) + "-" + pad2(date.getDate()) +
+        " " + pad2(date.getHours()) + ":" + pad2(date.getMinutes()) + ":" + pad2(date.getSeconds());
+    }
+    try {
+      return new Intl.DateTimeFormat("zh-CN", {
+        timeZone: tz, year: "numeric", month: "2-digit", day: "2-digit",
+        hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false
+      }).format(date).replace(/\//g, "-");
+    } catch (e) {
+      return date.toISOString();
+    }
+  }
+
+  function rel(date) {
+    var diff = Date.now() - date.getTime();
+    var abs = Math.abs(diff);
+    var fut = diff < 0;
+    var u;
+    if (abs < 1000) return fut ? "马上就到" : "就在刚刚";
+    if (abs < 60000) u = Math.floor(abs / 1000) + " 秒";
+    else if (abs < 3600000) u = Math.floor(abs / 60000) + " 分钟";
+    else if (abs < 86400000) u = Math.floor(abs / 3600000) + " 小时";
+    else if (abs < 86400000 * 30) u = Math.floor(abs / 86400000) + " 天";
+    else if (abs < 86400000 * 365) u = Math.floor(abs / (86400000 * 30)) + " 个月";
+    else u = (abs / (86400000 * 365)).toFixed(1) + " 年";
+    return fut ? u + "后" : u + "前";
+  }
+
+  function stat(k, v, cls) {
+    return '<div class="stat"><div class="k">' + k + '</div><div class="v sm ' + (cls || "") + '">' + v + "</div></div>";
+  }
+
+  function esc(s) {
+    return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  }
+
+  function tick() {
+    var d = new Date();
+    $nowSec.textContent = Math.floor(d.getTime() / 1000);
+    $nowMs.textContent = d.getTime();
+    $nowLocal.textContent = fmtInTZ(d, "local");
+    $nowUtc.textContent = fmtInTZ(d, "UTC");
+    renderTs();
+  }
+
+  function renderTs() {
+    var raw = $tsIn.value.trim().replace(/[^\d.-]/g, "");
+    if (!raw) { $tsOut.innerHTML = '<div class="note">输入一个秒或毫秒时间戳，这里会立刻出结果。</div>'; return; }
+    var n = Number(raw);
+    if (!isFinite(n)) { $tsOut.innerHTML = '<div class="note err">不是合法的数字。</div>'; return; }
+    var ms = Math.abs(n) < 1e11 ? n * 1000 : n;
+    var d = new Date(ms);
+    if (isNaN(d.getTime())) { $tsOut.innerHTML = '<div class="note err">超出可表示范围。</div>'; return; }
+    var tz = $tz.value;
+    var unit = Math.abs(n) < 1e11 ? "秒" : "毫秒";
+    $tsOut.innerHTML =
+      stat("识别为", unit) +
+      stat("时区时间", esc(fmtInTZ(d, tz))) +
+      stat("相对现在", esc(rel(d))) +
+      stat("ISO 8601 (UTC)", esc(d.toISOString()));
+  }
+
+  function renderDt() {
+    var val = $dtIn.value;
+    if (!val) { $dtOut.innerHTML = '<div class="note">选个时间，这里会算出对应时间戳。</div>'; return; }
+    var d = new Date(val);
+    if (isNaN(d.getTime())) { $dtOut.innerHTML = '<div class="note err">时间格式不正确。</div>'; return; }
+    $dtOut.innerHTML =
+      stat("秒级时间戳", Math.floor(d.getTime() / 1000)) +
+      stat("毫秒时间戳", d.getTime()) +
+      stat("相对现在", esc(rel(d))) +
+      stat("ISO 8601 (UTC)", esc(d.toISOString()));
+  }
+
+  function localInputValue(d) {
+    return d.getFullYear() + "-" + pad2(d.getMonth() + 1) + "-" + pad2(d.getDate()) +
+      "T" + pad2(d.getHours()) + ":" + pad2(d.getMinutes()) + ":" + pad2(d.getSeconds());
+  }
+
+  function renderFormats() {
+    var d = new Date();
+    var lines = [
+      ["秒级", Math.floor(d.getTime() / 1000)],
+      ["毫秒级", d.getTime()],
+      ["ISO 8601 UTC", d.toISOString()],
+      ["本地 YYYY-MM-DD HH:mm:ss", fmtInTZ(d, "local").replace(/-/g, "-")],
+      ["日期 YYYY-MM-DD", fmtInTZ(d, "local").slice(0, 10)],
+      ["UTC 日期 YYYY-MM-DD", d.toISOString().slice(0, 10)],
+      ["GMT 字符串", d.toUTCString()],
+      ["中国标准时间", fmtInTZ(d, "Asia/Shanghai")]
+    ];
+    $formats.textContent = lines.map(function (x) {
+      return x[0] + "： " + x[1];
+    }).join("\n");
+  }
+
+  $tsIn.addEventListener("input", renderTs);
+  $tz.addEventListener("change", renderTs);
+  $dtIn.addEventListener("change", renderDt);
+
+  document.getElementById("useNow").addEventListener("click", function () {
+    $tsIn.value = Math.floor(Date.now() / 1000);
+    renderTs();
+  });
+
+  document.getElementById("dtNow").addEventListener("click", function () {
+    $dtIn.value = localInputValue(new Date());
+    renderDt();
+  });
+
+  document.getElementById("dtToTs").addEventListener("click", renderDt);
+
+  var quick = [
+    ["今天 00:00", function () { var d = new Date(); d.setHours(0,0,0,0); return d; }],
+    ["本周一 00:00", function () {
+      var d = new Date(); var w = (d.getDay() + 6) % 7; d.setDate(d.getDate() - w); d.setHours(0,0,0,0); return d;
+    }],
+    ["本月 1 号", function () { var d = new Date(); d.setDate(1); d.setHours(0,0,0,0); return d; }],
+    ["7 天前", function () { return new Date(Date.now() - 7 * 864e5); }],
+    ["30 天前", function () { return new Date(Date.now() - 30 * 864e5); }],
+    ["Unix 纪元", function () { return new Date(0); }],
+    ["2038 边界", function () { return new Date(2147483647 * 1000); }]
+  ];
+  var $quick = document.getElementById("quick");
+  quick.forEach(function (q) {
+    var b = document.createElement("button");
+    b.className = "btn btn-ghost btn-sm";
+    b.textContent = q[0];
+    b.addEventListener("click", function () {
+      $tsIn.value = Math.floor(q[1]().getTime() / 1000);
+      renderTs();
+    });
+    $quick.appendChild(b);
+  });
+
+  renderFormats();
+  tick();
+  setInterval(tick, 1000);
+
+  $tsIn.value = Math.floor(Date.now() / 1000);
+  $dtIn.value = localInputValue(new Date());
+  renderTs();
+  renderDt();
+})();
+</script>
+</body>
+</html>

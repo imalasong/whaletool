@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>收益率计算器 · WhaleTool</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐳</text></svg>">
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+
+<div class="wt-back"><a href="../">← 工具合辑</a></div>
+
+<div class="tool-head">
+  <h1>📊 收益率计算器</h1>
+  <p>算清买入卖出的盈亏、收益率和手续费，也能反推要卖到多少才达标。按 A 股 / 港股规则算，红涨绿跌。</p>
+</div>
+
+<div class="wrap">
+  <div class="panel">
+    <div class="panel-title"><span>市场与费率</span><span class="spacer"></span>
+      <span class="pill" id="mktPill">A 股</span></div>
+    <div class="row tight">
+      <button class="btn btn-primary btn-sm" data-mkt="a">A 股（沪深）</button>
+      <button class="btn btn-ghost btn-sm" data-mkt="hk">港股</button>
+      <button class="btn btn-ghost btn-sm" data-mkt="us">美股</button>
+      <button class="btn btn-ghost btn-sm" data-mkt="fund">场外基金</button>
+      <button class="btn btn-ghost btn-sm" data-mkt="custom">自定义</button>
+    </div>
+    <div class="grid3" style="margin-top:14px" id="fees"></div>
+    <div class="note" style="margin-top:12px" id="feeNote"></div>
+  </div>
+
+  <div class="grid2">
+    <div class="panel">
+      <div class="panel-title"><span>交易明细</span></div>
+      <div class="row">
+        <label class="lb" style="margin:0;min-width:74px">买入价</label>
+        <input class="wt mono" id="buyPrice" value="422" style="flex:1 1 110px">
+        <label class="lb" style="margin:0 0 0 6px;min-width:74px">卖出价</label>
+        <input class="wt mono" id="sellPrice" value="450" style="flex:1 1 110px">
+      </div>
+      <div class="row" style="margin-top:10px">
+        <label class="lb" style="margin:0;min-width:74px">股数</label>
+        <input class="wt mono" id="shares" value="1000" style="flex:1 1 110px">
+        <label class="lb" style="margin:0 0 0 6px;min-width:74px">币种</label>
+        <input class="wt" id="cur" value="HKD" style="flex:1 1 110px">
+      </div>
+      <div class="row" style="margin-top:14px">
+        <button class="btn btn-primary" id="btnCalc">计算</button>
+        <button class="btn btn-ghost" id="btnSwapP">反转买卖价</button>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-title"><span>结果</span><span class="spacer"></span>
+        <span class="pill" id="verdict">—</span></div>
+      <div class="stat-row">
+        <div class="stat"><div class="k">毛利润</div><div class="v" id="sGross">—</div></div>
+        <div class="stat"><div class="k">总手续费</div><div class="v" id="sFee">—</div></div>
+        <div class="stat"><div class="k">净利润</div><div class="v" id="sNet">—</div></div>
+        <div class="stat"><div class="k">收益率</div><div class="v" id="sRate">—</div></div>
+        <div class="stat"><div class="k">成本合计</div><div class="v sm" id="sCost">—</div></div>
+        <div class="stat"><div class="k">回款合计</div><div class="v sm" id="sIncome">—</div></div>
+        <div class="stat"><div class="k">每股赚</div><div class="v sm" id="sPerShare">—</div></div>
+        <div class="stat"><div class="k">保本价</div><div class="v sm" id="sBreakeven">—</div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-title"><span>费用明细</span></div>
+    <table class="wt" id="feeTable">
+      <thead><tr><th>项目</th><th>方向</th><th class="num">费率</th><th class="num">金额</th></tr></thead>
+      <tbody><tr><td colspan="4" class="muted">—</td></tr></tbody>
+    </table>
+  </div>
+
+  <div class="panel">
+    <div class="panel-title"><span>反推工具</span><span class="hint">想赚多少，得卖到多少</span></div>
+    <div class="row">
+      <label class="lb" style="margin:0">目标净收益率</label>
+      <input class="wt mono" id="targetRate" value="10" style="width:110px">
+      <span class="muted" style="font-size:13px">%</span>
+      <button class="btn btn-ghost btn-sm" id="btnTarget">算目标卖出价</button>
+    </div>
+    <div class="out" id="targetOut" style="margin-top:12px">—</div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-title"><span>盈亏平衡表</span><span class="hint">按卖出价档位算净收益</span></div>
+    <table class="wt" id="grid">
+      <thead><tr><th class="num">卖出价</th><th class="num">涨跌</th><th class="num">净收益</th><th class="num">净收益率</th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </div>
+</div>
+
+<div class="tool-foot">纯本地计算，费率仅供参考，实际以券商为准 · <a href="../">返回工具合辑</a></div>
+
+<script>
+(function () {
+  "use strict";
+
+  var PRESETS = {
+    a: {
+      label: "A 股",
+      note: "佣金按万三、双边各收最低 5 元；卖出单边收印花税 0.05%（2023 年 8 月起减半）；过户费双边 0.001%。",
+      fields: [
+        { k: "commission", name: "佣金率", val: 0.0003, kind: "rate" },
+        { k: "minComm", name: "佣金最低", val: 5, kind: "money" },
+        { k: "stamp", name: "印花税（卖）", val: 0.0005, kind: "rate" },
+        { k: "transfer", name: "过户费", val: 0.00001, kind: "rate" },
+        { k: "other", name: "其他（卖）", val: 0, kind: "rate" }
+      ]
+    },
+    hk: {
+      label: "港股",
+      note: "港股佣金差异大，这里给参考值：佣金万五最低 5 港元，印花税双向 0.1%，交易征费 0.0027%，联交所交易费 0.00565%，结算费 0.002%。",
+      fields: [
+        { k: "commission", name: "佣金率", val: 0.0005, kind: "rate" },
+        { k: "minComm", name: "佣金最低", val: 5, kind: "money" },
+        { k: "stamp", name: "印花税（双边）", val: 0.001, kind: "rateBoth" },
+        { k: "transfer", name: "交易征费+交易费", val: 0.0000835, kind: "rateBoth" },
+        { k: "other", name: "结算费", val: 0.00002, kind: "rateBoth" }
+      ]
+    },
+    us: {
+      label: "美股",
+      note: "多数券商已零佣金。SEC 规费（卖出）0.0000278，FINRA 交易活动费（卖出）每股 0.000166，上限 8.30 美元。",
+      fields: [
+        { k: "commission", name: "佣金率", val: 0, kind: "rate" },
+        { k: "minComm", name: "佣金最低", val: 0, kind: "money" },
+        { k: "stamp", name: "SEC 规费（卖）", val: 0.0000278, kind: "rate" },
+        { k: "transfer", name: "FINRA（卖）", val: 0, kind: "rate" },
+        { k: "other", name: "其他（卖）", val: 0, kind: "rate" }
+      ]
+    },
+    fund: {
+      label: "场外基金",
+      note: "申购费买入时收（多数平台打 1 折），赎回费按持有期分档，持有越久越低。这里按持有 7 天以上的 0.5% 估算。",
+      fields: [
+        { k: "commission", name: "申购费", val: 0.0015, kind: "rateBuy" },
+        { k: "minComm", name: "最低收费", val: 0, kind: "money" },
+        { k: "stamp", name: "赎回费", val: 0.005, kind: "rateSell" },
+        { k: "transfer", name: "其他", val: 0, kind: "rate" },
+        { k: "other", name: "其他（卖）", val: 0, kind: "rate" }
+      ]
+    },
+    custom: {
+      label: "自定义",
+      note: "所有费率都可以手改，改完立即重算。",
+      fields: [
+        { k: "commission", name: "佣金率", val: 0.0003, kind: "rate" },
+        { k: "minComm", name: "佣金最低", val: 5, kind: "money" },
+        { k: "stamp", name: "印花税（卖）", val: 0.0005, kind: "rate" },
+        { k: "transfer", name: "其他（双向）", val: 0, kind: "rateBoth" },
+        { k: "other", name: "其他（卖）", val: 0, kind: "rate" }
+      ]
+    }
+  };
+
+  var mkt = "a";
+
+  function buildFees() {
+    var p = PRESETS[mkt];
+    document.getElementById("mktPill").textContent = p.label;
+    document.getElementById("feeNote").textContent = p.note;
+    document.getElementById("fees").innerHTML = p.fields.map(function (f) {
+      var unit = f.kind === "money" ? "" : (f.kind === "rate" || f.kind === "rateBoth" || f.kind === "rateBuy" || f.kind === "rateSell" ? "‰ 千分比" : "");
+      var show = f.kind === "money" ? f.val : (f.val * 1000).toFixed(4).replace(/\.?0+$/, "");
+      return '<div><label class="lb">' + f.name + "</label>" +
+        '<input class="wt mono fee" data-k="' + f.k + '" data-kind="' + f.kind + '" value="' + show + '">' +
+        (f.kind === "money" ? "" : '<div class="hint" style="font-size:11px;color:var(--faint);margin-top:3px">' + unit + "</div>") +
+        "</div>";
+    }).join("");
+    Array.prototype.forEach.call(document.querySelectorAll(".fee"), function (inp) {
+      inp.addEventListener("input", calc);
+    });
+    calc();
+  }
+
+  function feeVal(k, kind) {
+    var el = document.querySelector('.fee[data-k="' + k + '"]');
+    if (!el) return 0;
+    var v = parseFloat(el.value) || 0;
+    if (kind === "money") return v;
+    // 界面单位是千分比，换算回小数
+    return v / 1000;
+  }
+
+  function feeKind(k) {
+    var el = document.querySelector('.fee[data-k="' + k + '"]');
+    return el ? el.dataset.kind : "rate";
+  }
+
+  function money(n, cur) {
+    var v = Math.abs(n) < 0.005 ? 0 : n;
+    return v.toLocaleString("zh-CN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " " + cur;
+  }
+
+  function pct(n) { return (n * 100).toFixed(2) + "%"; }
+
+  var last = null;
+
+  function compute(bp, sp, sh) {
+    var commRate = feeVal("commission", feeKind("commission"));
+    var minComm = feeVal("minComm", "money");
+    var stampRate = feeVal("stamp", null);
+    var stampKind = feeKind("stamp");
+    var transRate = feeVal("transfer", null);
+    var transKind = feeKind("transfer");
+    var otherRate = feeVal("other", null);
+
+    var buyAmount = bp * sh;
+    var sellAmount = sp * sh;
+
+    var buyComm = commRate ? Math.max(buyAmount * commRate, minComm) : 0;
+    // 申购费类：只在买入
+    var buyExtra = 0;
+    if (stampKind === "rateBuy") buyExtra += buyAmount * stampRate;
+    if (transKind === "rateBoth") buyExtra += buyAmount * transRate;
+    if (transKind === "rate") buyExtra += buyAmount * transRate;
+
+    var sellComm = commRate ? Math.max(sellAmount * commRate, minComm) : 0;
+    var sellExtra = 0;
+    if (stampKind === "rate" || stampKind === "rateSell" || stampKind === "rateBoth") sellExtra += sellAmount * stampRate;
+    if (transKind === "rateBoth") sellExtra += sellAmount * transRate;
+    sellExtra += sellAmount * otherRate;
+
+    var buyFee = buyComm + buyExtra;
+    var sellFee = sellComm + sellExtra;
+
+    var cost = buyAmount + buyFee;
+    var income = sellAmount - sellFee;
+    var gross = sellAmount - buyAmount;
+    var net = income - cost;
+    var rate = cost ? net / cost : 0;
+    var totalFee = buyFee + sellFee;
+
+    return {
+      bp: bp, sp: sp, sh: sh,
+      buyAmount: buyAmount, sellAmount: sellAmount,
+      buyComm: buyComm, buyExtra: buyExtra, sellComm: sellComm, sellExtra: sellExtra,
+      buyFee: buyFee, sellFee: sellFee, totalFee: totalFee,
+      cost: cost, income: income, gross: gross, net: net, rate: rate,
+      unitFees: { comm: commRate, minComm: minComm, stamp: stampRate, stampKind: stampKind, trans: transRate, transKind: transKind, other: otherRate }
+    };
+  }
+
+  function calc() {
+    var bp = parseFloat(document.getElementById("buyPrice").value) || 0;
+    var sp = parseFloat(document.getElementById("sellPrice").value) || 0;
+    var sh = parseFloat(document.getElementById("shares").value) || 0;
+    var cur = document.getElementById("cur").value || "";
+    if (!bp || !sh) {
+      document.getElementById("verdict").className = "pill warn";
+      document.getElementById("verdict").textContent = "填完整买入价和股数";
+      return;
+    }
+    var r = compute(bp, sp, sh);
+    last = r;
+
+    var cls = r.net >= 0 ? "up" : "down";
+    var vc = r.net >= 0 ? "up" : "down";
+    document.getElementById("sGross").textContent = money(r.gross, cur);
+    document.getElementById("sGross").className = "v " + cls;
+    document.getElementById("sFee").textContent = money(r.totalFee, cur);
+    document.getElementById("sFee").className = "v";
+    document.getElementById("sNet").textContent = money(r.net, cur);
+    document.getElementById("sNet").className = "v " + cls;
+    document.getElementById("sRate").textContent = (r.rate >= 0 ? "+" : "") + pct(r.rate);
+    document.getElementById("sRate").className = "v " + cls;
+    document.getElementById("sCost").textContent = money(r.cost, cur);
+    document.getElementById("sIncome").textContent = money(r.income, cur);
+    document.getElementById("sPerShare").textContent = money(r.net / sh, cur);
+    document.getElementById("sPerShare").className = "v sm " + cls;
+
+    // 保本价：净收益为 0 的卖出价（二分法）
+    var lo = 0, hi = bp * 3 + 10;
+    for (var i = 0; i < 60; i++) {
+      var mid = (lo + hi) / 2;
+      if (compute(bp, mid, sh).net < 0) lo = mid; else hi = mid;
+    }
+    var be = hi;
+    document.getElementById("sBreakeven").textContent = be.toFixed(3) + " " + cur;
+    document.getElementById("sBreakeven").className = "v sm";
+
+    var v = document.getElementById("verdict");
+    v.className = "pill" + (r.net >= 0 ? "" : " bad");
+    v.textContent = r.net >= 0
+      ? "盈利 " + pct(r.rate) + "（保本价 " + be.toFixed(3) + "）"
+      : "亏损 " + pct(r.rate) + "（保本价 " + be.toFixed(3) + "）";
+
+    // 费用明细
+    var rows = [
+      ["佣金", "买入", r.unitFees.comm ? r.unitFees.comm : 0, r.buyComm],
+      ["过户/其他", "买入", r.buyAmount ? r.buyExtra / r.buyAmount : 0, r.buyExtra],
+      ["佣金", "卖出", r.unitFees.comm ? r.unitFees.comm : 0, r.sellComm],
+      ["印花税/规费", "卖出", 0, r.sellExtra]
+    ];
+    document.querySelector("#feeTable tbody").innerHTML = rows.map(function (x) {
+      return "<tr><td>" + x[0] + "</td><td>" + x[1] + '</td><td class="num">' +
+        (x[2] ? (x[2] * 1000).toFixed(4).replace(/\.?0+$/, "") + "‰" : '<span class="muted">—</span>') +
+        '</td><td class="num">' + money(x[3], cur) + "</td></tr>";
+    }).join("") +
+      '<tr style="background:#f8fbfc"><td colspan="3"><b>合计</b></td><td class="num"><b>' + money(r.totalFee, cur) + "</b></td></tr>";
+
+    // 平衡表
+    var tiers = [0.95, 0.98, 1, 1.02, 1.05, 1.1, 1.15, 1.2];
+    document.querySelector("#grid tbody").innerHTML = tiers.map(function (t) {
+      var p = bp * t;
+      var rr = compute(bp, p, sh);
+      var c = rr.net >= 0 ? "up" : "down";
+      return '<tr><td class="num">' + p.toFixed(3) + '</td><td class="num ' + c + '">' +
+        ((t - 1) * 100 >= 0 ? "+" : "") + ((t - 1) * 100).toFixed(1) + "%</td>" +
+        '<td class="num ' + c + '">' + money(rr.net, cur) + '</td><td class="num ' + c + '">' +
+        (rr.rate >= 0 ? "+" : "") + pct(rr.rate) + "</td></tr>";
+    }).join("");
+  }
+
+  document.getElementById("btnCalc").addEventListener("click", calc);
+  document.getElementById("btnSwapP").addEventListener("click", function () {
+    var b = document.getElementById("buyPrice"), s = document.getElementById("sellPrice");
+    var t = b.value; b.value = s.value; s.value = t;
+    calc();
+  });
+
+  document.getElementById("btnTarget").addEventListener("click", function () {
+    if (!last) { calc(); }
+    var tr = parseFloat(document.getElementById("targetRate").value) || 0;
+    var bp = parseFloat(document.getElementById("buyPrice").value) || 0;
+    var sh = parseFloat(document.getElementById("shares").value) || 0;
+    var cur = document.getElementById("cur").value || "";
+    if (!bp || !sh) { document.getElementById("targetOut").textContent = "先填买入价和股数。"; return; }
+
+    var lo = 0, hi = bp * 10 + 100;
+    for (var i = 0; i < 80; i++) {
+      var mid = (lo + hi) / 2;
+      if (compute(bp, mid, sh).rate < tr / 100) lo = mid; else hi = mid;
+    }
+    var need = hi;
+    var res = compute(bp, need, sh);
+    var r2 = compute(bp, need, sh);
+    document.getElementById("targetOut").textContent =
+      "要拿到 " + tr + "% 的净收益率（按成本计），卖出价需要到 " + need.toFixed(3) + " " + cur + "\n" +
+      "相当于从 " + bp + " 涨到 " + need.toFixed(3) + "，涨幅 " + (((need / bp) - 1) * 100).toFixed(2) + "%\n" +
+      "那时毛利润 " + money(r2.gross, cur) + "，手续费 " + money(r2.totalFee, cur) + "，净赚 " + money(r2.net, cur);
+  });
+
+  Array.prototype.forEach.call(document.querySelectorAll("[data-mkt]"), function (b) {
+    b.addEventListener("click", function () {
+      mkt = this.dataset.mkt;
+      Array.prototype.forEach.call(document.querySelectorAll("[data-mkt]"), function (x) {
+        x.className = "btn btn-ghost btn-sm";
+      });
+      this.className = "btn btn-primary btn-sm";
+      var p = PRESETS[mkt];
+      if (mkt === "hk" || mkt === "us") { document.getElementById("cur").value = mkt === "hk" ? "HKD" : "USD"; }
+      else if (mkt === "a") document.getElementById("cur").value = "CNY";
+      buildFees();
+    });
+  });
+
+  ["buyPrice", "sellPrice", "shares", "cur"].forEach(function (id) {
+    document.getElementById(id).addEventListener("input", calc);
+  });
+
+  buildFees();
+})();
+</script>
+</body>
+</html>

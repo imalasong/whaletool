@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>图片转 Base64 · WhaleTool</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐳</text></svg>">
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+
+<div class="wt-back"><a href="../">← 工具合辑</a></div>
+
+<div class="tool-head">
+  <h1>🔡 图片转 Base64</h1>
+  <p>拖入图片直接得到 Base64 和 Data URL。适合把图标内联进 HTML / CSS，或者调试接口时传图片。</p>
+</div>
+
+<div class="wrap">
+  <div class="grid2">
+    <div class="panel">
+      <div class="panel-title"><span>选择图片</span></div>
+      <div class="drop" id="drop">
+        <div class="di">🖼</div>
+        <p>把图片拖到这里，或点击选择</p>
+        <small id="fileInfo">PNG / JPG / SVG / WebP / GIF</small>
+      </div>
+      <input type="file" id="file" accept="image/*" style="display:none">
+      <div class="row" style="margin-top:14px">
+        <label class="lb" style="margin:0"><input type="checkbox" id="strip"> 去掉 data:...;base64, 前缀</label>
+      </div>
+      <div class="stat-row" style="margin-top:14px">
+        <div class="stat"><div class="k">原始体积</div><div class="v sm" id="sOrig">—</div></div>
+        <div class="stat"><div class="k">Base64 长度</div><div class="v sm" id="sB64">—</div></div>
+        <div class="stat"><div class="k">膨胀率</div><div class="v sm" id="sGrow">—</div></div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-title"><span>预览</span><span class="spacer"></span>
+        <span class="pill" id="dimInfo">—</span></div>
+      <div style="display:flex;justify-content:center;align-items:center;min-height:220px;background:#fbfdfe;border:1px solid var(--border-soft);border-radius:14px;padding:14px">
+        <img id="preview" style="max-width:100%;max-height:280px;border-radius:8px;display:none" alt="">
+        <span class="muted" id="ph" style="font-size:13px">选一张图片看预览</span>
+      </div>
+      <div class="row" style="margin-top:14px;justify-content:center">
+        <span class="pill warn" id="warn" style="display:none"></span>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-title"><span>Data URL</span><span class="spacer"></span>
+      <button class="btn btn-ghost btn-sm" id="btnCopyUrl">复制 Data URL</button></div>
+    <div class="out" id="dataurl" style="max-height:150px">—</div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-title"><span>Base64</span><span class="spacer"></span>
+      <button class="btn btn-ghost btn-sm" id="btnCopyB64">复制 Base64</button>
+      <button class="btn btn-ghost btn-sm" id="btnTxt">下载 .txt</button></div>
+    <div class="out" id="b64" style="max-height:260px">—</div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-title"><span>怎么用</span></div>
+    <div class="out" id="usecase" style="font-family:inherit;font-size:13px"></div>
+  </div>
+</div>
+
+<div class="tool-foot">转换在浏览器本地完成，图片不会上传 · <a href="../">返回工具合辑</a></div>
+
+<script>
+(function () {
+  "use strict";
+  var $drop = document.getElementById("drop"), $file = document.getElementById("file"),
+      $preview = document.getElementById("preview"), $ph = document.getElementById("ph"),
+      $du = document.getElementById("dataurl"), $b64 = document.getElementById("b64"),
+      $strip = document.getElementById("strip"),
+      $sOrig = document.getElementById("sOrig"), $sB64 = document.getElementById("sB64"),
+      $sGrow = document.getElementById("sGrow"), $dim = document.getElementById("dimInfo"),
+      $fileInfo = document.getElementById("fileInfo"), $warn = document.getElementById("warn"),
+      $usecase = document.getElementById("usecase");
+
+  var rawB64 = "", rawMime = "", rawName = "";
+
+  function fmtSize(n) {
+    if (n < 1024) return n + " B";
+    if (n < 1048576) return (n / 1024).toFixed(1) + " KB";
+    return (n / 1048576).toFixed(2) + " MB";
+  }
+
+  function update() {
+    if (!rawB64) {
+      $du.textContent = "—"; $b64.textContent = "—";
+      return;
+    }
+    var out = $strip.checked ? rawB64 : "data:" + rawMime + ";base64," + rawB64;
+    $du.textContent = "data:" + rawMime + ";base64," + rawB64;
+    $b64.textContent = out;
+    $sB64.textContent = rawB64.length + " 字符";
+  }
+
+  function handle(f) {
+    if (!f || !/^image\//.test(f.type)) { alert("请选择图片文件"); return; }
+    rawMime = f.type;
+    rawName = f.name.replace(/\.[^.]+$/, "");
+    $fileInfo.textContent = f.name + " · " + fmtSize(f.size);
+
+    var reader = new FileReader();
+    reader.onload = function () {
+      var dataUrl = reader.result;
+      var comma = dataUrl.indexOf(",");
+      rawB64 = dataUrl.slice(comma + 1);
+
+      $preview.src = dataUrl;
+      $preview.style.display = "block";
+      $ph.style.display = "none";
+
+      $preview.onload = function () {
+        $dim.textContent = $preview.naturalWidth + "×" + $preview.naturalHeight;
+      };
+
+      $sOrig.textContent = fmtSize(f.size);
+      var grow = Math.round((rawB64.length / f.size - 1) * 100);
+      $sGrow.textContent = "+" + grow + "%";
+
+      if (f.size > 100 * 1024) {
+        $warn.style.display = "inline-flex";
+        $warn.textContent = "图片超过 100 KB，内联进 HTML 会让页面明显变大";
+      } else {
+        $warn.style.display = "none";
+      }
+
+      update();
+      $usecase.textContent =
+        "① HTML 里内联\n<img src=\"data:" + rawMime + ";base64,……\">\n\n" +
+        "② CSS 里当背景\n.icon { background-image: url(\"data:" + rawMime + ";base64,……\"); }\n\n" +
+        "③ JS 里当常量\nconst ICON = \"data:" + rawMime + ";base64,……\";\n\n" +
+        "④ 接口请求体\n{ \"filename\": \"" + f.name + "\", \"content\": \"data:" + rawMime + ";base64,……\" }";
+    };
+    reader.onerror = function () { alert("读取失败"); };
+    reader.readAsDataURL(f);
+  }
+
+  function copy(text, btn) {
+    if (!text) return;
+    var old = btn.textContent;
+    var done = function () { btn.textContent = "已复制 ✓"; setTimeout(function () { btn.textContent = old; }, 1400); };
+    if (navigator.clipboard && location.protocol !== "file:") {
+      navigator.clipboard.writeText(text).then(done, function () { fb(text, done); });
+    } else { fb(text, done); }
+  }
+  function fb(v, cb) {
+    var ta = document.createElement("textarea");
+    ta.value = v; ta.style.position = "fixed"; ta.style.opacity = "0";
+    document.body.appendChild(ta); ta.select();
+    try { document.execCommand("copy"); cb(); } catch (e) {}
+    document.body.removeChild(ta);
+  }
+
+  document.getElementById("btnCopyUrl").addEventListener("click", function () {
+    copy(rawB64 ? "data:" + rawMime + ";base64," + rawB64 : "", this);
+  });
+  document.getElementById("btnCopyB64").addEventListener("click", function () {
+    copy($b64.textContent === "—" ? "" : $b64.textContent, this);
+  });
+  document.getElementById("btnTxt").addEventListener("click", function () {
+    if (!rawB64) { alert("先选一张图片"); return; }
+    var blob = new Blob([$b64.textContent], { type: "text/plain" });
+    var a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = (rawName || "image") + ".base64.txt";
+    a.click();
+    setTimeout(function () { URL.revokeObjectURL(a.href); }, 3000);
+  });
+
+  $strip.addEventListener("change", update);
+
+  $drop.addEventListener("click", function () { $file.click(); });
+  $file.addEventListener("change", function () { if (this.files[0]) handle(this.files[0]); });
+  ["dragenter", "dragover"].forEach(function (ev) {
+    $drop.addEventListener(ev, function (e) { e.preventDefault(); $drop.classList.add("over"); });
+  });
+  ["dragleave", "drop"].forEach(function (ev) {
+    $drop.addEventListener(ev, function (e) { e.preventDefault(); $drop.classList.remove("over"); });
+  });
+  $drop.addEventListener("drop", function (e) {
+    if (e.dataTransfer.files[0]) handle(e.dataTransfer.files[0]);
+  });
+
+  $usecase.textContent = "选一张图片后，这里会给出四种常见用法的代码片段。";
+})();
+</script>
+</body>
+</html>

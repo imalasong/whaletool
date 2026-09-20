@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>正则测试 · WhaleTool</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐳</text></svg>">
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+
+<div class="wt-back"><a href="../">← 工具合辑</a></div>
+
+<div class="tool-head">
+  <h1>🎯 正则测试</h1>
+  <p>实时匹配高亮，列出所有捕获组和命名组。内置手机号、邮箱、URL、IPv4 等常用模板，点一下就能用。</p>
+</div>
+
+<div class="wrap">
+  <div class="panel">
+    <div class="panel-title"><span>正则表达式</span><span class="spacer"></span>
+      <span class="pill" id="status">—</span></div>
+    <div class="row">
+      <span style="font-size:16px;color:var(--muted);font-family:ui-monospace,monospace">/</span>
+      <input class="wt mono" id="pattern" value="(\\w+)@(\\w+)\\.(\\w+)" style="flex:1 1 240px" spellcheck="false" autocomplete="off">
+      <span style="font-size:16px;color:var(--muted);font-family:ui-monospace,monospace">/</span>
+      <input class="wt mono" id="flags" value="g" style="width:80px" spellcheck="false" autocomplete="off">
+    </div>
+    <div class="row tight" style="margin-top:10px">
+      <button class="btn btn-ghost btn-sm flag" data-f="g">g 全局</button>
+      <button class="btn btn-ghost btn-sm flag" data-f="i">i 忽略大小写</button>
+      <button class="btn btn-ghost btn-sm flag" data-f="m">m 多行</button>
+      <button class="btn btn-ghost btn-sm flag" data-f="s">s 点匹配换行</button>
+      <button class="btn btn-ghost btn-sm flag" data-f="u">u Unicode</button>
+    </div>
+    <div class="row tight" style="margin-top:10px" id="presets"></div>
+  </div>
+
+  <div class="grid2">
+    <div class="panel">
+      <div class="panel-title"><span>测试文本</span><span class="spacer"></span>
+        <span class="hint" id="lenInfo">0 字符</span></div>
+      <textarea class="wt mono" id="text" spellcheck="false" style="min-height:220px">联系邮箱：xiaochangbai@qq.com
+备用邮箱：dev@whaletool.io
+无效示例：not-an-email@@x</textarea>
+    </div>
+
+    <div class="panel">
+      <div class="panel-title"><span>匹配高亮</span></div>
+      <div class="out" id="highlight" style="min-height:220px;font-family:ui-monospace,Consolas,monospace"></div>
+      <div class="row" style="margin-top:12px">
+        <button class="btn btn-ghost btn-sm" id="btnCopyAll">复制所有匹配</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-title"><span>匹配详情</span><span class="spacer"></span>
+      <span class="hint" id="matchCount">—</span></div>
+    <table class="wt" id="matches">
+      <thead><tr><th class="num" style="width:44px">#</th><th style="width:80px">位置</th><th>匹配内容</th><th>捕获组</th></tr></thead>
+      <tbody><tr><td colspan="4" class="muted">—</td></tr></tbody>
+    </table>
+  </div>
+</div>
+
+<div class="tool-foot">正则匹配在浏览器本地执行 · <a href="../">返回工具合辑</a></div>
+
+<script>
+(function () {
+  "use strict";
+  var $p = document.getElementById("pattern"), $f = document.getElementById("flags"),
+      $t = document.getElementById("text"), $st = document.getElementById("status"),
+      $hl = document.getElementById("highlight"),
+      $body = document.querySelector("#matches tbody"),
+      $mc = document.getElementById("matchCount"),
+      $len = document.getElementById("lenInfo"),
+      $presets = document.getElementById("presets");
+
+  function esc(s) {
+    return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  }
+
+  function run() {
+    var pat = $p.value, flags = $f.value.replace(/[^gimsuy]/g, ""), text = $t.value;
+    $len.textContent = text.length + " 字符";
+
+    if (!pat) {
+      $st.className = "pill"; $st.textContent = "等待输入";
+      $hl.textContent = text; $body.innerHTML = '<tr><td colspan="4" class="muted">—</td></tr>';
+      $mc.textContent = "—";
+      return;
+    }
+
+    var re;
+    try {
+      re = new RegExp(pat, flags.indexOf("g") >= 0 ? flags : flags + "g");
+    } catch (e) {
+      $st.className = "pill bad"; $st.textContent = "正则语法错误";
+      $hl.innerHTML = '<span class="err">❌ ' + esc(e.message) + "</span>";
+      $body.innerHTML = '<tr><td colspan="4" class="muted">—</td></tr>';
+      $mc.textContent = "—";
+      return;
+    }
+
+    var parts = [], last = 0, all = [], m, guard = 0;
+    while ((m = re.exec(text)) !== null) {
+      if (guard++ > 5000) break;
+      if (m.index < last) { re.lastIndex++; continue; }
+      parts.push(esc(text.slice(last, m.index)));
+      parts.push('<mark style="background:rgba(15,118,110,.2);color:#0b5d57;border-radius:3px;padding:0 1px">' + esc(m[0]) + "</mark>");
+      last = m.index + m[0].length;
+      all.push({
+        index: m.index,
+        value: m[0],
+        groups: m.slice(1),
+        named: m.groups || null
+      });
+      if (m[0] === "") re.lastIndex++;   // 防死循环
+    }
+    parts.push(esc(text.slice(last)));
+    $hl.innerHTML = parts.join("") || '<span class="muted">（空文本）</span>';
+
+    $st.className = "pill";
+    $st.textContent = all.length ? "匹配 " + all.length + " 处" : "无匹配";
+    if (!all.length) $st.className = "pill warn";
+    $mc.textContent = all.length + " 处匹配";
+
+    if (!all.length) {
+      $body.innerHTML = '<tr><td colspan="4" class="muted">没有匹配到任何内容。</td></tr>';
+      return;
+    }
+
+    $body.innerHTML = all.slice(0, 200).map(function (x, i) {
+      var gs = [];
+      x.groups.forEach(function (g, gi) {
+        gs.push('<span class="tag">$' + (gi + 1) + " = " + esc(g === undefined ? "undefined" : g) + "</span>");
+      });
+      if (x.named) {
+        Object.keys(x.named).forEach(function (k) {
+          gs.push('<span class="tag">' + esc(k) + " = " + esc(x.named[k]) + "</span>");
+        });
+      }
+      return "<tr><td class=\"num\">" + (i + 1) + "</td>" +
+        "<td>" + x.index + "–" + (x.index + x.value.length) + "</td>" +
+        '<td style="word-break:break-all;font-family:ui-monospace,Consolas,monospace">' + esc(x.value) + "</td>" +
+        "<td>" + (gs.length ? gs.join(" ") : '<span class="muted">无</span>') + "</td></tr>";
+    }).join("") + (all.length > 200 ? '<tr><td colspan="4" class="muted">仅显示前 200 条，共 ' + all.length + " 条。</td></tr>" : "");
+
+    return all;
+  }
+
+  var PRESETS = [
+    ["邮箱", "(\\w[\\w.-]*)@([\\w-]+)\\.(\\w{2,})", "g"],
+    ["手机号", "1[3-9]\\d{9}", "g"],
+    ["URL", "https?://[^\\s\"'<>]+", "g"],
+    ["IPv4", "\\b(?:(?:25[0-5]|2[0-4]\\d|1?\\d?\\d)\\.){3}(?:25[0-5]|2[0-4]\\d|1?\\d?\\d)\\b", "g"],
+    ["日期", "(\\d{4})-(\\d{2})-(\\d{2})", "g"],
+    ["中文字符", "[\\u4e00-\\u9fa5]+", "g"],
+    ["HTML 标签", "<([a-zA-Z][\\w-]*)\\b[^>]*>(.*?)</\\1>", "gs"],
+    ["十六进制颜色", "#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})\\b", "g"],
+    ["驼峰转下划线", "([a-z0-9])([A-Z])", "g"],
+    ["重复词", "\\b(\\w+)\\s+\\1\\b", "gi"]
+  ];
+  PRESETS.forEach(function (ps) {
+    var b = document.createElement("button");
+    b.className = "btn btn-ghost btn-sm";
+    b.textContent = ps[0];
+    b.addEventListener("click", function () {
+      $p.value = ps[1]; $f.value = ps[2]; run();
+    });
+    $presets.appendChild(b);
+  });
+
+  Array.prototype.forEach.call(document.querySelectorAll(".flag"), function (b) {
+    b.addEventListener("click", function () {
+      var ch = this.dataset.f, cur = $f.value;
+      $f.value = cur.indexOf(ch) >= 0 ? cur.replace(ch, "") : cur + ch;
+      run();
+    });
+  });
+
+  $p.addEventListener("input", run);
+  $f.addEventListener("input", run);
+  $t.addEventListener("input", run);
+
+  document.getElementById("btnCopyAll").addEventListener("click", function () {
+    var pat = $p.value;
+    if (!pat) return;
+    var re;
+    try { re = new RegExp(pat, $f.value.indexOf("g") >= 0 ? $f.value : $f.value + "g"); }
+    catch (e) { return; }
+    var lines = [], m, g = 0;
+    while ((m = re.exec($t.value)) !== null) {
+      if (g++ > 5000) break;
+      lines.push(m[0]);
+      if (m[0] === "") re.lastIndex++;
+    }
+    if (!lines.length) return;
+    var text = lines.join("\n"), btn = this, old = btn.textContent;
+    var done = function () { btn.textContent = "已复制 ✓"; setTimeout(function () { btn.textContent = old; }, 1400); };
+    if (navigator.clipboard && location.protocol !== "file:") {
+      navigator.clipboard.writeText(text).then(done, function () { fb(text, done); });
+    } else { fb(text, done); }
+    function fb(v, cb) {
+      var ta = document.createElement("textarea");
+      ta.value = v; ta.style.position = "fixed"; ta.style.opacity = "0";
+      document.body.appendChild(ta); ta.select();
+      try { document.execCommand("copy"); cb(); } catch (e) {}
+      document.body.removeChild(ta);
+    }
+  });
+
+  run();
+})();
+</script>
+</body>
+</html>

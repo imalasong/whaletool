@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>二维码生成 · WhaleTool</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐳</text></svg>">
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+
+<div class="wt-back"><a href="../">← 工具合辑</a></div>
+
+<div class="tool-head">
+  <h1>🔳 二维码生成</h1>
+  <p>文本、网址、WiFi 都能转。可调尺寸与容错级别，支持 PNG 位图和 SVG 矢量两种下载。</p>
+</div>
+
+<div class="wrap">
+  <div class="grid2">
+    <div class="panel">
+      <div class="panel-title"><span>内容</span><span class="spacer"></span>
+        <span class="pill" id="capInfo">—</span></div>
+      <div class="row tight" style="margin-bottom:12px">
+        <button class="btn btn-ghost btn-sm" data-tpl="text">纯文本</button>
+        <button class="btn btn-ghost btn-sm" data-tpl="url">网址</button>
+        <button class="btn btn-ghost btn-sm" data-tpl="wifi">WiFi</button>
+        <button class="btn btn-ghost btn-sm" data-tpl="vcard">名片</button>
+        <button class="btn btn-ghost btn-sm" data-tpl="sms">短信</button>
+      </div>
+      <textarea class="wt mono" id="content" style="min-height:150px" spellcheck="false">https://imalasong.github.io/whaletool/</textarea>
+      <div class="row" style="margin-top:12px">
+        <label class="lb" style="margin:0">尺寸</label>
+        <select class="wt" id="size" style="width:auto">
+          <option value="180">180 px</option>
+          <option value="240">240 px</option>
+          <option value="320" selected>320 px</option>
+          <option value="480">480 px</option>
+          <option value="640">640 px</option>
+        </select>
+        <label class="lb" style="margin:0 0 0 6px">容错级别</label>
+        <select class="wt" id="ec" style="width:auto">
+          <option value="L">L · 7%</option>
+          <option value="M" selected>M · 15%</option>
+          <option value="Q">Q · 25%</option>
+          <option value="H">H · 30%</option>
+        </select>
+      </div>
+      <div class="row" style="margin-top:12px">
+        <label class="lb" style="margin:0">前景</label>
+        <input type="color" id="fg" value="#0f1e28" style="width:44px;height:34px;border:1px solid var(--border);border-radius:8px;cursor:pointer;background:none">
+        <label class="lb" style="margin:0 0 0 10px">背景</label>
+        <input type="color" id="bg" value="#ffffff" style="width:44px;height:34px;border:1px solid var(--border);border-radius:8px;cursor:pointer;background:none">
+        <label class="lb" style="margin:0 0 0 10px"><input type="checkbox" id="quiet" checked> 保留白边</label>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-title"><span>预览</span><span class="spacer"></span>
+        <span class="pill" id="sizeInfo">—</span></div>
+      <div style="display:flex;justify-content:center;align-items:center;min-height:320px;background:#fbfdfe;border:1px solid var(--border-soft);border-radius:14px;padding:16px">
+        <div id="canvasWrap"></div>
+      </div>
+      <div class="row" style="margin-top:14px;justify-content:center">
+        <button class="btn btn-primary" id="btnPng">下载 PNG</button>
+        <button class="btn btn-ghost" id="btnSvg">下载 SVG</button>
+      </div>
+      <div class="note" style="margin-top:14px" id="err"></div>
+    </div>
+  </div>
+</div>
+
+<div class="tool-foot">二维码在浏览器本地生成，内容不外传 · <a href="../">返回工具合辑</a></div>
+
+<script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js"></script>
+<script>
+(function () {
+  "use strict";
+  var $c = document.getElementById("content"), $size = document.getElementById("size"),
+      $ec = document.getElementById("ec"), $fg = document.getElementById("fg"),
+      $bg = document.getElementById("bg"), $quiet = document.getElementById("quiet"),
+      $wrap = document.getElementById("canvasWrap"), $capInfo = document.getElementById("capInfo"),
+      $sizeInfo = document.getElementById("sizeInfo"), $err = document.getElementById("err");
+
+  var TPL = {
+    text: "WhaleTool —— 一个纯前端的工具合辑",
+    url: "https://imalasong.github.io/whaletool/",
+    wifi: "WIFI:T:WPA;S:MyWiFi;P:your-password;H:false;;",
+    vcard: "BEGIN:VCARD\nVERSION:3.0\nN:小白\nTEL:13800138000\nEMAIL:704566072@qq.com\nORG:WhaleTool\nEND:VCARD",
+    sms: "SMSTO:13800138000:你好，这是预设短信内容"
+  };
+
+  var matrix = null;
+
+  function build() {
+    var text = $c.value;
+    if (!text.trim()) {
+      $wrap.innerHTML = '<span class="muted" style="font-size:13px">输入内容后生成二维码</span>';
+      $capInfo.textContent = "—"; $sizeInfo.textContent = "—";
+      $err.textContent = ""; matrix = null;
+      return;
+    }
+    if (typeof qrcode === "undefined") {
+      $err.innerHTML = '⚠️ 二维码库没加载成功（可能处于离线状态）。请联网后刷新页面。';
+      $wrap.innerHTML = '<span class="muted" style="font-size:13px">依赖未就绪</span>';
+      return;
+    }
+    $err.textContent = "";
+    var ec = $ec.value;
+    var typeNumber = 0;
+    var qr;
+    try {
+      qr = qrcode(typeNumber, ec);
+      qr.addData(text);
+      qr.make();
+    } catch (e) {
+      $err.innerHTML = "❌ 内容太长了，二维码放不下。试试缩短内容或把容错级别降到 L。";
+      $wrap.innerHTML = '<span class="muted" style="font-size:13px">生成失败</span>';
+      return;
+    }
+
+    var count = qr.getModuleCount();
+    var margin = $quiet.checked ? 4 : 0;
+    var total = count + margin * 2;
+    var px = +$size.value;
+    matrix = { qr: qr, count: count, margin: margin, total: total };
+
+    var fg = $fg.value, bg = $bg.value;
+
+    var svg = '<svg xmlns="http://www.w3.org/2000/svg" width="' + px + '" height="' + px +
+      '" viewBox="0 0 ' + total + " " + total + '" shape-rendering="crispEdges">';
+    if (bg.toLowerCase() !== "#ffffff" || true) {
+      svg += '<rect width="' + total + '" height="' + total + '" fill="' + bg + '"/>';
+    }
+    svg += '<path d="';
+    for (var r = 0; r < count; r++) {
+      for (var c2 = 0; c2 < count; c2++) {
+        if (!qr.isDark(r, c2)) continue;
+        svg += "M" + (c2 + margin) + " " + (r + margin) + "h1v1h-1z";
+      }
+    }
+    svg += '" fill="' + fg + '"/></svg>';
+    $wrap.innerHTML = svg;
+
+    $capInfo.textContent = qr.getModuleCount() + "×" + qr.getModuleCount() + " 模块 · " + ec + " 级";
+    $sizeInfo.textContent = px + "×" + px + " px";
+    $err.innerHTML = '<span class="ok">✓ 生成成功</span> · 内容 ' + text.length + " 字符";
+    $err.style.borderLeftColor = "rgba(23,138,90,.5)";
+  }
+
+  function download(href, name) {
+    var a = document.createElement("a");
+    a.href = href; a.download = name; a.click();
+  }
+
+  document.getElementById("btnPng").addEventListener("click", function () {
+    if (!matrix) { alert("先生成二维码"); return; }
+    var px = +$size.value, q = matrix.qr, m = matrix.margin, total = matrix.total;
+    var scale = px / total;
+    var cv = document.createElement("canvas");
+    cv.width = px; cv.height = px;
+    var ctx = cv.getContext("2d");
+    ctx.fillStyle = $bg.value;
+    ctx.fillRect(0, 0, px, px);
+    ctx.fillStyle = $fg.value;
+    var count = matrix.count;
+    for (var r = 0; r < count; r++) {
+      for (var c2 = 0; c2 < count; c2++) {
+        if (!q.isDark(r, c2)) continue;
+        ctx.fillRect(Math.round((c2 + m) * scale), Math.round((r + m) * scale),
+          Math.ceil(scale), Math.ceil(scale));
+      }
+    }
+    download(cv.toDataURL("image/png"), "qrcode.png");
+  });
+
+  document.getElementById("btnSvg").addEventListener("click", function () {
+    if (!matrix) { alert("先生成二维码"); return; }
+    var svg = $wrap.querySelector("svg");
+    if (!svg) return;
+    var blob = new Blob([svg.outerHTML], { type: "image/svg+xml" });
+    download(URL.createObjectURL(blob), "qrcode.svg");
+    setTimeout(function () { URL.revokeObjectURL(blob); }, 3000);
+  });
+
+  Array.prototype.forEach.call(document.querySelectorAll("[data-tpl]"), function (b) {
+    b.addEventListener("click", function () {
+      $c.value = TPL[this.dataset.tpl];
+      build();
+    });
+  });
+
+  $c.addEventListener("input", build);
+  $size.addEventListener("change", build);
+  $ec.addEventListener("change", build);
+  $fg.addEventListener("input", build);
+  $bg.addEventListener("input", build);
+  $quiet.addEventListener("change", build);
+
+  build();
+})();
+</script>
+</body>
+</html>

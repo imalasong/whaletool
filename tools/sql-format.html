@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SQL 格式化 · WhaleTool</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐳</text></svg>">
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+
+<div class="wt-back"><a href="../">← 工具合辑</a></div>
+
+<div class="tool-head">
+  <h1>🗄 SQL 格式化</h1>
+  <p>关键字大写、子句换行缩进。支持 SELECT / INSERT / UPDATE / DELETE 以及 join、子查询、CASE WHEN，也能一键压成一行。</p>
+</div>
+
+<div class="wrap">
+  <div class="panel">
+    <div class="panel-title"><span>输入 SQL</span><span class="spacer"></span>
+      <span class="pill" id="status">—</span></div>
+    <textarea class="wt mono" id="input" style="min-height:200px" spellcheck="false"></textarea>
+    <div class="row" style="margin-top:12px">
+      <button class="btn btn-primary" id="btnFormat">格式化</button>
+      <button class="btn btn-ghost" id="btnMin">压成一行</button>
+      <button class="btn btn-ghost" id="btnUpper">仅关键字大写</button>
+      <button class="btn btn-ghost" id="btnSample">示例</button>
+      <button class="btn btn-ghost" id="btnClear">清空</button>
+      <span class="spacer"></span>
+      <select class="wt" id="style" style="width:auto">
+        <option value="standard">标准（关键字大写）</option>
+        <option value="lower">全小写</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-title"><span>结果</span><span class="spacer"></span>
+      <button class="btn btn-ghost btn-sm" id="btnCopy">复制</button>
+      <button class="btn btn-ghost btn-sm" id="btnUseAsInput">结果作为输入</button></div>
+    <div class="out" id="output"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-title"><span>语句概览</span></div>
+    <div class="stat-row" id="stats"></div>
+  </div>
+</div>
+
+<div class="tool-foot">格式化在浏览器本地完成 · <a href="../">返回工具合辑</a></div>
+
+<script>
+(function () {
+  "use strict";
+  var $in = document.getElementById("input"), $out = document.getElementById("output"),
+      $st = document.getElementById("status"), $style = document.getElementById("style"),
+      $stats = document.getElementById("stats");
+
+  /* 需要独占一行的主要子句 */
+  var NEWLINE = [
+    "SELECT","FROM","WHERE","GROUP BY","ORDER BY","HAVING","LIMIT","OFFSET","UNION ALL","UNION",
+    "INSERT INTO","VALUES","UPDATE","SET","DELETE FROM","WITH","RETURNING","ON CONFLICT",
+    "LEFT OUTER JOIN","RIGHT OUTER JOIN","INNER JOIN","LEFT JOIN","RIGHT JOIN","FULL JOIN",
+    "CROSS JOIN","JOIN","ON","AND","OR"
+  ];
+
+  /* 关键字表（只做大写，不换行） */
+  var KEYWORDS = [
+    "SELECT","FROM","WHERE","GROUP BY","ORDER BY","HAVING","LIMIT","OFFSET","UNION ALL","UNION",
+    "INSERT INTO","INSERT","VALUES","UPDATE","SET","DELETE FROM","DELETE","WITH","RETURNING",
+    "LEFT OUTER JOIN","RIGHT OUTER JOIN","INNER JOIN","LEFT JOIN","RIGHT JOIN","FULL JOIN",
+    "CROSS JOIN","JOIN","ON","AND","OR","NOT","NULL","IS","IN","EXISTS","BETWEEN","LIKE","ILIKE",
+    "ASC","DESC","AS","DISTINCT","COUNT","SUM","AVG","MIN","MAX","COALESCE","CASE","WHEN","THEN",
+    "ELSE","END","CAST","INTERVAL","CREATE TABLE","PRIMARY KEY","FOREIGN KEY","REFERENCES",
+    "DEFAULT","INDEX","UNIQUE","ALTER TABLE","DROP TABLE","TRUNCATE","BEGIN","COMMIT","ROLLBACK",
+    "OVER","PARTITION BY","ROW_NUMBER","RANK","CONFLICT","DO UPDATE","EXCLUDED","TRUE","FALSE"
+  ].sort(function (a, b) { return b.length - a.length; });
+
+  var STRINGS = [];
+
+  function protect(sql) {
+    STRINGS = [];
+    // 保护字符串字面量、注释、反引号/双引号标识符、$1 参数
+    return sql
+      .replace(/--[^\n]*/g, function (m) { STRINGS.push(m); return "\u0001" + (STRINGS.length - 1) + "\u0001"; })
+      .replace(/\/\*[\s\S]*?\*\//g, function (m) { STRINGS.push(m); return "\u0001" + (STRINGS.length - 1) + "\u0001"; })
+      .replace(/'(?:''|[^'])*'/g, function (m) { STRINGS.push(m); return "\u0001" + (STRINGS.length - 1) + "\u0001"; })
+      .replace(/"(?:""|[^"])*"/g, function (m) { STRINGS.push(m); return "\u0001" + (STRINGS.length - 1) + "\u0001"; })
+      .replace(/`[^`]*`/g, function (m) { STRINGS.push(m); return "\u0001" + (STRINGS.length - 1) + "\u0001"; });
+  }
+
+  function restore(s) {
+    return s.replace(/\u0001(\d+)\u0001/g, function (_, i) { return STRINGS[+i]; });
+  }
+
+  function normalizeCase(sql, upper) {
+    var s = sql;
+    KEYWORDS.forEach(function (k) {
+      var re = new RegExp("\\b" + k.replace(/\s+/g, "\\s+") + "\\b", "gi");
+      s = s.replace(re, upper ? k : k.toLowerCase());
+    });
+    // 函数名统一小写
+    s = s.replace(/\b([A-Z][A-Z0-9_]{2,})\s*\(/g, function (m, fn) {
+      if (KEYWORDS.indexOf(fn.toUpperCase()) >= 0) return m;
+      return (upper ? fn.toUpperCase() : fn.toLowerCase()) + "(";
+    });
+    return s;
+  }
+
+  function formatSQL(raw, mode) {
+    var upper = $style.value === "standard";
+    var s = protect(raw);
+    s = normalizeCase(s, upper);
+    s = s.replace(/\s+/g, " ").trim();
+
+    // 括号内不强换行，先做占位再打散
+    if (mode === "min") {
+      s = s.replace(/,\s*/g, ", ");
+      return restore(s);
+    }
+
+    // 逗号后换行（仅在选择列表层级的顶层逗号）
+    var tokens = s.split(/(\u0001\d+\u0001)/);
+    var result = [];
+    tokens.forEach(function (tok) {
+      if (/^\u0001\d+\u0001$/.test(tok)) { result.push(tok); return; }
+      // 在主语句层把 ", " 变成 ",\n"
+      result.push(tok.replace(/,\s*/g, ",\n"));
+    });
+    s = result.join("");
+
+    // 主要子句前换行
+    var nl = NEWLINE.slice().sort(function (a, b) { return b.length - a.length; });
+    nl.forEach(function (k) {
+      var re = new RegExp("\\s*\\b" + k.replace(/\s+/g, "\\s+") + "\\b", "g");
+      s = s.replace(re, "\n" + (upper ? k : k.toLowerCase()));
+    });
+
+    // 清理多余换行 / 缩进
+    var lines = s.split("\n").map(function (l) { return l.replace(/\s+$/, "").replace(/^\s+/, ""); })
+      .filter(function (l) { return l.length; });
+
+    var out = [];
+    lines.forEach(function (l) {
+      var isSub = /^(AND|OR)\b/i.test(l);
+      var isJoin = /^(LEFT|RIGHT|INNER|FULL|CROSS)?\s*JOIN\b/i.test(l) || /^ON\b/i.test(l);
+      var isEnd = /^(GROUP BY|ORDER BY|HAVING|LIMIT|OFFSET|UNION|VALUES|SET|RETURNING|ON CONFLICT)\b/i.test(l);
+      var pad = isSub ? "  " : "    ";
+      out.push(pad + l);
+      if (isEnd) return;
+    });
+
+    // 首行顶格
+    var text = out.join("\n");
+    text = text.replace(/^\s+/, "");
+    text = text.replace(/,\n\s+/g, ",\n    ");
+    return restore(text);
+  }
+
+  function analyze(sql) {
+    var s = sql.toUpperCase();
+    var first = (s.match(/^\s*(WITH|SELECT|INSERT|UPDATE|DELETE|CREATE|ALTER|DROP|TRUNCATE|BEGIN)/) || [])[1] || "—";
+    var joins = (s.match(/\bJOIN\b/g) || []).length;
+    var subs = (s.match(/\bSELECT\b/g) || []).length;
+    var conds = (s.match(/\b(AND|OR)\b/g) || []).length;
+    var tables = [];
+    var re = /\b(?:FROM|JOIN|UPDATE|INTO)\s+([a-zA-Z_][\w.]*)/g, m;
+    while ((m = re.exec(sql)) !== null) {
+      var t = m[1];
+      if (tables.indexOf(t) < 0 && !/^\(/i.test(t)) tables.push(t);
+    }
+    $stats.innerHTML =
+      '<div class="stat"><div class="k">语句类型</div><div class="v sm">' + first + "</div></div>" +
+      '<div class="stat"><div class="k">涉及表</div><div class="v">' + tables.length + "</div></div>" +
+      '<div class="stat"><div class="k">JOIN 次数</div><div class="v">' + joins + "</div></div>" +
+      '<div class="stat"><div class="k">SELECT 层数</div><div class="v">' + subs + "</div></div>" +
+      '<div class="stat"><div class="k">条件数</div><div class="v">' + conds + "</div></div>";
+  }
+
+  function run(mode) {
+    var raw = $in.value;
+    if (!raw.trim()) {
+      $out.textContent = "";
+      $st.className = "pill"; $st.textContent = "等待输入";
+      $stats.innerHTML = "";
+      return;
+    }
+    var text = formatSQL(raw, mode || "pretty");
+    $out.textContent = text;
+    $st.className = "pill";
+    $st.textContent = mode === "min" ? "已压缩" :
+      (mode === "upper" ? "关键字已大写" : "已格式化");
+    analyze(raw);
+  }
+
+  document.getElementById("btnFormat").addEventListener("click", function () { run("pretty"); });
+  document.getElementById("btnMin").addEventListener("click", function () { run("min"); });
+  document.getElementById("btnUpper").addEventListener("click", function () {
+    var upper = $style.value === "standard";
+    var s = protect($in.value);
+    $out.textContent = restore(normalizeCase(s, upper));
+    $st.className = "pill"; $st.textContent = "关键字已处理";
+    analyze($in.value);
+  });
+
+  $style.addEventListener("change", function () { run("pretty"); });
+
+  document.getElementById("btnSample").addEventListener("click", function () {
+    $in.value = "select u.id, u.name, count(o.id) as order_cnt, sum(o.amount) as total from users u left join orders o on o.user_id = u.id and o.status = 'paid' where u.created_at > '2026-01-01' and u.city in ('sz','gz') group by u.id, u.name having count(o.id) > 3 order by total desc limit 20;";
+    run("pretty");
+  });
+
+  document.getElementById("btnClear").addEventListener("click", function () {
+    $in.value = ""; run("pretty");
+  });
+
+  document.getElementById("btnCopy").addEventListener("click", function () {
+    if (!$out.textContent) return;
+    var btn = this, old = btn.textContent, text = $out.textContent;
+    var done = function () { btn.textContent = "已复制 ✓"; setTimeout(function () { btn.textContent = old; }, 1400); };
+    if (navigator.clipboard && location.protocol !== "file:") {
+      navigator.clipboard.writeText(text).then(done, function () { fb(text, done); });
+    } else { fb(text, done); }
+    function fb(v, cb) {
+      var ta = document.createElement("textarea");
+      ta.value = v; ta.style.position = "fixed"; ta.style.opacity = "0";
+      document.body.appendChild(ta); ta.select();
+      try { document.execCommand("copy"); cb(); } catch (e) {}
+      document.body.removeChild(ta);
+    }
+  });
+
+  document.getElementById("btnUseAsInput").addEventListener("click", function () {
+    if (!$out.textContent) return;
+    $in.value = $out.textContent; run("pretty");
+  });
+
+  $in.addEventListener("input", function () { run("pretty"); });
+
+  $in.value = "select u.id, u.name, count(o.id) as order_cnt, sum(o.amount) as total from users u left join orders o on o.user_id = u.id and o.status = 'paid' where u.created_at > '2026-01-01' and u.city in ('sz','gz') group by u.id, u.name having count(o.id) > 3 order by total desc limit 20;";
+  run("pretty");
+})();
+</script>
+</body>
+</html>

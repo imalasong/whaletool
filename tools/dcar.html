@@ -1,0 +1,486 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>定投回测 · WhaleTool</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐳</text></svg>">
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+
+<div class="wt-back"><a href="../">← 工具合辑</a></div>
+
+<div class="tool-head">
+  <h1>📈 定投回测</h1>
+  <p>按周期和金额模拟定投，算总投入、最终市值、年化收益和最大回撤。用历史净值序列（CSV）跑最准。</p>
+</div>
+
+<div class="wrap">
+  <div class="panel">
+    <div class="panel-title"><span>数据来源</span></div>
+    <div class="row tight">
+      <button class="btn btn-primary btn-sm" data-src="csv">用净值 CSV</button>
+      <button class="btn btn-ghost btn-sm" data-src="season">用「买入价 / 卖出价」粗略估算</button>
+      <button class="btn btn-ghost btn-sm" data-src="random">用随机模拟</button>
+    </div>
+    <div class="note" style="margin-top:12px" id="srcNote"></div>
+  </div>
+
+  <div class="panel" id="csvPane">
+    <div class="panel-title"><span>净值序列</span><span class="hint">每行：日期,净值</span>
+      <span class="spacer"></span>
+      <button class="btn btn-ghost btn-sm" id="btnDemo">填示例数据</button></div>
+    <textarea class="wt mono" id="csv" style="min-height:180px" spellcheck="false" placeholder="2024-01-01,1.000
+2024-02-01,0.980
+2024-03-01,1.050
+..."></textarea>
+  </div>
+
+  <div class="panel" id="seasonPane" style="display:none">
+    <div class="panel-title"><span>粗略估算参数</span></div>
+    <div class="row">
+      <label class="lb" style="margin:0">起始净值</label>
+      <input class="wt mono" id="vStart" value="1.000" style="width:110px">
+      <label class="lb" style="margin:0 0 0 8px">结束净值</label>
+      <input class="wt mono" id="vEnd" value="1.350" style="width:110px">
+      <label class="lb" style="margin:0 0 0 8px">波动强度</label>
+      <input class="wt mono" id="vVol" value="15" style="width:80px">
+      <span class="muted" style="font-size:13px">% 年化</span>
+    </div>
+    <div class="note" style="margin-top:12px">按「起点净值 → 终点净值」用几何路径生成中间点位，再叠加随机波动。适合快速试算，不代表真实行情。</div>
+  </div>
+
+  <div class="grid2">
+    <div class="panel">
+      <div class="panel-title"><span>定投计划</span></div>
+      <div class="row">
+        <label class="lb" style="margin:0;min-width:92px">每期投入</label>
+        <input class="wt mono" id="periodAmt" value="2000" style="flex:1 1 120px">
+      </div>
+      <div class="row" style="margin-top:10px">
+        <label class="lb" style="margin:0;min-width:92px">频率</label>
+        <select class="wt" id="freq" style="width:auto">
+          <option value="d">每交易日</option>
+          <option value="w">每周</option>
+          <option value="bw">每两周</option>
+          <option value="m" selected>每月</option>
+          <option value="q">每季度</option>
+        </select>
+      </div>
+      <div class="row" style="margin-top:10px">
+        <label class="lb" style="margin:0;min-width:92px">定投日</label>
+        <input class="wt mono" id="dom" type="number" value="1" min="1" max="28" style="width:80px">
+        <span class="muted" style="font-size:12.5px">每月第几天</span>
+      </div>
+      <div class="row" style="margin-top:10px">
+        <label class="lb" style="margin:0;min-width:92px">手续费率</label>
+        <input class="wt mono" id="feeRate" value="0.15" style="width:80px">
+        <span class="muted" style="font-size:12.5px">%（每期按申购金额收）</span>
+      </div>
+      <div class="row" style="margin-top:16px">
+        <button class="btn btn-primary" id="btnRun">开始回测</button>
+        <button class="btn btn-ghost" id="btnCompare">对比「一次性买入」</button>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-title"><span>回测结果</span><span class="spacer"></span>
+        <span class="pill" id="verdict">—</span></div>
+      <div class="stat-row">
+        <div class="stat"><div class="k">总投入</div><div class="v" id="sInvest">—</div></div>
+        <div class="stat"><div class="k">最终市值</div><div class="v" id="sValue">—</div></div>
+        <div class="stat"><div class="k">总收益</div><div class="v" id="sProfit">—</div></div>
+        <div class="stat"><div class="k">累计收益率</div><div class="v" id="sReturn">—</div></div>
+        <div class="stat"><div class="k">年化收益率</div><div class="v" id="sAnnual">—</div></div>
+        <div class="stat"><div class="k">最大回撤</div><div class="v" id="sDrawdown">—</div></div>
+        <div class="stat"><div class="k">定投期数</div><div class="v" id="sTimes">—</div></div>
+        <div class="stat"><div class="k">持有份额</div><div class="v sm" id="sUnits">—</div></div>
+        <div class="stat"><div class="k">平均成本</div><div class="v sm" id="sAvgCost">—</div></div>
+        <div class="stat"><div class="k">手续费合计</div><div class="v sm" id="sFee">—</div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-title"><span>净值走势与持仓成本</span><span class="hint">折线是净值，横轴是时间</span></div>
+    <div id="chart" style="width:100%"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-title"><span>逐期明细</span><span class="spacer"></span>
+      <span class="hint" id="detailHint">—</span></div>
+    <div style="max-height:420px;overflow:auto">
+      <table class="wt" id="detail">
+        <thead><tr><th>日期</th><th class="num">净值</th><th class="num">投入</th><th class="num">买入份额</th><th class="num">累计份额</th><th class="num">累计成本</th><th class="num">当期市值</th><th class="num">收益率</th></tr></thead>
+        <tbody><tr><td colspan="8" class="muted">—</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-title"><span>结论</span></div>
+    <div class="note" id="conclusion">跑一次回测看结论。</div>
+  </div>
+</div>
+
+<div class="tool-foot">所有数据留在浏览器，不上传 · <a href="../">返回工具合辑</a></div>
+
+<script>
+(function () {
+  "use strict";
+  var src = "csv";
+
+  function fm(n, d) {
+    d = d === undefined ? 2 : d;
+    return (n || 0).toLocaleString("zh-CN", { minimumFractionDigits: d, maximumFractionDigits: d });
+  }
+  function pct(n) { return (n >= 0 ? "+" : "") + (n * 100).toFixed(2) + "%"; }
+
+  function parseCSV(text) {
+    var out = [];
+    text.split("\n").forEach(function (l) {
+      l = l.trim();
+      if (!l || /^#/.test(l)) return;
+      var seg = l.split(/[,\t;]+/).map(function (x) { return x.trim(); });
+      if (seg.length < 2) return;
+      var d = new Date(seg[0].replace(/\//g, "-"));
+      var v = parseFloat(seg[1]);
+      if (isNaN(d.getTime()) || !isFinite(v) || v <= 0) return;
+      out.push({ date: d, value: v });
+    });
+    out.sort(function (a, b) { return a.date - b.date; });
+    return out;
+  }
+
+  function genSeason() {
+    var v0 = parseFloat(document.getElementById("vStart").value) || 1;
+    var v1 = parseFloat(document.getElementById("vEnd").value) || 1.35;
+    var vol = (parseFloat(document.getElementById("vVol").value) || 15) / 100;
+    var n = 60;  // 60 个月
+    var series = [];
+    var d = new Date();
+    d.setMonth(d.getMonth() - n);
+    var logStart = Math.log(v0), logEnd = Math.log(v1);
+    var seed = 20260920;
+    function rnd() {
+      seed = (seed * 1103515245 + 12345) & 0x7fffffff;
+      return seed / 0x7fffffff;
+    }
+    for (var i = 0; i <= n; i++) {
+      var trend = logStart + (logEnd - logStart) * i / n;
+      // 叠加均值回归的噪声，避免路径太直
+      var noise = (rnd() - 0.5) * 2 * vol / Math.sqrt(12) * 1.6;
+      var v = Math.exp(trend + noise);
+      var dd = new Date(d); dd.setMonth(d.getMonth() + i);
+      series.push({ date: dd, value: Math.max(0.01, v) });
+    }
+    return series;
+  }
+
+  function genRandom() {
+    var series = [];
+    var d = new Date();
+    d.setMonth(d.getMonth() - 60);
+    var v = 1, seed = Date.now() % 2147483647;
+    function rnd() {
+      seed = (seed * 1103515245 + 12345) & 0x7fffffff;
+      return seed / 0x7fffffff;
+    }
+    for (var i = 0; i <= 60; i++) {
+      var drift = 0.006, vol = 0.045;
+      v = v * Math.exp((drift - vol * vol / 2) + (rnd() - 0.5) * 2 * vol);
+      var dd = new Date(d); dd.setMonth(d.getMonth() + i);
+      series.push({ date: dd, value: Math.max(0.01, v) });
+    }
+    return series;
+  }
+
+  function pickInvestDates(series, freq, dom) {
+    var picked = [];
+    if (freq === "d") return series.slice();
+    var lastKey = "";
+    series.forEach(function (pt) {
+      var d = pt.date;
+      var key;
+      if (freq === "w") {
+        var wk = Math.floor(d.getTime() / (7 * 864e5));
+        key = "w" + wk;
+      } else if (freq === "bw") {
+        var wk2 = Math.floor(d.getTime() / (7 * 864e5));
+        key = "b" + Math.floor(wk2 / 2);
+      } else if (freq === "m") {
+        key = d.getFullYear() + "-" + d.getMonth();
+        if (d.getDate() < dom) return;   // 等到了定投日才买
+      } else {
+        key = d.getFullYear() + "-" + Math.floor(d.getMonth() / 3);
+      }
+      if (key !== lastKey) {
+        lastKey = key;
+        picked.push(pt);
+      }
+    });
+    return picked;
+  }
+
+  function backtest() {
+    var series;
+    if (src === "csv") {
+      series = parseCSV(document.getElementById("csv").value);
+    } else if (src === "season") {
+      series = genSeason();
+    } else {
+      series = genRandom();
+    }
+    if (series.length < 2) {
+      document.getElementById("verdict").className = "pill bad";
+      document.getElementById("verdict").textContent = "数据不够";
+      document.getElementById("conclusion").textContent = "至少需要两行净值数据（日期,净值）。";
+      return;
+    }
+
+    var periodAmt = parseFloat(document.getElementById("periodAmt").value) || 0;
+    var freq = document.getElementById("freq").value;
+    var dom = parseInt(document.getElementById("dom").value) || 1;
+    var feeRate = (parseFloat(document.getElementById("feeRate").value) || 0) / 100;
+
+    var buys = pickInvestDates(series, freq, dom);
+    if (!buys.length) buys = [series[0]];
+
+    var units = 0, invested = 0, feeTotal = 0;
+    var rows = [], peak = 0, maxDD = 0, mvSeries = [];
+
+    // 每个时间点都要算市值，才能得到回撤曲线
+    var buyMap = {};
+    buys.forEach(function (b) { buyMap[b.date.getTime()] = true; });
+
+    series.forEach(function (pt) {
+      if (buyMap[pt.date.getTime()] && periodAmt > 0) {
+        var fee = periodAmt * feeRate;
+        var net = periodAmt - fee;
+        var got = net / pt.value;
+        units += got;
+        invested += periodAmt;
+        feeTotal += fee;
+        rows.push({
+          date: pt.date, nav: pt.value, invest: periodAmt, units: got,
+          cumUnits: units, cumCost: invested, fee: fee
+        });
+      }
+      var mv = units * pt.value;
+      peak = Math.max(peak, mv);
+      if (peak > 0) maxDD = Math.max(maxDD, (peak - mv) / peak);
+      mvSeries.push({ date: pt.date, nav: pt.value, mv: mv, cost: invested });
+    });
+
+    var last = series[series.length - 1];
+    var finalValue = units * last.value;
+    var profit = finalValue - invested;
+    var totalReturn = invested ? profit / invested : 0;
+
+    // 年化（按时间加权收益率近似：区间长度取首末期数跨度）
+    var years = (last.date - buys[0].date) / (365.25 * 864e5);
+    var annual = 0;
+    if (years > 0 && invested > 0 && finalValue > 0) {
+      // 用资金加权 IRR 的简化近似：把每笔投入折现
+      // 这里用迭代法求 IRR
+      var lo = -0.99, hi = 5;
+      for (var iter = 0; iter < 80; iter++) {
+        var mid = (lo + hi) / 2;
+        var npv = 0;
+        rows.forEach(function (r) {
+          var t = (r.date - buys[0].date) / (365.25 * 864e5);
+          npv -= (r.invest) / Math.pow(1 + mid, t);
+        });
+        npv += finalValue / Math.pow(1 + mid, years);
+        if (npv < 0) hi = mid; else lo = mid;
+      }
+      annual = (lo + hi) / 2;
+    }
+
+    // 一次性买入对比
+    var lumpUnits = invested ? (invested * (1 - feeRate)) / series[0].value : 0;
+    var lumpValue = lumpUnits * last.value;
+    var lumpReturn = invested ? (lumpValue - invested) / invested : 0;
+
+    document.getElementById("sInvest").textContent = fm(invested);
+    document.getElementById("sValue").textContent = fm(finalValue);
+    document.getElementById("sValue").className = "v " + (profit >= 0 ? "up" : "down");
+    document.getElementById("sProfit").textContent = (profit >= 0 ? "+" : "") + fm(profit);
+    document.getElementById("sProfit").className = "v " + (profit >= 0 ? "up" : "down");
+    document.getElementById("sReturn").textContent = pct(totalReturn);
+    document.getElementById("sReturn").className = "v " + (totalReturn >= 0 ? "up" : "down");
+    document.getElementById("sAnnual").textContent = pct(annual);
+    document.getElementById("sAnnual").className = "v " + (annual >= 0 ? "up" : "down");
+    document.getElementById("sDrawdown").textContent = "-" + (maxDD * 100).toFixed(2) + "%";
+    document.getElementById("sDrawdown").className = "v up";
+    document.getElementById("sTimes").textContent = buys.length;
+    document.getElementById("sUnits").textContent = fm(units, 4);
+    document.getElementById("sAvgCost").textContent = fm(units ? invested / units : 0, 4);
+    document.getElementById("sFee").textContent = fm(feeTotal);
+
+    var v = document.getElementById("verdict");
+    v.className = "pill" + (profit >= 0 ? "" : " bad");
+    v.textContent = profit >= 0 ? "盈利 " + pct(totalReturn) : "亏损 " + pct(totalReturn);
+
+    document.getElementById("detailHint").textContent =
+      buys.length + " 期 · 区间 " + fmtDate(series[0].date) + " → " + fmtDate(last.date);
+
+    // 明细表（只显示最近 120 期）
+    var show = rows.slice(-120).reverse().map(function (r, i) {
+      var idx = rows.indexOf(r);
+      var mv = mvSeries[series.indexOf(r.date) >= 0 ? idx : idx] ? 0 : 0;
+      var curMV = r.cumUnits * r.nav;
+      var ret = r.cumCost ? (curMV - r.cumCost) / r.cumCost : 0;
+      return "<tr><td>" + fmtDate(r.date) + '</td><td class="num">' + r.nav.toFixed(4) +
+        '</td><td class="num">' + fm(r.invest, 0) +
+        '</td><td class="num">' + fm(r.units, 4) +
+        '</td><td class="num">' + fm(r.cumUnits, 4) +
+        '</td><td class="num">' + fm(r.cumCost, 0) +
+        '</td><td class="num">' + fm(curMV, 0) +
+        '</td><td class="num ' + (ret >= 0 ? "down" : "up") + '">' + pct(ret) + "</td></tr>";
+    }).join("");
+    document.querySelector("#detail tbody").innerHTML = show;
+
+    drawChart(mvSeries);
+
+    // 结论
+    var better = totalReturn - lumpReturn;
+    var concl = [];
+    concl.push("定投 <b>" + buys.length + " 期</b>，累计投入 " + fm(invested) + "，期末市值 " + fm(finalValue) +
+      "，累计收益率 <b>" + pct(totalReturn) + "</b>，年化约 <b>" + pct(annual) + "</b>。");
+    concl.push("同期一次性买入收益率为 " + pct(lumpReturn) + "，定投" +
+      (better > 0.005 ? "跑赢 " + (better * 100).toFixed(2) + " 个百分点" :
+       (better < -0.005 ? "跑输 " + Math.abs(better * 100).toFixed(2) + " 个百分点" : "基本持平") + "。");
+    concl.push("区间最大回撤 " + (maxDD * 100).toFixed(2) + "%。这说明过程中你需要承受 " +
+      (maxDD * 100).toFixed(1) + "% 的浮亏而不割肉。");
+    var avgCost = units ? invested / units : 0;
+    concl.push("平均成本 " + avgCost.toFixed(4) + "，期末净值 " + last.value.toFixed(4) +
+      "，净值只要站上 " + avgCost.toFixed(4) + " 就是盈利状态。");
+    if (lumpReturn > totalReturn + 0.05) {
+      concl.push("<b>注意：</b>这段区间是单边上涨行情，一次性买入明显更赚。定投的优势在震荡和下跌市，牛市里必然会跑输。");
+    } else if (totalReturn > lumpReturn + 0.05) {
+      concl.push("这段区间波动较大，定投摊低成本的效果体现出来了，跑赢了一次性买入。");
+    }
+    document.getElementById("conclusion").innerHTML = concl.map(function (c) { return "· " + c; }).join("<br>");
+  }
+
+  function fmtDate(d) {
+    return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+  }
+
+  function drawChart(data) {
+    var el = document.getElementById("chart");
+    if (!data.length) { el.innerHTML = ""; return; }
+    var W = 1100, H = 300, padL = 46, padR = 52, padT = 16, padB = 26;
+    var navs = data.map(function (d) { return d.nav; });
+    var minV = Math.min.apply(null, navs), maxV = Math.max.apply(null, navs);
+    var span = maxV - minV || 1;
+    minV -= span * 0.08; maxV += span * 0.08;
+
+    function x(i) { return padL + (W - padL - padR) * (i / Math.max(1, data.length - 1)); }
+    function y(v) { return padT + (H - padT - padB) * (1 - (v - minV) / (maxV - minV)); }
+
+    var path = data.map(function (d, i) { return (i ? "L" : "M") + x(i).toFixed(1) + " " + y(d.nav).toFixed(1); }).join(" ");
+
+    // 成本线（累计成本/累计份额）
+    var costPath = "", hasCost = false;
+    data.forEach(function (d, i) {
+      if (!d.cost || !d.mv) return;
+      // 用 mv/cost 推导收益率曲线更直观，这里单独画一条收益率线
+    });
+    // 收益率曲线
+    var retData = data.map(function (d) {
+      return d.cost ? (d.mv - d.cost) / d.cost : 0;
+    });
+    var rMin = Math.min.apply(null, retData), rMax = Math.max.apply(null, retData);
+    var rSpan = Math.max(Math.abs(rMin), Math.abs(rMax), 0.02);
+    function yR(v) { return padT + (H - padT - padB) * (1 - (v + rSpan) / (rSpan * 2)); }
+    var retPath = retData.map(function (v, i) { return (i ? "L" : "M") + x(i).toFixed(1) + " " + yR(v).toFixed(1); }).join(" ");
+
+    var gridLines = "";
+    for (var g = 0; g <= 4; g++) {
+      var vv = minV + (maxV - minV) * g / 4;
+      var yy = y(vv);
+      gridLines += '<line x1="' + padL + '" y1="' + yy.toFixed(1) + '" x2="' + (W - padR) + '" y2="' + yy.toFixed(1) +
+        '" stroke="#eef3f6" stroke-width="1"/>' +
+        '<text x="' + (padL - 8) + '" y="' + (yy + 4).toFixed(1) + '" font-size="11" fill="#a8b8c2" text-anchor="end">' + vv.toFixed(3) + "</text>";
+    }
+
+    var zero = yR(0);
+    var zeroLine = '<line x1="' + padL + '" y1="' + zero.toFixed(1) + '" x2="' + (W - padR) + '" y2="' + zero.toFixed(1) +
+      '" stroke="#f09595" stroke-width="1" stroke-dasharray="4 4"/>' +
+      '<text x="' + (W - padR + 6) + '" y="' + (zero + 4).toFixed(1) + '" font-size="11" fill="#d13b3b">0%</text>';
+
+    var first = data[0], last = data[data.length - 1];
+    el.innerHTML =
+      '<svg viewBox="0 0 ' + W + " " + H + '" width="100%" style="display:block">' +
+      gridLines + zeroLine +
+      '<path d="' + path + '" fill="none" stroke="#0f766e" stroke-width="2" stroke-linejoin="round"/>' +
+      '<path d="' + retPath + '" fill="none" stroke="#0891b2" stroke-width="1.6" stroke-dasharray="5 4" stroke-linejoin="round"/>' +
+      '<text x="' + x(0) + '" y="' + (H - 8) + '" font-size="11" fill="#a8b8c2" text-anchor="start">' + fmtDate(first.date) + "</text>" +
+      '<text x="' + x(data.length - 1) + '" y="' + (H - 8) + '" font-size="11" fill="#a8b8c2" text-anchor="end">' + fmtDate(last.date) + "</text>" +
+      "</svg>" +
+      '<div style="display:flex;gap:18px;justify-content:center;margin-top:8px;font-size:12px;color:#7b8f9c">' +
+      '<span><span style="display:inline-block;width:16px;height:2px;background:#0f766e;vertical-align:middle"></span> 净值</span>' +
+      '<span><span style="display:inline-block;width:16px;height:2px;background:#0891b2;vertical-align:middle"></span> 累计收益率（右轴缩放）</span>' +
+      "</div>";
+  }
+
+  Array.prototype.forEach.call(document.querySelectorAll("[data-src]"), function (b) {
+    b.addEventListener("click", function () {
+      src = this.dataset.src;
+      Array.prototype.forEach.call(document.querySelectorAll("[data-src]"), function (x) {
+        x.className = "btn btn-ghost btn-sm";
+      });
+      this.className = "btn btn-primary btn-sm";
+      document.getElementById("csvPane").style.display = src === "csv" ? "" : "none";
+      document.getElementById("seasonPane").style.display = src === "season" ? "" : "none";
+      var notes = {
+        csv: "把你的净值序列粘进下面的框，格式为「日期,净值」，逗号或制表符都行。基金 / ETF 的历史净值可以从天天基金、蛋卷等平台导出。",
+        season: "没有历史数据时，用起止净值加波动强度生成一条模拟路径。适合快速试算，但结论不能当真实历史用。",
+        random: "完全随机生成一条 5 年净值路径，用来观察定投在随机行情下的表现分布。每次跑结果都不一样。"
+      };
+      document.getElementById("srcNote").textContent = notes[src];
+      backtest();
+    });
+  });
+
+  document.getElementById("btnDemo").addEventListener("click", function () {
+    var lines = [];
+    var v = 1.0, d = new Date();
+    d.setFullYear(d.getFullYear() - 3);
+    d.setDate(1);
+    var seed = 88888;
+    function rnd() { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed / 0x7fffffff; }
+    for (var i = 0; i < 36; i++) {
+      var drift = 0.011;
+      var vol = 0.055;
+      v = v * Math.exp(drift + (rnd() - 0.5) * 2 * vol);
+      var dd = new Date(d); dd.setMonth(d.getMonth() + i);
+      lines.push(fmtDate(dd) + "," + v.toFixed(4));
+    }
+    document.getElementById("csv").value = lines.join("\n");
+    backtest();
+  });
+
+  document.getElementById("btnRun").addEventListener("click", backtest);
+  document.getElementById("btnCompare").addEventListener("click", function () {
+    backtest();
+    document.getElementById("conclusion").scrollIntoView({ behavior: "smooth", block: "center" });
+  });
+
+  ["periodAmt", "dom", "feeRate"].forEach(function (id) {
+    document.getElementById(id).addEventListener("input", backtest);
+  });
+  document.getElementById("freq").addEventListener("change", backtest);
+  document.getElementById("csv").addEventListener("input", backtest);
+  ["vStart", "vEnd", "vVol"].forEach(function (id) {
+    document.getElementById(id).addEventListener("input", backtest);
+  });
+
+  document.getElementById("btnDemo").click();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>JSON 格式化 · WhaleTool</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐳</text></svg>">
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+
+<div class="wt-back"><a href="../">← 工具合辑</a></div>
+
+<div class="tool-head">
+  <h1>🧩 JSON 格式化</h1>
+  <p>格式化 / 压缩 / 校验三合一。出错会告诉你错在第几行第几列，支持按 key 递归排序。</p>
+</div>
+
+<div class="wrap">
+  <div class="panel">
+    <div class="panel-title">
+      <span>输入</span>
+      <span class="hint" id="inInfo">0 字符</span>
+      <span class="spacer"></span>
+      <span class="pill" id="status">等待输入</span>
+    </div>
+    <textarea class="wt mono" id="input" placeholder='{"name":"小七","tags":["go","python"],"nested":{"a":1}}' spellcheck="false"></textarea>
+    <div class="row" style="margin-top:12px">
+      <button class="btn btn-primary" id="btnFormat">格式化</button>
+      <button class="btn btn-ghost" id="btnMin">压缩</button>
+      <button class="btn btn-ghost" id="btnSort">按 key 排序</button>
+      <button class="btn btn-ghost" id="btnSample">示例</button>
+      <button class="btn btn-ghost" id="btnClear">清空</button>
+      <span class="spacer"></span>
+      <select class="wt" id="indent" style="width:auto">
+        <option value="2">缩进 2 空格</option>
+        <option value="4">缩进 4 空格</option>
+        <option value="1">Tab</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-title">
+      <span>结果</span>
+      <span class="spacer"></span>
+      <button class="btn btn-ghost btn-sm" id="btnCopy">复制结果</button>
+      <button class="btn btn-ghost btn-sm" id="btnDownload">下载 .json</button>
+    </div>
+    <div class="out" id="output"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-title"><span>结构概览</span></div>
+    <div class="stat-row" id="stats">
+      <div class="stat"><div class="k">类型</div><div class="v sm" id="sType">—</div></div>
+      <div class="stat"><div class="k">层级深度</div><div class="v" id="sDepth">—</div></div>
+      <div class="stat"><div class="k">键数量</div><div class="v" id="sKeys">—</div></div>
+      <div class="stat"><div class="k">数组元素</div><div class="v" id="sItems">—</div></div>
+      <div class="stat"><div class="k">压缩后体积</div><div class="v" id="sSize">—</div></div>
+    </div>
+  </div>
+</div>
+
+<div class="tool-foot">数据全程留在浏览器里，不会上传 · <a href="../">返回工具合辑</a></div>
+
+<script>
+(function () {
+  "use strict";
+  var $in = document.getElementById("input"),
+      $out = document.getElementById("output"),
+      $st = document.getElementById("status"),
+      $info = document.getElementById("inInfo"),
+      $indent = document.getElementById("indent");
+
+  var SAMPLE = {
+    name: "WhaleTool",
+    version: "1.0.0",
+    tags: ["工具", "纯前端", "离线可用"],
+    owner: { name: "小七", city: "深圳", links: { github: "https://github.com/imalasong" } },
+    features: [
+      { id: 1, title: "JSON 格式化", active: true },
+      { id: 2, title: "时间戳转换", active: true }
+    ],
+    counts: { tools: 27, stars: null }
+  };
+
+  function pad(n) { return " ".repeat(n); }
+
+  function parse() {
+    var text = $in.value.trim();
+    if (!text) { throw { empty: true }; }
+    // 定位错误行列
+    try {
+      return JSON.parse(text);
+    } catch (e) {
+      var m = /position (\d+)/.exec(e.message);
+      if (m) {
+        var pos = +m[1];
+        var before = text.slice(0, pos);
+        var line = before.split("\n").length;
+        var col = pos - before.lastIndexOf("\n");
+        throw { msg: e.message, line: line, col: col };
+      }
+      throw { msg: e.message };
+    }
+  }
+
+  function deepSort(v) {
+    if (Array.isArray(v)) return v.map(deepSort);
+    if (v && typeof v === "object") {
+      var o = {};
+      Object.keys(v).sort().forEach(function (k) { o[k] = deepSort(v[k]); });
+      return o;
+    }
+    return v;
+  }
+
+  function depthOf(v, d) {
+    d = d || 0;
+    if (Array.isArray(v)) {
+      if (!v.length) return d + 1;
+      return Math.max.apply(null, v.map(function (x) { return depthOf(x, d + 1); }));
+    }
+    if (v && typeof v === "object") {
+      var ks = Object.keys(v);
+      if (!ks.length) return d + 1;
+      return Math.max.apply(null, ks.map(function (k) { return depthOf(v[k], d + 1); }));
+    }
+    return d;
+  }
+
+  function countKeys(v) {
+    if (Array.isArray(v)) return v.reduce(function (s, x) { return s + countKeys(x); }, 0);
+    if (v && typeof v === "object") {
+      return Object.keys(v).reduce(function (s, k) { return s + 1 + countKeys(v[k]); }, 0);
+    }
+    return 0;
+  }
+
+  function countItems(v) {
+    if (Array.isArray(v)) return v.length + v.reduce(function (s, x) { return s + countItems(x); }, 0);
+    if (v && typeof v === "object") {
+      return Object.keys(v).reduce(function (s, k) { return s + countItems(v[k]); }, 0);
+    }
+    return 0;
+  }
+
+  function sizeOf(v) {
+    var bytes = new Blob([v]).size;
+    if (bytes < 1024) return bytes + " B";
+    if (bytes < 1048576) return (bytes / 1024).toFixed(1) + " KB";
+    return (bytes / 1048576).toFixed(2) + " MB";
+  }
+
+  function render(v, mode) {
+    var ind = $indent.value === "1" ? "\t" : +$indent.value;
+    var text = JSON.stringify(v, null, mode === "min" ? 0 : ind);
+    $out.textContent = text;
+    $out.className = "out";
+    $st.className = "pill";
+    $st.textContent = mode === "min" ? "已压缩" : "校验通过";
+    $sType.textContent = Array.isArray(v) ? "Array" : (v === null ? "null" : typeof v);
+    $sDepth.textContent = depthOf(v);
+    $sKeys.textContent = countKeys(v);
+    $sItems.textContent = countItems(v);
+    $sSize.textContent = sizeOf(JSON.stringify(v));
+  }
+
+  var $sType = document.getElementById("sType"),
+      $sDepth = document.getElementById("sDepth"),
+      $sKeys = document.getElementById("sKeys"),
+      $sItems = document.getElementById("sItems"),
+      $sSize = document.getElementById("sSize");
+
+  function run(mode) {
+    var v;
+    try {
+      v = parse();
+    } catch (e) {
+      $out.className = "out";
+      $out.innerHTML = "";
+      var p = document.createElement("div");
+      p.className = "err";
+      if (e.empty) { p.textContent = "还没输入内容。"; }
+      else {
+        p.textContent = "❌ JSON 语法错误" + (e.line ? "（第 " + e.line + " 行，第 " + e.col + " 列）" : "");
+        var d = document.createElement("div");
+        d.className = "muted";
+        d.style.marginTop = "6px";
+        d.textContent = e.msg;
+        $out.appendChild(p);
+        $out.appendChild(d);
+      }
+      if (e.empty) $out.appendChild(p);
+      $st.className = "pill bad";
+      $st.textContent = "校验失败";
+      [["sType"], ["sDepth"], ["sKeys"], ["sItems"], ["sSize"]].forEach(function (x) {
+        document.getElementById(x[0]).textContent = "—";
+      });
+      return;
+    }
+    render(v, mode || "pretty");
+  }
+
+  $in.addEventListener("input", function () {
+    $info.textContent = $in.value.length + " 字符";
+    if ($in.value.trim()) run("pretty"); else { $out.textContent = ""; $st.className = "pill"; $st.textContent = "等待输入"; }
+  });
+
+  document.getElementById("btnFormat").addEventListener("click", function () { run("pretty"); });
+  document.getElementById("btnMin").addEventListener("click", function () { run("min"); });
+  $indent.addEventListener("change", function () { run("pretty"); });
+
+  document.getElementById("btnSort").addEventListener("click", function () {
+    try {
+      var v = deepSort(parse());
+      render(v, "pretty");
+    } catch (e) {
+      run("pretty");
+    }
+  });
+
+  document.getElementById("btnSample").addEventListener("click", function () {
+    $in.value = JSON.stringify(SAMPLE, null, 2);
+    $info.textContent = $in.value.length + " 字符";
+    run("pretty");
+  });
+
+  document.getElementById("btnClear").addEventListener("click", function () {
+    $in.value = ""; $out.textContent = "";
+    $info.textContent = "0 字符";
+    $st.className = "pill"; $st.textContent = "等待输入";
+    ["sType", "sDepth", "sKeys", "sItems", "sSize"].forEach(function (id) {
+      document.getElementById(id).textContent = "—";
+    });
+  });
+
+  function copy(text, btn) {
+    var done = function () {
+      var old = btn.textContent; btn.textContent = "已复制 ✓";
+      setTimeout(function () { btn.textContent = old; }, 1400);
+    };
+    if (navigator.clipboard && location.protocol !== "file:") {
+      navigator.clipboard.writeText(text).then(done, function () { fallback(text, done); });
+    } else { fallback(text, done); }
+  }
+  function fallback(text, done) {
+    var ta = document.createElement("textarea");
+    ta.value = text; ta.style.position = "fixed"; ta.style.opacity = "0";
+    document.body.appendChild(ta); ta.select();
+    try { document.execCommand("copy"); done(); } catch (e) { alert("复制失败，请手动选中"); }
+    document.body.removeChild(ta);
+  }
+
+  document.getElementById("btnCopy").addEventListener("click", function () {
+    if (!$out.textContent) return;
+    copy($out.textContent, this);
+  });
+
+  document.getElementById("btnDownload").addEventListener("click", function () {
+    if (!$out.textContent) return;
+    var blob = new Blob([$out.textContent], { type: "application/json" });
+    var a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "data.json";
+    a.click();
+    setTimeout(function () { URL.revokeObjectURL(a.href); }, 3000);
+  });
+
+  $in.value = JSON.stringify(SAMPLE, null, 2);
+  $info.textContent = $in.value.length + " 字符";
+  run("pretty");
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>URL 编解码 · WhaleTool</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐳</text></svg>">
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+
+<div class="wt-back"><a href="../">← 工具合辑</a></div>
+
+<div class="tool-head">
+  <h1>🔗 URL 编解码</h1>
+  <p>encodeURIComponent / encodeURI 两种模式，查询串自动拆成参数表，中文和特殊符号都不会翻车。</p>
+</div>
+
+<div class="wrap">
+  <div class="panel">
+    <div class="panel-title"><span>输入</span><span class="spacer"></span>
+      <span class="pill" id="status">等待输入</span></div>
+    <textarea class="wt mono" id="input" placeholder="https://api.example.com/search?q=深圳天气&lang=zh-CN&page=1" spellcheck="false"></textarea>
+    <div class="row" style="margin-top:12px">
+      <button class="btn btn-primary" id="btnEnc">编码 →</button>
+      <button class="btn btn-primary" id="btnDec">← 解码</button>
+      <button class="btn btn-ghost" id="btnSample">示例</button>
+      <button class="btn btn-ghost" id="btnClear">清空</button>
+      <span class="spacer"></span>
+      <select class="wt" id="mode" style="width:auto">
+        <option value="component">encodeURIComponent（全转义，推荐）</option>
+        <option value="uri">encodeURI（保留 :/?&=）</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-title"><span>结果</span><span class="spacer"></span>
+      <button class="btn btn-ghost btn-sm" id="btnCopy">复制结果</button>
+      <button class="btn btn-ghost btn-sm" id="btnSwap">结果转输入</button></div>
+    <div class="out" id="output"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-title"><span>URL 结构拆解</span><span class="hint">自动识别</span></div>
+    <table class="wt" id="parts">
+      <thead><tr><th>部分</th><th>内容</th></tr></thead>
+      <tbody><tr><td colspan="2" class="muted">输入一个完整 URL 后自动拆解。</td></tr></tbody>
+    </table>
+  </div>
+
+  <div class="panel">
+    <div class="panel-title"><span>查询参数</span><span class="hint" id="qHint">—</span></div>
+    <table class="wt" id="query">
+      <thead><tr><th>参数名</th><th>值（解码后）</th></tr></thead>
+      <tbody><tr><td colspan="2" class="muted">没有查询参数。</td></tr></tbody>
+    </table>
+  </div>
+</div>
+
+<div class="tool-foot">编解码在浏览器本地完成 · <a href="../">返回工具合辑</a></div>
+
+<script>
+(function () {
+  "use strict";
+  var $in = document.getElementById("input"), $out = document.getElementById("output"),
+      $st = document.getElementById("status"), $mode = document.getElementById("mode"),
+      $parts = document.querySelector("#parts tbody"),
+      $query = document.querySelector("#query tbody"),
+      $qHint = document.getElementById("qHint");
+
+  function setStatus(text, cls) {
+    $st.className = "pill" + (cls ? " " + cls : "");
+    $st.textContent = text;
+  }
+
+  function analyze(url) {
+    var text = url.trim();
+    if (!/^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//.test(text)) {
+      $parts.innerHTML = '<tr><td colspan="2" class="muted">不是完整 URL（缺少协议头）。</td></tr>';
+      $query.innerHTML = '<tr><td colspan="2" class="muted">没有查询参数。</td></tr>';
+      $qHint.textContent = "—";
+      return;
+    }
+    var u;
+    try { u = new URL(text); }
+    catch (e) {
+      $parts.innerHTML = '<tr><td colspan="2" class="muted err">URL 格式有问题，无法解析。</td></tr>';
+      return;
+    }
+    var rows = [
+      ["协议", u.protocol.replace(":", "")],
+      ["主机名", u.hostname],
+      ["端口", u.port || "（默认）"],
+      ["路径", u.pathname],
+      ["查询串", u.search || "（无）"],
+      ["锚点", u.hash || "（无）"]
+    ];
+    $parts.innerHTML = rows.map(function (r) {
+      return "<tr><td>" + r[0] + '</td><td style="word-break:break-all">' + escapeHtml(r[1]) + "</td></tr>";
+    }).join("");
+
+    var keys = [];
+    u.searchParams.forEach(function (v, k) { if (keys.indexOf(k) < 0) keys.push(k); });
+    if (!keys.length) {
+      $query.innerHTML = '<tr><td colspan="2" class="muted">没有查询参数。</td></tr>';
+      $qHint.textContent = "0 个";
+      return;
+    }
+    $qHint.textContent = keys.length + " 个";
+    $query.innerHTML = keys.map(function (k) {
+      var vals = u.searchParams.getAll(k);
+      return "<tr><td>" + escapeHtml(k) + '</td><td style="word-break:break-all">' +
+        escapeHtml(vals.join("  |  ")) + "</td></tr>";
+    }).join("");
+  }
+
+  function escapeHtml(s) {
+    return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  }
+
+  function enc() {
+    var v = $in.value;
+    if (!v) { setStatus("等待输入"); return; }
+    try {
+      var r = $mode.value === "uri" ? encodeURI(v) : encodeURIComponent(v);
+      $out.textContent = r;
+      $out.className = "out";
+      setStatus("已编码");
+      analyze(v);
+    } catch (e) {
+      $out.textContent = "";
+      $out.className = "out err";
+      $out.textContent = "❌ 编码失败：" + e.message;
+      setStatus("编码失败", "bad");
+    }
+  }
+
+  function dec() {
+    var v = $in.value;
+    if (!v) { setStatus("等待输入"); return; }
+    try {
+      var r = decodeURIComponent(v.replace(/\+/g, " "));
+      $out.textContent = r;
+      $out.className = "out";
+      setStatus("已解码");
+      analyze(r);
+    } catch (e) {
+      $out.textContent = "";
+      $out.className = "out";
+      var d = document.createElement("div");
+      d.className = "err";
+      d.textContent = "❌ 解码失败：" + e.message;
+      var n = document.createElement("div");
+      n.className = "muted";
+      n.style.marginTop = "6px";
+      n.textContent = "常见原因：含有孤立的 % 号，或 %XX 不是合法的十六进制。可以先试试「编码 →」。";
+      $out.appendChild(d);
+      $out.appendChild(n);
+      setStatus("解码失败", "bad");
+    }
+  }
+
+  document.getElementById("btnEnc").addEventListener("click", enc);
+  document.getElementById("btnDec").addEventListener("click", dec);
+
+  document.getElementById("btnSample").addEventListener("click", function () {
+    $in.value = "https://api.example.com/search?q=深圳天气&lang=zh-CN&tags=a,b&page=1#result";
+    enc();
+  });
+
+  document.getElementById("btnClear").addEventListener("click", function () {
+    $in.value = ""; $out.textContent = "";
+    setStatus("等待输入");
+    $parts.innerHTML = '<tr><td colspan="2" class="muted">输入一个完整 URL 后自动拆解。</td></tr>';
+    $query.innerHTML = '<tr><td colspan="2" class="muted">没有查询参数。</td></tr>';
+    $qHint.textContent = "—";
+  });
+
+  document.getElementById("btnSwap").addEventListener("click", function () {
+    if (!$out.textContent) return;
+    $in.value = $out.textContent;
+    enc();
+  });
+
+  document.getElementById("btnCopy").addEventListener("click", function () {
+    if (!$out.textContent) return;
+    var btn = this, old = btn.textContent;
+    var done = function () { btn.textContent = "已复制 ✓"; setTimeout(function () { btn.textContent = old; }, 1400); };
+    if (navigator.clipboard && location.protocol !== "file:") {
+      navigator.clipboard.writeText($out.textContent).then(done, function () { fb(done); });
+    } else { fb(done); }
+    function fb(cb) {
+      var ta = document.createElement("textarea");
+      ta.value = $out.textContent; ta.style.position = "fixed"; ta.style.opacity = "0";
+      document.body.appendChild(ta); ta.select();
+      try { document.execCommand("copy"); cb(); } catch (e) { alert("复制失败"); }
+      document.body.removeChild(ta);
+    }
+  });
+
+  $in.addEventListener("input", function () {
+    if ($in.value.trim()) setStatus("已输入，选择编码或解码");
+    else setStatus("等待输入");
+  });
+
+  $in.value = "https://api.example.com/search?q=深圳天气&lang=zh-CN&tags=a,b&page=1#result";
+  enc();
+})();
+</script>
+</body>
+</html>

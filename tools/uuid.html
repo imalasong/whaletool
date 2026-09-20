@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>UUID / 密码生成 · WhaleTool</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐳</text></svg>">
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+
+<div class="wt-back"><a href="../">← 工具合辑</a></div>
+
+<div class="tool-head">
+  <h1>🎲 UUID / 密码生成</h1>
+  <p>批量生成 UUID v4、随机密码、短 ID。全部用浏览器的加密随机源，不用 Math.random。</p>
+</div>
+
+<div class="wrap">
+  <div class="panel">
+    <div class="panel-title"><span>生成类型</span></div>
+    <div class="row tight">
+      <button class="btn btn-primary" data-kind="uuid">UUID v4</button>
+      <button class="btn btn-ghost" data-kind="pass">随机密码</button>
+      <button class="btn btn-ghost" data-kind="id">短 ID</button>
+      <button class="btn btn-ghost" data-kind="hex">十六进制</button>
+      <button class="btn btn-ghost" data-kind="nanoid">URL 友好 ID</button>
+    </div>
+    <div class="row" style="margin-top:14px">
+      <label class="lb" style="margin:0">数量</label>
+      <input class="wt" id="count" type="number" value="10" min="1" max="500" style="width:90px">
+      <label class="lb" style="margin:0 0 0 6px" id="lenLabel">长度</label>
+      <input class="wt" id="len" type="number" value="20" min="4" max="128" style="width:90px">
+      <button class="btn btn-primary" id="btnGen">生成</button>
+    </div>
+    <div class="row" style="margin-top:12px" id="passOpts">
+      <label class="lb" style="margin:0"><input type="checkbox" class="pc" value="upper" checked> 大写 A-Z</label>
+      <label class="lb" style="margin:0 0 0 12px"><input type="checkbox" class="pc" value="lower" checked> 小写 a-z</label>
+      <label class="lb" style="margin:0 0 0 12px"><input type="checkbox" class="pc" value="digit" checked> 数字 0-9</label>
+      <label class="lb" style="margin:0 0 0 12px"><input type="checkbox" class="pc" value="symbol"> 符号 !@#$%</label>
+      <label class="lb" style="margin:0 0 0 12px"><input type="checkbox" class="pc" value="nohomo" checked> 排除易混淆字符 0O1lI</label>
+    </div>
+    <div class="row" style="margin-top:10px">
+      <span class="pill" id="entropy">—</span>
+      <span class="hint" id="optHint"></span>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-title"><span>结果</span><span class="spacer"></span>
+      <span class="hint" id="genCount">—</span>
+      <button class="btn btn-ghost btn-sm" id="btnCopyAll">全部复制</button>
+      <button class="btn btn-ghost btn-sm" id="btnDownload">下载 .txt</button></div>
+    <div class="out" id="result" style="max-height:520px"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-title"><span>强度参考</span></div>
+    <table class="wt">
+      <thead><tr><th>字符集</th><th class="num">长度</th><th class="num">组合数（约）</th><th>用途</th></tr></thead>
+      <tbody>
+        <tr><td>纯数字</td><td class="num">6</td><td class="num">10⁶</td><td>短信验证码，够用但不长命</td></tr>
+        <tr><td>大小写 + 数字</td><td class="num">12</td><td class="num">4.7×10²¹</td><td>普通账号密码，及格线</td></tr>
+        <tr><td>大小写 + 数字 + 符号</td><td class="num">16</td><td class="num">1.2×10³¹</td><td>重要账号，推荐</td></tr>
+        <tr><td>大小写 + 数字 + 符号</td><td class="num">24</td><td class="num">3.4×10⁴⁷</td><td>密码管理器主密码</td></tr>
+      </tbody>
+    </table>
+    <div class="note" style="margin-top:14px">
+      熵值 ≥ 80 bit 基本可抵抗暴力破解；≥ 128 bit 对现有算力属于不可行。低于 60 bit 的密码只适合做验证码这类一次性用途。
+    </div>
+  </div>
+</div>
+
+<div class="tool-foot">随机数由浏览器加密随机源生成，不上传 · <a href="../">返回工具合辑</a></div>
+
+<script>
+(function () {
+  "use strict";
+  var kind = "uuid";
+  var $result = document.getElementById("result"), $count = document.getElementById("count"),
+      $len = document.getElementById("len"), $lenLabel = document.getElementById("lenLabel"),
+      $entropy = document.getElementById("entropy"), $genCount = document.getElementById("genCount"),
+      $passOpts = document.getElementById("passOpts");
+
+  function rand(n) {
+    var a = new Uint32Array(n);
+    crypto.getRandomValues(a);
+    return a;
+  }
+
+  function pick(arr) {
+    var a = rand(1);
+    return arr[a[0] % arr.length];
+  }
+
+  function uuidv4() {
+    var b = new Uint8Array(16);
+    crypto.getRandomValues(b);
+    b[6] = (b[6] & 0x0f) | 0x40;
+    b[8] = (b[8] & 0x3f) | 0x80;
+    var h = [];
+    for (var i = 0; i < 16; i++) h.push(b[i].toString(16).padStart(2, "0"));
+    return h.slice(0, 4).join("") + "-" + h.slice(4, 6).join("") + "-" +
+      h.slice(6, 8).join("") + "-" + h.slice(8, 10).join("") + "-" + h.slice(10, 16).join("");
+  }
+
+  function charset() {
+    var upper = "ABCDEFGHIJKLMNOPQRSTUVWXYZ", lower = "abcdefghijklmnopqrstuvwxyz",
+        digit = "0123456789", symbol = "!@#$%^&*()-_=+[]{};:,.?";
+    var exclude = "0O1lI";
+    var s = "", chosen = [];
+    Array.prototype.forEach.call(document.querySelectorAll(".pc"), function (c) {
+      if (!c.checked) return;
+      chosen.push(c.value);
+      if (c.value === "upper") s += upper;
+      if (c.value === "lower") s += lower;
+      if (c.value === "digit") s += digit;
+      if (c.value === "symbol") s += symbol;
+    });
+    if (document.querySelector('.pc[value="nohomo"]').checked) {
+      s = s.split("").filter(function (ch) { return exclude.indexOf(ch) < 0; }).join("");
+    }
+    return { set: s.split(""), groups: chosen.length };
+  }
+
+  function randStr(set, len) {
+    var out = [];
+    for (var i = 0; i < len; i++) out.push(pick(set));
+    return out.join("");
+  }
+
+  function entropyBits(setSize, len) {
+    return Math.round(len * Math.log2(setSize));
+  }
+
+  function gen() {
+    var n = Math.max(1, Math.min(500, +$count.value || 1));
+    var len = Math.max(4, Math.min(128, +$len.value || 20));
+    var list = [];
+
+    if (kind === "uuid") {
+      for (var i = 0; i < n; i++) list.push(uuidv4());
+      $entropy.textContent = "128 bit 随机（UUID v4 固定）";
+      $entropy.className = "pill";
+    } else if (kind === "pass") {
+      var cs = charset();
+      if (!cs.set.length) { $result.textContent = "❌ 至少要勾选一种字符类型。"; return; }
+      for (i = 0; i < n; i++) list.push(randStr(cs.set, len));
+      var bits = entropyBits(cs.set.length, len);
+      $entropy.textContent = bits + " bit 熵 · 字符集 " + cs.set.length + " 个";
+      $entropy.className = "pill" + (bits >= 80 ? "" : " warn");
+    } else if (kind === "id") {
+      var al = "abcdefghijklmnopqrstuvwxyz0123456789";
+      for (i = 0; i < n; i++) list.push(randStr(al.split(""), len));
+      $entropy.textContent = entropyBits(36, len) + " bit 熵 · 小写+数字";
+      $entropy.className = "pill";
+    } else if (kind === "hex") {
+      var hx = "0123456789abcdef";
+      for (i = 0; i < n; i++) list.push(randStr(hx.split(""), len));
+      $entropy.textContent = entropyBits(16, len) + " bit 熵 · 十六进制";
+      $entropy.className = "pill";
+    } else if (kind === "nanoid") {
+      var na = "useandom-26T198340PX75pxJACKVERYMINDBUSHWOLF_GQZbfghjklqvwyzrict";
+      for (i = 0; i < n; i++) list.push(randStr(na.split(""), len));
+      $entropy.textContent = entropyBits(64, len) + " bit 熵 · URL 友好";
+      $entropy.className = "pill";
+    }
+
+    $result.textContent = list.join("\n");
+    $genCount.textContent = list.length + " 条";
+  }
+
+  Array.prototype.forEach.call(document.querySelectorAll("[data-kind]"), function (b) {
+    b.addEventListener("click", function () {
+      kind = this.dataset.kind;
+      Array.prototype.forEach.call(document.querySelectorAll("[data-kind]"), function (x) {
+        x.className = "btn btn-ghost";
+      });
+      this.className = "btn btn-primary";
+      var isUuid = kind === "uuid";
+      $len.disabled = isUuid;
+      $lenLabel.style.opacity = isUuid ? ".4" : "1";
+      $len.value = kind === "uuid" ? 36 : (kind === "hex" ? 32 : 20);
+      $passOpts.style.opacity = kind === "pass" ? "1" : ".35";
+      $passOpts.style.pointerEvents = kind === "pass" ? "auto" : "none";
+      gen();
+    });
+  });
+
+  Array.prototype.forEach.call(document.querySelectorAll(".pc"), function (c) {
+    c.addEventListener("change", gen);
+  });
+
+  $count.addEventListener("change", gen);
+  $len.addEventListener("change", gen);
+  document.getElementById("btnGen").addEventListener("click", gen);
+
+  document.getElementById("btnCopyAll").addEventListener("click", function () {
+    if (!$result.textContent) return;
+    var btn = this, old = btn.textContent, text = $result.textContent;
+    var done = function () { btn.textContent = "已复制 ✓"; setTimeout(function () { btn.textContent = old; }, 1400); };
+    if (navigator.clipboard && location.protocol !== "file:") {
+      navigator.clipboard.writeText(text).then(done, function () { fb(text, done); });
+    } else { fb(text, done); }
+    function fb(v, cb) {
+      var ta = document.createElement("textarea");
+      ta.value = v; ta.style.position = "fixed"; ta.style.opacity = "0";
+      document.body.appendChild(ta); ta.select();
+      try { document.execCommand("copy"); cb(); } catch (e) {}
+      document.body.removeChild(ta);
+    }
+  });
+
+  document.getElementById("btnDownload").addEventListener("click", function () {
+    if (!$result.textContent) return;
+    var blob = new Blob([$result.textContent], { type: "text/plain" });
+    var a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = kind + "-" + Date.now() + ".txt";
+    a.click();
+    setTimeout(function () { URL.revokeObjectURL(a.href); }, 3000);
+  });
+
+  Array.prototype.forEach.call(document.querySelectorAll(".pc"), function () {
+    $passOpts.style.opacity = ".35";
+    $passOpts.style.pointerEvents = "none";
+  });
+
+  gen();
+})();
+</script>
+</body>
+</html>

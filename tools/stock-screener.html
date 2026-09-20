@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>规则化选股器 · WhaleTool</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐳</text></svg>">
+<link rel="stylesheet" href="../assets/style.css">
+<style>
+  .rule-row { display: grid; grid-template-columns: 1.3fr 1fr 1fr auto; gap: 8px; align-items: center; margin-bottom: 8px; }
+  .rule-row select, .rule-row input { width: 100%; }
+  .rule-del {
+    background: #fdf2f2; border: 1px solid #f5c6c6; color: #c33; border-radius: 9px;
+    width: 34px; height: 34px; cursor: pointer; font-size: 15px; line-height: 1;
+  }
+  .rule-del:hover { background: #fbe3e3; }
+  .logic-line { display:flex; gap:6px; align-items:center; margin:4px 0 12px; }
+  .code-box { background:#0d1418; color:#cfe9e4; border-radius:12px; padding:16px; font-family:ui-monospace,Consolas,monospace; font-size:12.6px; line-height:1.7; white-space:pre-wrap; overflow:auto; }
+  .code-box .kw { color:#7fd1c1; }
+  .code-box .cm { color:#5f7b83; }
+</style>
+</head>
+<body>
+
+<div class="wt-back"><a href="../">← 工具合辑</a></div>
+
+<div class="tool-head">
+  <h1>🔎 规则化选股器</h1>
+  <p>用你自己写的条件表达选股逻辑，而不是套平台的固定因子。逻辑留痕、可复现、可回看，也能导出成代码去别处跑。</p>
+</div>
+
+<div class="wrap">
+  <div class="panel">
+    <div class="panel-title"><span>一 · 定义字段</span><span class="hint">你的筛选依据，比如 PE / ROE / 市值</span>
+      <span class="spacer"></span>
+      <button class="btn btn-ghost btn-sm" id="btnFieldSample">用常用字段</button>
+      <button class="btn btn-ghost btn-sm" id="btnAddField">+ 添加字段</button></div>
+    <div id="fields"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-title"><span>二 · 写规则</span><span class="hint">字段 运算符 值</span>
+      <span class="spacer"></span>
+      <button class="btn btn-ghost btn-sm" id="btnAddRule">+ 添加条件</button></div>
+    <div id="rules"></div>
+    <div class="logic-line">
+      <label class="lb" style="margin:0">条件之间</label>
+      <select class="wt" id="logic" style="width:auto">
+        <option value="and">全部满足（AND）</option>
+        <option value="or">满足任一（OR）</option>
+      </select>
+      <span class="hint" id="ruleHint"></span>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-title"><span>三 · 候选数据</span><span class="hint">CSV 格式，首行是字段名</span>
+      <span class="spacer"></span>
+      <button class="btn btn-ghost btn-sm" id="btnDataSample">示例数据</button>
+      <button class="btn btn-ghost btn-sm" id="btnPasteCsv">粘贴 CSV</button></div>
+    <textarea class="wt mono" id="data" style="min-height:170px" spellcheck="false"></textarea>
+  </div>
+
+  <div class="panel">
+    <div class="panel-title"><span>四 · 运行</span></div>
+    <div class="row">
+      <button class="btn btn-primary" id="btnRun">执行筛选</button>
+      <label class="lb" style="margin:0 0 0 8px">排序字段</label>
+      <select class="wt" id="sortField" style="width:auto">
+        <option value="">不排序</option>
+      </select>
+      <select class="wt" id="sortDir" style="width:auto">
+        <option value="desc">降序</option>
+        <option value="asc">升序</option>
+      </select>
+      <span class="spacer"></span>
+      <button class="btn btn-ghost btn-sm" id="btnExport">导出结果 CSV</button>
+      <button class="btn btn-ghost btn-sm" id="btnExportCode">导出逻辑代码</button>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-title"><span>筛选结果</span><span class="spacer"></span>
+      <span class="pill" id="resultPill">—</span></div>
+    <div style="max-height:440px;overflow:auto">
+      <table class="wt" id="out">
+        <thead></thead>
+        <tbody><tr><td class="muted">点「执行筛选」看结果。</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-title"><span>等价逻辑留痕</span><span class="hint">把这套规则固化下来，便于回看和复盘</span></div>
+    <div class="code-box" id="code">// 定义好字段和规则后，这里会生成对应的伪代码</div>
+    <div class="note" style="margin-top:12px">
+      这些代码可以直接拿去做别的：Python 里换成 pandas 的 <code>df.query()</code>，Go 里写成 if 判断，SQL 里翻成 WHERE 子句。
+      关键是把「你的判断标准」显性化，避免凭感觉改来改去。
+    </div>
+  </div>
+</div>
+
+<div class="tool-foot">所有数据留在浏览器本地 · <a href="../">返回工具合辑</a></div>
+
+<script>
+(function () {
+  "use strict";
+
+  var OPS = [
+    { v: ">", t: "大于" }, { v: ">=", t: "大于等于" }, { v: "<", t: "小于" },
+    { v: "<=", t: "小于等于" }, { v: "==", t: "等于" }, { v: "!=", t: "不等于" },
+    { v: "between", t: "介于（含）" }, { v: "contains", t: "包含文字" }
+  ];
+
+  var FIELDS = ["代码", "名称", "价格", "PE", "PB", "ROE", "股息率", "市值亿", "营收增速", "利润增速", "所属行业"];
+  var NUMERIC = ["价格", "PE", "PB", "ROE", "股息率", "市值亿", "营收增速", "利润增速"];
+
+  function fieldOptions(sel) {
+    return FIELDS.map(function (f) {
+      return '<option value="' + f + '"' + (f === sel ? " selected" : "") + ">" + f + "</option>";
+    }).join("");
+  }
+
+  function addField(name) {
+    var n = name || "";
+    var div = document.createElement("div");
+    div.style.marginBottom = "8px";
+    div.innerHTML = '<div class="rule-row" style="grid-template-columns:1fr auto">' +
+      '<input class="wt fld" value="' + n + '" placeholder="字段名，如 ROE">' +
+      '<button class="rule-del" title="删除">✕</button></div>';
+    div.querySelector(".rule-del").addEventListener("click", function () {
+      div.remove(); refreshFieldSelects(); genCode();
+    });
+    div.querySelector(".fld").addEventListener("input", function () {
+      refreshFieldSelects(); genCode();
+    });
+    document.getElementById("fields").appendChild(div);
+    refreshFieldSelects();
+  }
+
+  function getFields() {
+    return Array.prototype.map.call(document.querySelectorAll(".fld"), function (i) { return i.value.trim(); }).filter(Boolean);
+  }
+
+  function addRule(field, op, val, val2) {
+    var div = document.createElement("div");
+    div.className = "rule";
+    div.innerHTML = '<div class="rule-row">' +
+      '<select class="wt r-fld">' + fieldOptions(field) + "</select>" +
+      '<select class="wt r-op">' + OPS.map(function (o) {
+        return '<option value="' + o.v + '"' + (o.v === (op || ">") ? " selected" : "") + ">" + o.t + "</option>";
+      }).join("") + "</select>" +
+      '<input class="wt mono r-val" value="' + (val === undefined ? "" : val) + '" placeholder="值">' +
+      '<button class="rule-del" title="删除">✕</button>' +
+      "</div>";
+    var extra = document.createElement("div");
+    extra.className = "rule-row";
+    extra.style.display = "none";
+    extra.innerHTML = '<span class="muted" style="font-size:12px">到</span>' +
+      '<input class="wt mono r-val2" value="' + (val2 === undefined ? "" : val2) + '" placeholder="上限" style="grid-column:2/4">' +
+      "<span></span>";
+    div.appendChild(extra);
+
+    var opSel = div.querySelector(".r-op");
+    var upd = function () { extra.style.display = opSel.value === "between" ? "grid" : "none"; genCode(); };
+    opSel.addEventListener("change", upd);
+    div.querySelector(".r-val").addEventListener("input", genCode);
+    div.querySelector(".r-val2").addEventListener("input", genCode);
+    div.querySelector(".r-fld").addEventListener("change", genCode);
+    div.querySelector(".rule-del").addEventListener("click", function () { div.remove(); genCode(); });
+    upd();
+
+    document.getElementById("rules").appendChild(div);
+  }
+
+  function getRules() {
+    return Array.prototype.map.call(document.querySelectorAll(".rule"), function (d) {
+      return {
+        field: d.querySelector(".r-fld").value,
+        op: d.querySelector(".r-op").value,
+        val: d.querySelector(".r-val").value.trim(),
+        val2: d.querySelector(".r-val2").value.trim()
+      };
+    }).filter(function (r) { return r.val !== ""; });
+  }
+
+  function refreshFieldSelects() {
+    var flds = getFields();
+    if (!flds.length) return;
+    Array.prototype.forEach.call(document.querySelectorAll(".r-fld"), function (sel) {
+      var cur = sel.value;
+      sel.innerHTML = flds.map(function (f) {
+        return '<option value="' + f + '"' + (f === cur ? " selected" : "") + ">" + f + "</option>";
+      }).join("");
+    });
+    var sf = document.getElementById("sortField");
+    var curS = sf.value;
+    sf.innerHTML = '<option value="">不排序</option>' + flds.map(function (f) {
+      return '<option value="' + f + '"' + (f === curS ? " selected" : "") + ">" + f + "</option>";
+    }).join("");
+  }
+
+  function parseCSV(text) {
+    var lines = text.split("\n").filter(function (l) { return l.trim(); });
+    if (lines.length < 2) return { head: [], rows: [] };
+    function splitLine(l) { return l.split(/[,\t;]+/).map(function (x) { return x.trim().replace(/^"|"$/g, ""); }); }
+    var head = splitLine(lines[0]);
+    var rows = lines.slice(1).map(function (l) {
+      var cells = splitLine(l), o = {};
+      head.forEach(function (h, i) { o[h] = cells[i] === undefined ? "" : cells[i]; });
+      return o;
+    });
+    return { head: head, rows: rows };
+  }
+
+  function isNum(v) { return v !== "" && isFinite(v); }
+
+  function matchAll(row, rules, logic) {
+    if (!rules.length) return true;
+    var res = rules.map(function (r) {
+      var raw = row[r.field];
+      if (raw === undefined) return false;
+      var a = isNum(raw) ? parseFloat(raw) : raw;
+      if (r.op === "contains") return String(raw).indexOf(r.val) >= 0;
+      if (r.op === "between") {
+        var lo = parseFloat(r.val), hi = parseFloat(r.val2);
+        if (!isNum(raw) || isNaN(lo) || isNaN(hi)) return false;
+        return a >= lo && a <= hi;
+      }
+      var b = isNum(r.val) ? parseFloat(r.val) : r.val;
+      switch (r.op) {
+        case ">":  return a > b;
+        case ">=": return a >= b;
+        case "<":  return a < b;
+        case "<=": return a <= b;
+        case "==": return a == b;
+        case "!=": return a != b;
+        default: return false;
+      }
+    });
+    return logic === "and" ? res.every(Boolean) : res.some(Boolean);
+  }
+
+  function run() {
+    var parsed = parseCSV(document.getElementById("data").value);
+    var rules = getRules();
+    var logic = document.getElementById("logic").value;
+    var pill = document.getElementById("resultPill");
+
+    if (!parsed.rows.length) {
+      pill.className = "pill bad";
+      pill.textContent = "没有候选数据";
+      document.querySelector("#out thead").innerHTML = "";
+      document.querySelector("#out tbody").innerHTML = '<tr><td class="muted">先在「候选数据」里粘一段 CSV。</td></tr>';
+      return;
+    }
+    if (!rules.length) {
+      pill.className = "pill warn";
+      pill.textContent = "没有生效的条件";
+      document.querySelector("#out thead").innerHTML = "";
+      document.querySelector("#out tbody").innerHTML = '<tr><td class="muted">至少写一条有值的条件。</td></tr>';
+      return;
+    }
+
+    var hits = parsed.rows.filter(function (r) { return matchAll(r, rules, logic); });
+
+    var sf = document.getElementById("sortField").value;
+    var dir = document.getElementById("sortDir").value;
+    if (sf) {
+      hits.sort(function (a, b) {
+        var x = a[sf], y = b[sf];
+        if (isNum(x) && isNum(y)) {
+          x = parseFloat(x); y = parseFloat(y);
+          return dir === "desc" ? y - x : x - y;
+        }
+        return dir === "desc" ? String(y).localeCompare(String(x)) : String(x).localeCompare(String(y));
+      });
+    }
+
+    pill.className = "pill" + (hits.length ? "" : " warn");
+    pill.textContent = "命中 " + hits.length + " / " + parsed.rows.length + " 条";
+
+    var head = parsed.head;
+    document.querySelector("#out thead").innerHTML =
+      "<tr>" + head.map(function (h) { return "<th>" + h + "</th>"; }).join("") + "</tr>";
+
+    if (!hits.length) {
+      document.querySelector("#out tbody").innerHTML =
+        '<tr><td colspan="' + head.length + '" class="muted">没有股票满足全部条件。条件太严就放宽一两条试试。</td></tr>';
+      return;
+    }
+
+    document.querySelector("#out tbody").innerHTML = hits.map(function (r) {
+      return "<tr>" + head.map(function (h) {
+        var v = r[h] === undefined ? "" : r[h];
+        return "<td>" + String(v).replace(/&/g, "&amp;").replace(/</g, "&lt;") + "</td>";
+      }).join("") + "</tr>";
+    }).join("");
+  }
+
+  function genCode() {
+    var rules = getRules();
+    var logic = document.getElementById("logic").value;
+    var lines = [];
+    lines.push("// 选股规则 · 生成于 " + new Date().toLocaleString("zh-CN"));
+    lines.push("");
+    lines.push("function 筛选(股票):");
+    lines.push("    条件 = [");
+    rules.forEach(function (r, i) {
+      var expr;
+      if (r.op === "between") expr = r.val + " <= 股票." + r.field + " <= " + r.val2;
+      else if (r.op === "contains") expr = "股票." + r.field + ".包含(\"" + r.val + "\")";
+      else expr = "股票." + r.field + " " + r.op + " " + r.val;
+      lines.push("        # " + (i + 1) + ". " + r.field + " " + OPS.filter(function (o) { return o.v === r.op; })[0].t + " " + r.val + (r.val2 ? " ~ " + r.val2 : ""));
+      lines.push("        " + expr + (i < rules.length - 1 ? "," : ""));
+    });
+    lines.push("    ]");
+    lines.push("    返回 " + (logic === "and" ? "条件.全部成立()" : "条件.任一成立()"));
+    lines.push("");
+    lines.push("// Python 等价写法（pandas）");
+    var py = rules.map(function (r) {
+      if (r.op === "between") return "(df['" + r.field + "'] >= " + r.val + ") & (df['" + r.field + "'] <= " + r.val2 + ")";
+      if (r.op === "contains") return "df['" + r.field + "'].str.contains('" + r.val + "')";
+      var op = r.op === "==" ? "==" : (r.op === "!=" ? "!=" : r.op);
+      return "(df['" + r.field + "'] " + op + " " + r.val + ")";
+    });
+    lines.push("df[" + py.join(logic === "and" ? "\n   & " : "\n   | ") + "]");
+    lines.push("");
+    lines.push("// SQL 等价写法（WHERE 子句）");
+    var sql = rules.map(function (r) {
+      if (r.op === "between") return "(" + r.field + " BETWEEN " + r.val + " AND " + r.val2 + ")";
+      if (r.op === "contains") return r.field + " LIKE '%" + r.val + "%'";
+      return "(" + r.field + " " + r.op + " " + r.val + ")";
+    });
+    lines.push("WHERE " + sql.join(logic === "and" ? "\n  AND " : "\n  OR "));
+    document.getElementById("code").textContent = lines.join("\n");
+  }
+
+  function download(name, text, mime) {
+    var blob = new Blob(["\ufeff" + text], { type: mime });
+    var a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = name;
+    a.click();
+    setTimeout(function () { URL.revokeObjectURL(a.href); }, 3000);
+  }
+
+  document.getElementById("btnAddField").addEventListener("click", function () { addField(""); });
+  document.getElementById("btnAddRule").addEventListener("click", function () { addRule(undefined, ">", ""); });
+  document.getElementById("logic").addEventListener("change", genCode);
+  document.getElementById("btnRun").addEventListener("click", run);
+  document.getElementById("sortField").addEventListener("change", run);
+  document.getElementById("sortDir").addEventListener("change", run);
+
+  document.getElementById("btnFieldSample").addEventListener("click", function () {
+    document.getElementById("fields").innerHTML = "";
+    ["代码", "名称", "价格", "PE", "PB", "ROE", "股息率", "市值亿", "所属行业"].forEach(function (f) { addField(f); });
+    refreshFieldSelects();
+  });
+
+  document.getElementById("btnDataSample").addEventListener("click", function () {
+    var head = "代码,名称,价格,PE,PB,ROE,股息率,市值亿,所属行业";
+    var rows = [
+      ["0700.HK", "腾讯控股", "450.0", "19.5", "3.8", "21.3", "0.85", "42000", "互联网"],
+      ["0941.HK", "中国移动", "78.5", "11.2", "1.1", "10.5", "6.20", "16800", "电信"],
+      ["0939.HK", "建设银行", "6.85", "4.6", "0.55", "11.8", "7.90", "16500", "银行"],
+      ["1398.HK", "工商银行", "5.60", "4.9", "0.52", "10.9", "8.30", "19900", "银行"],
+      ["0388.HK", "香港交易所", "285.0", "32.4", "7.1", "23.5", "2.10", "3600", "金融"],
+      ["9988.HK", "阿里巴巴", "112.0", "14.2", "1.4", "11.2", "1.05", "21400", "互联网"],
+      ["1810.HK", "小米集团", "42.5", "28.7", "3.9", "14.6", "0.00", "10600", "电子"],
+      ["2318.HK", "中国平安", "52.3", "7.8", "0.85", "12.4", "5.40", "9500", "保险"],
+      ["3690.HK", "美团", "128.0", "26.5", "3.2", "13.8", "0.00", "7800", "互联网"],
+      ["0006.HK", "电能实业", "48.2", "14.8", "1.2", "8.6", "5.80", "1030", "公用事业"],
+      ["1088.HK", "中国神华", "35.6", "9.4", "1.3", "15.2", "6.90", "7070", "煤炭"],
+      ["6098.HK", "碧桂园服务", "6.20", "8.5", "0.45", "5.2", "2.40", "210", "物业"]
+    ];
+    document.getElementById("data").value = head + "\n" + rows.map(function (r) { return r.join(","); }).join("\n");
+    run();
+  });
+
+  document.getElementById("btnPasteCsv").addEventListener("click", function () {
+    if (navigator.clipboard && navigator.clipboard.readText) {
+      navigator.clipboard.readText().then(function (t) {
+        document.getElementById("data").value = t;
+        run();
+      }, function () { alert("读不到剪贴板，请手动粘贴到文本框"); });
+    } else {
+      alert("当前环境不支持读取剪贴板，请手动粘贴");
+    }
+  });
+
+  document.getElementById("btnExport").addEventListener("click", function () {
+    var parsed = parseCSV(document.getElementById("data").value);
+    var rules = getRules();
+    var logic = document.getElementById("logic").value;
+    var hits = parsed.rows.filter(function (r) { return matchAll(r, rules, logic); });
+    if (!hits.length) { alert("没有结果可导出"); return; }
+    var csv = parsed.head.join(",") + "\n" + hits.map(function (r) {
+      return parsed.head.map(function (h) { return '"' + String(r[h] || "").replace(/"/g, '""') + '"'; }).join(",");
+    }).join("\n");
+    download("选股结果.csv", csv, "text/csv");
+  });
+
+  document.getElementById("btnExportCode").addEventListener("click", function () {
+    download("选股规则.txt", document.getElementById("code").textContent, "text/plain");
+  });
+
+  // 初始化
+  document.getElementById("btnFieldSample").click();
+  addRule("PE", "<", "15");
+  addRule("股息率", ">", "4");
+  addRule("ROE", ">", "10");
+  document.getElementById("btnDataSample").click();
+  genCode();
+})();
+</script>
+</body>
+</html>

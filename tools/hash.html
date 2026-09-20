@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>哈希计算 · WhaleTool</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐳</text></svg>">
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+
+<div class="wt-back"><a href="../">← 工具合辑</a></div>
+
+<div class="tool-head">
+  <h1>🔐 哈希计算</h1>
+  <p>MD5 / SHA-1 / SHA-256 / SHA-512 一次全出。可以算文本，也可以把文件拖进来算校验值。</p>
+</div>
+
+<div class="wrap">
+  <div class="grid2">
+    <div class="panel">
+      <div class="panel-title"><span>文本哈希</span><span class="spacer"></span>
+        <span class="pill" id="tStatus">—</span></div>
+      <textarea class="wt mono" id="text" placeholder="粘贴要计算哈希的文本…" spellcheck="false"></textarea>
+      <div class="row" style="margin-top:12px">
+        <button class="btn btn-primary" id="btnRun">计算</button>
+        <button class="btn btn-ghost" id="btnClear">清空</button>
+        <span class="spacer"></span>
+        <button class="btn btn-ghost btn-sm" id="btnCopyAll">复制全部</button>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-title"><span>文件哈希</span><span class="hint">适合校验下载包</span></div>
+      <div class="drop" id="drop">
+        <div class="di">📦</div>
+        <p>把文件拖到这里，或点击选择</p>
+        <small id="fileInfo">支持任意大小文件</small>
+      </div>
+      <input type="file" id="file" style="display:none">
+      <div class="row" style="margin-top:12px">
+        <button class="btn btn-ghost btn-sm" id="btnClearFile">清除文件</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-title"><span>计算结果</span><span class="spacer"></span>
+      <span class="hint" id="algoHint">点击任意一行复制</span></div>
+    <table class="wt" id="result">
+      <thead><tr><th style="width:88px">算法</th><th>摘要</th><th style="width:52px" class="num">长度</th></tr></thead>
+      <tbody id="resultBody">
+        <tr><td colspan="3" class="muted">输入文本或选择文件后显示结果。</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="panel">
+    <div class="panel-title"><span>说明</span></div>
+    <div class="note">
+      • MD5 / SHA-1 已被证明存在碰撞风险，只用于校验完整性，<b>不要用于密码存储或签名</b>。<br>
+      • 密码场景请用 bcrypt / scrypt / Argon2 这类带盐慢哈希。<br>
+      • 本站用的是浏览器原生 Web Crypto API，同一份文件在任何工具里结果应完全一致。
+    </div>
+  </div>
+</div>
+
+<div class="tool-foot">哈希在浏览器本地计算，文件不会上传 · <a href="../">返回工具合辑</a></div>
+
+<script>
+(function () {
+  "use strict";
+  var $text = document.getElementById("text"),
+      $body = document.getElementById("resultBody"),
+      $tStatus = document.getElementById("tStatus"),
+      $drop = document.getElementById("drop"),
+      $file = document.getElementById("file"),
+      $fileInfo = document.getElementById("fileInfo"),
+      $algoHint = document.getElementById("algoHint");
+
+  var ALGOS = ["MD5", "SHA-1", "SHA-256", "SHA-512"];
+
+  function toHex(buf) {
+    var b = new Uint8Array(buf), s = "";
+    for (var i = 0; i < b.length; i++) s += b[i].toString(16).padStart(2, "0");
+    return s;
+  }
+
+  /* 纯 JS MD5（Web Crypto 不支持 MD5） */
+  function md5(bytes) {
+    function rl(n, c) { return (n << c) | (n >>> (32 - c)); }
+    function au(x, y) { var l = (x & 0xFFFF) + (y & 0xFFFF); return (((x >> 16) + (y >> 16) + (l >> 16)) << 16) | (l & 0xFFFF); }
+    function cmn(q, a, b, x, s, t) { return au(rl(au(au(a, q), au(x, t)), s), b); }
+    function ff(a,b,c,d,x,s,t){ return cmn((b&c)|((~b)&d),a,b,x,s,t); }
+    function gg(a,b,c,d,x,s,t){ return cmn((b&d)|(c&(~d)),a,b,x,s,t); }
+    function hh(a,b,c,d,x,s,t){ return cmn(b^c^d,a,b,x,s,t); }
+    function ii(a,b,c,d,x,s,t){ return cmn(c^(b|(~d)),a,b,x,s,t); }
+
+    var n = bytes.length;
+    var nblk = ((n + 8) >> 6) + 1;
+    var blks = new Array(nblk * 16);
+    for (var i = 0; i < nblk * 16; i++) blks[i] = 0;
+    for (i = 0; i < n; i++) blks[i >> 2] |= bytes[i] << ((i % 4) * 8);
+    blks[n >> 2] |= 0x80 << ((n % 4) * 8);
+    blks[nblk * 16 - 2] = n * 8;
+    blks[nblk * 16 - 1] = Math.floor(n / 0x20000000);
+
+    var a = 1732584193, b = -271733879, c = -1732584194, d = 271733878;
+    for (i = 0; i < blks.length; i += 16) {
+      var oa = a, ob = b, oc = c, od = d;
+      a = ff(a,b,c,d,blks[i],      7,  -680876936);
+      d = ff(d,a,b,c,blks[i+1],   12, -389564586);
+      c = ff(c,d,a,b,blks[i+2],   17,  606105819);
+      b = ff(b,c,d,a,blks[i+3],   22, -1044525330);
+      a = ff(a,b,c,d,blks[i+4],    7, -176418897);
+      d = ff(d,a,b,c,blks[i+5],   12,  1200080426);
+      c = ff(c,d,a,b,blks[i+6],   17, -1473231341);
+      b = ff(b,c,d,a,blks[i+7],   22, -45705983);
+      a = ff(a,b,c,d,blks[i+8],    7,  1770035416);
+      d = ff(d,a,b,c,blks[i+9],   12, -1958414417);
+      c = ff(c,d,a,b,blks[i+10],  17, -42063);
+      b = ff(b,c,d,a,blks[i+11],  22, -1990404162);
+      a = ff(a,b,c,d,blks[i+12],   7,  1804603682);
+      d = ff(d,a,b,c,blks[i+13],  12, -40341101);
+      c = ff(c,d,a,b,blks[i+14],  17, -1502002290);
+      b = ff(b,c,d,a,blks[i+15],  22,  1236535329);
+
+      a = gg(a,b,c,d,blks[i+1],    5, -165796510);
+      d = gg(d,a,b,c,blks[i+6],    9, -1069501632);
+      c = gg(c,d,a,b,blks[i+11],  14,  643717713);
+      b = gg(b,c,d,a,blks[i],     20, -373897302);
+      a = gg(a,b,c,d,blks[i+5],    5, -701558691);
+      d = gg(d,a,b,c,blks[i+10],   9,  38016083);
+      c = gg(c,d,a,b,blks[i+15],  14, -660478335);
+      b = gg(b,c,d,a,blks[i+4],   20, -405537848);
+      a = gg(a,b,c,d,blks[i+9],    5,  568446438);
+      d = gg(d,a,b,c,blks[i+14],   9, -1019803690);
+      c = gg(c,d,a,b,blks[i+3],   14, -187363961);
+      b = gg(b,c,d,a,blks[i+8],   20,  1163531501);
+      a = gg(a,b,c,d,blks[i+13],   5, -1444681467);
+      d = gg(d,a,b,c,blks[i+2],    9, -51403784);
+      c = gg(c,d,a,b,blks[i+7],   14,  1735328473);
+      b = gg(b,c,d,a,blks[i+12],  20, -1926607734);
+
+      a = hh(a,b,c,d,blks[i+5],    4, -378558);
+      d = hh(d,a,b,c,blks[i+8],   11, -2022574463);
+      c = hh(c,d,a,b,blks[i+11],  16,  1839030562);
+      b = hh(b,c,d,a,blks[i+14],  23, -35309556);
+      a = hh(a,b,c,d,blks[i+1],    4, -1530992060);
+      d = hh(d,a,b,c,blks[i+4],   11,  1272893353);
+      c = hh(c,d,a,b,blks[i+7],   16, -155497632);
+      b = hh(b,c,d,a,blks[i+10],  23, -1094730640);
+      a = hh(a,b,c,d,blks[i+13],   4,  681279174);
+      d = hh(d,a,b,c,blks[i],     11, -358537222);
+      c = hh(c,d,a,b,blks[i+3],   16, -722521979);
+      b = hh(b,c,d,a,blks[i+6],   23,  76029189);
+      a = hh(a,b,c,d,blks[i+9],    4, -640364487);
+      d = hh(d,a,b,c,blks[i+12],  11, -421815835);
+      c = hh(c,d,a,b,blks[i+15],  16,  530742520);
+      b = hh(b,c,d,a,blks[i+2],   23, -995338651);
+
+      a = ii(a,b,c,d,blks[i],      6, -198630844);
+      d = ii(d,a,b,c,blks[i+7],   10,  1126891415);
+      c = ii(c,d,a,b,blks[i+14],  15, -1416354905);
+      b = ii(b,c,d,a,blks[i+5],   21, -57434055);
+      a = ii(a,b,c,d,blks[i+12],   6,  1700485571);
+      d = ii(d,a,b,c,blks[i+3],   10, -1894986606);
+      c = ii(c,d,a,b,blks[i+10],  15, -1051523);
+      b = ii(b,c,d,a,blks[i+1],   21, -2054922799);
+      a = ii(a,b,c,d,blks[i+8],    6,  1873313359);
+      d = ii(d,a,b,c,blks[i+15],  10, -30611744);
+      c = ii(c,d,a,b,blks[i+6],   15, -1560198380);
+      b = ii(b,c,d,a,blks[i+13],  21,  1309151649);
+      a = ii(a,b,c,d,blks[i+4],    6, -145523070);
+      d = ii(d,a,b,c,blks[i+11],  10, -1120210379);
+      c = ii(c,d,a,b,blks[i+2],   15,  718787259);
+      b = ii(b,c,d,a,blks[i+9],   21, -343485551);
+
+      a = au(a, oa); b = au(b, ob); c = au(c, oc); d = au(d, od);
+    }
+
+    function u32(n) {
+      var s = "";
+      for (var i = 0; i < 4; i++) s += ((n >>> (i * 8)) & 0xFF).toString(16).padStart(2, "0");
+      return s;
+    }
+    return u32(a) + u32(b) + u32(c) + u32(d);
+  }
+
+  function rows(results, emptyMsg) {
+    if (emptyMsg) {
+      $body.innerHTML = '<tr><td colspan="3" class="muted">' + emptyMsg + "</td></tr>";
+      $algoHint.textContent = "点击任意一行复制";
+      return;
+    }
+    $body.innerHTML = results.map(function (r) {
+      return '<tr data-v="' + r.v + '" style="cursor:pointer">' +
+        "<td>" + r.k + '</td>' +
+        '<td style="word-break:break-all;font-family:ui-monospace,Consolas,monospace">' + r.v + "</td>" +
+        '<td class="num">' + r.v.length + "</td></tr>";
+    }).join("");
+    Array.prototype.forEach.call($body.querySelectorAll("tr[data-v]"), function (tr) {
+      tr.addEventListener("click", function () {
+        var v = tr.getAttribute("data-v");
+        var done = function () {
+          $algoHint.textContent = "已复制 " + v.slice(0, 8) + "…";
+          setTimeout(function () { $algoHint.textContent = "点击任意一行复制"; }, 1600);
+        };
+        if (navigator.clipboard && location.protocol !== "file:") {
+          navigator.clipboard.writeText(v).then(done, function () { fallback(v, done); });
+        } else { fallback(v, done); }
+      });
+    });
+  }
+
+  function fallback(v, cb) {
+    var ta = document.createElement("textarea");
+    ta.value = v; ta.style.position = "fixed"; ta.style.opacity = "0";
+    document.body.appendChild(ta); ta.select();
+    try { document.execCommand("copy"); cb(); } catch (e) {}
+    document.body.removeChild(ta);
+  }
+
+  function calcText() {
+    var s = $text.value;
+    if (!s) { rows(null, "输入文本或选择文件后显示结果。"); $tStatus.className = "pill"; $tStatus.textContent = "—"; return; }
+    var bytes = new TextEncoder().encode(s);
+    var results = [{ k: "MD5", v: md5(bytes) }];
+    $tStatus.className = "pill"; $tStatus.textContent = bytes.length + " 字节";
+    var jobs = ["SHA-1", "SHA-256", "SHA-512"].map(function (a) {
+      return crypto.subtle.digest(a, bytes).then(function (b) { return { k: a, v: toHex(b) }; });
+    });
+    Promise.all(jobs).then(function (rs) {
+      var all = [{ k: "MD5", v: results[0].v }].concat(rs);
+      all.sort(function (x, y) { return ALGOS.indexOf(x.k) - ALGOS.indexOf(y.k); });
+      rows(all);
+    });
+  }
+
+  function calcFile(f) {
+    $fileInfo.textContent = f.name + " · " + fmtSize(f.size);
+    $tStatus.className = "pill"; $tStatus.textContent = "读取中…";
+    var reader = new FileReader();
+    reader.onload = function () {
+      var bytes = new Uint8Array(reader.result);
+      var results = [{ k: "MD5", v: md5(bytes) }];
+      var jobs = ["SHA-1", "SHA-256", "SHA-512"].map(function (a) {
+        return crypto.subtle.digest(a, bytes).then(function (b) { return { k: a, v: toHex(b) }; });
+      });
+      Promise.all(jobs).then(function (rs) {
+        var all = [{ k: "MD5", v: results[0].v }].concat(rs);
+        all.sort(function (x, y) { return ALGOS.indexOf(x.k) - ALGOS.indexOf(y.k); });
+        rows(all);
+        $algoHint.textContent = "点击任意一行复制";
+        $tStatus.className = "pill"; $tStatus.textContent = "文件已计算";
+      });
+    };
+    reader.onerror = function () { rows(null, "文件读取失败。"); };
+    reader.readAsArrayBuffer(f);
+  }
+
+  function fmtSize(n) {
+    if (n < 1024) return n + " B";
+    if (n < 1048576) return (n / 1024).toFixed(1) + " KB";
+    if (n < 1073741824) return (n / 1048576).toFixed(2) + " MB";
+    return (n / 1073741824).toFixed(2) + " GB";
+  }
+
+  $text.addEventListener("input", calcText);
+  document.getElementById("btnRun").addEventListener("click", calcText);
+  document.getElementById("btnClear").addEventListener("click", function () {
+    $text.value = ""; calcText();
+  });
+
+  document.getElementById("btnCopyAll").addEventListener("click", function () {
+    var lines = Array.prototype.map.call($body.querySelectorAll("tr[data-v]"), function (tr) {
+      return tr.children[0].textContent + "  " + tr.getAttribute("data-v");
+    });
+    if (!lines.length) return;
+    var btn = this, old = btn.textContent;
+    var text = lines.join("\n");
+    var done = function () { btn.textContent = "已复制 ✓"; setTimeout(function () { btn.textContent = old; }, 1400); };
+    if (navigator.clipboard && location.protocol !== "file:") {
+      navigator.clipboard.writeText(text).then(done, function () { fallback(text, done); });
+    } else { fallback(text, done); }
+  });
+
+  $drop.addEventListener("click", function () { $file.click(); });
+  $file.addEventListener("change", function () { if (this.files[0]) calcFile(this.files[0]); });
+
+  ["dragenter", "dragover"].forEach(function (ev) {
+    $drop.addEventListener(ev, function (e) { e.preventDefault(); $drop.classList.add("over"); });
+  });
+  ["dragleave", "drop"].forEach(function (ev) {
+    $drop.addEventListener(ev, function (e) { e.preventDefault(); $drop.classList.remove("over"); });
+  });
+  $drop.addEventListener("drop", function (e) {
+    var f = e.dataTransfer.files[0];
+    if (f) calcFile(f);
+  });
+
+  document.getElementById("btnClearFile").addEventListener("click", function () {
+    $file.value = "";
+    $fileInfo.textContent = "支持任意大小文件";
+    calcText();
+  });
+
+  $text.value = "hello whaletool";
+  calcText();
+})();
+</script>
+</body>
+</html>

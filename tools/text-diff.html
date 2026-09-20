@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>文本比对 · WhaleTool</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐳</text></svg>">
+<link rel="stylesheet" href="../assets/style.css">
+<style>
+  .diff { font-family:"SFMono-Regular",Consolas,monospace; font-size:12.8px; line-height:1.75; white-space:pre-wrap; word-break:break-all; }
+  .diff .ln { display:flex; gap:10px; padding:1px 6px; border-radius:4px; }
+  .diff .ln .gutter { flex:none; width:74px; color:var(--faint); text-align:right; user-select:none; font-size:11.5px; }
+  .diff .ln .body { flex:1; }
+  .diff .add { background:rgba(23,138,90,.12); }
+  .diff .del { background:rgba(209,59,59,.11); }
+  .diff .add .body { color:#0f6b46; }
+  .diff .del .body { color:#a32d2d; }
+  .diff .same { color:var(--muted); }
+  .diff ins { background:rgba(23,138,90,.3); text-decoration:none; border-radius:2px; }
+  .diff del { background:rgba(209,59,59,.28); text-decoration:none; border-radius:2px; }
+</style>
+</head>
+<body>
+
+<div class="wt-back"><a href="../">← 工具合辑</a></div>
+
+<div class="tool-head">
+  <h1>🔀 文本比对</h1>
+  <p>逐行对比两段文本，新增 / 删除 / 修改一目了然。同一行里的小改动也会做行内高亮。</p>
+</div>
+
+<div class="wrap">
+  <div class="grid2">
+    <div class="panel">
+      <div class="panel-title"><span>A · 原文本</span></div>
+      <textarea class="wt mono" id="a" spellcheck="false" placeholder="粘贴原始内容…"></textarea>
+    </div>
+    <div class="panel">
+      <div class="panel-title"><span>B · 新文本</span></div>
+      <textarea class="wt mono" id="b" spellcheck="false" placeholder="粘贴修改后的内容…"></textarea>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-title"><span>比对结果</span><span class="spacer"></span>
+      <span class="pill" id="summary">—</span>
+      <button class="btn btn-ghost btn-sm" id="btnSwap">交换 A/B</button>
+      <button class="btn btn-ghost btn-sm" id="btnSample">示例</button>
+      <button class="btn btn-ghost btn-sm" id="btnCopy">复制报告</button>
+    </div>
+    <div class="row tight" style="margin-bottom:12px">
+      <button class="btn btn-ghost btn-sm" data-view="all">全部</button>
+      <button class="btn btn-ghost btn-sm" data-view="diff">只看差异</button>
+      <label class="lb" style="margin:0 0 0 8px;font-weight:500">
+        <input type="checkbox" id="ignoreCase"> 忽略大小写
+      </label>
+      <label class="lb" style="margin:0 0 0 8px;font-weight:500">
+        <input type="checkbox" id="ignoreSpace"> 忽略首尾空白
+      </label>
+    </div>
+    <div class="out diff" id="result" style="max-height:600px;font-family:inherit"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-title"><span>统计</span></div>
+    <div class="stat-row" id="stats"></div>
+  </div>
+</div>
+
+<div class="tool-foot">比对在浏览器本地完成 · <a href="../">返回工具合辑</a></div>
+
+<script>
+(function () {
+  "use strict";
+  var $a = document.getElementById("a"), $b = document.getElementById("b"),
+      $res = document.getElementById("result"), $sum = document.getElementById("summary"),
+      $stats = document.getElementById("stats"),
+      $ic = document.getElementById("ignoreCase"), $is = document.getElementById("ignoreSpace");
+  var view = "all";
+
+  function norm(s) {
+    var x = s;
+    if ($ic.checked) x = x.toLowerCase();
+    if ($is.checked) return x.trim();
+    return x;
+  }
+
+  function esc(s) {
+    return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  }
+
+  /* LCS 求最长公共子序列，得到行级 diff */
+  function lcsDiff(A, B) {
+    var n = A.length, m = B.length;
+    // 超大文本降级：直接首尾对齐
+    if (n * m > 4000000) {
+      var simple = [], i;
+      for (i = 0; i < Math.max(n, m); i++) {
+        if (A[i] === B[i]) simple.push(["same", A[i], B[i]]);
+        else {
+          if (i < n) simple.push(["del", A[i], null]);
+          if (i < m) simple.push(["add", null, B[i]]);
+        }
+      }
+      return simple;
+    }
+    var dp = [];
+    for (var i = 0; i <= n; i++) dp.push(new Int32Array(m + 1));
+    for (i = n - 1; i >= 0; i--) {
+      for (var j = m - 1; j >= 0; j--) {
+        dp[i][j] = norm(A[i]) === norm(B[j])
+          ? dp[i + 1][j + 1] + 1
+          : Math.max(dp[i + 1][j], dp[i][j + 1]);
+      }
+    }
+    var out = [];
+    i = 0; var j = 0;
+    while (i < n && j < m) {
+      if (norm(A[i]) === norm(B[j])) { out.push(["same", A[i], B[j]]); i++; j++; }
+      else if (dp[i + 1][j] >= dp[i][j + 1]) { out.push(["del", A[i], null]); i++; }
+      else { out.push(["add", null, B[j]]); j++; }
+    }
+    while (i < n) { out.push(["del", A[i], null]); i++; }
+    while (j < m) { out.push(["add", null, B[j]]); j++; }
+    return out;
+  }
+
+  /* 行内字符级 diff */
+  function inlineDiff(x, y) {
+    var n = x.length, m = y.length;
+    if (n * m > 40000) return [esc(x), esc(y)];
+    var dp = [];
+    for (var i = 0; i <= n; i++) dp.push(new Int32Array(m + 1));
+    for (i = n - 1; i >= 0; i--) {
+      for (var j = m - 1; j >= 0; j--) {
+        dp[i][j] = norm(x[i]) === norm(y[j])
+          ? dp[i + 1][j + 1] + 1
+          : Math.max(dp[i + 1][j], dp[i][j + 1]);
+      }
+    }
+    var left = "", right = "";
+    i = 0; var j2 = 0;
+    while (i < n && j2 < m) {
+      if (norm(x[i]) === norm(y[j2])) { left += esc(x[i]); right += esc(y[j2]); i++; j2++; }
+      else if (dp[i + 1][j2] >= dp[i][j2 + 1]) { left += "<del>" + esc(x[i]) + "</del>"; i++; }
+      else { right += "<ins>" + esc(y[j2]) + "</ins>"; j2++; }
+    }
+    while (i < n) { left += "<del>" + esc(x[i]) + "</del>"; i++; }
+    while (j2 < m) { right += "<ins>" + esc(y[j2]) + "</ins>"; j2++; }
+    return [left, right];
+  }
+
+  function run() {
+    var ta = $a.value, tb = $b.value;
+    if (!ta && !tb) {
+      $res.innerHTML = '<span class="muted">两边都还是空的，先粘贴点内容吧。</span>';
+      $sum.className = "pill"; $sum.textContent = "—";
+      renderStats(0, 0, 0, 0);
+      return;
+    }
+    var A = ta.split("\n"), B = tb.split("\n");
+    var rows = lcsDiff(A, B);
+
+    // 相邻 del/add 配对做行内 diff
+    var out = [], add = 0, del = 0, same = 0, mod = 0;
+    for (var i = 0; i < rows.length; i++) {
+      var r = rows[i];
+      if (r[0] === "del" && rows[i + 1] && rows[i + 1][0] === "add") {
+        var pair = inlineDiff(r[1], rows[i + 1][1]);
+        out.push(["mod", pair[0], pair[1]]);
+        mod++;
+        i++;
+      } else {
+        if (r[0] === "add") add++;
+        else if (r[0] === "del") del++;
+        else same++;
+        out.push(r);
+      }
+    }
+    // 行号游标
+    var la = 0, lb = 0, html = "", shown = 0;
+    out.forEach(function (r) {
+      var isDiff = r[0] !== "same";
+      if (view === "diff" && !isDiff) { if (r[0] === "same") { la++; lb++; } return; }
+      shown++;
+      var cls = r[0] === "add" ? "add" : (r[0] === "del" ? "del" : (r[0] === "mod" ? "" : "same"));
+      var g = "", body = "";
+      if (r[0] === "add")      { lb++; g = "&nbsp;&nbsp;&nbsp;&nbsp;" + lb; body = esc(r[2] || ""); }
+      else if (r[0] === "del") { la++; g = la + "&nbsp;&nbsp;&nbsp;&nbsp;"; body = esc(r[1] || ""); }
+      else if (r[0] === "mod") { la++; lb++; g = la + "&nbsp;&nbsp;" + lb; body = ""; }
+      else                     { la++; lb++; g = la + "&nbsp;&nbsp;" + lb; body = esc(r[1] || ""); }
+      if (r[0] === "mod") {
+        html += '<div class="ln"><span class="gutter">' + g + '</span><span class="body">' +
+          '<span class="del-mark">' + r[1] + '</span></span></div>';
+        html += '<div class="ln"><span class="gutter">&nbsp;</span><span class="body">' + r[2] + "</span></div>";
+      } else {
+        html += '<div class="ln ' + cls + '"><span class="gutter">' + g +
+          '</span><span class="body">' + (body || "&nbsp;") + "</span></div>";
+      }
+    });
+
+    $res.innerHTML = html || '<span class="muted">没有差异。</span>';
+    $sum.className = "pill" + (add + del + mod === 0 ? "" : " warn");
+    $sum.textContent = add + del + mod === 0
+      ? "完全一致"
+      : "差异 " + (add + del + mod) + " 处";
+    renderStats(add, del, mod, same);
+    return out;
+  }
+
+  function renderStats(add, del, mod, same) {
+    $stats.innerHTML =
+      '<div class="stat"><div class="k">新增行</div><div class="v down">' + add + "</div></div>" +
+      '<div class="stat"><div class="k">删除行</div><div class="v up">' + del + "</div></div>" +
+      '<div class="stat"><div class="k">修改行</div><div class="v">' + mod + "</div></div>" +
+      '<div class="stat"><div class="k">未变行</div><div class="v">' + same + "</div></div>";
+  }
+
+  Array.prototype.forEach.call(document.querySelectorAll("[data-view]"), function (b) {
+    b.addEventListener("click", function () {
+      view = this.dataset.view;
+      Array.prototype.forEach.call(document.querySelectorAll("[data-view]"), function (x) {
+        x.className = "btn btn-ghost btn-sm";
+      });
+      this.className = "btn btn-primary btn-sm";
+      run();
+    });
+  });
+
+  document.getElementById("btnSwap").addEventListener("click", function () {
+    var t = $a.value; $a.value = $b.value; $b.value = t; run();
+  });
+
+  document.getElementById("btnSample").addEventListener("click", function () {
+    $a.value = [
+      "func GetUser(id int) (*User, error) {",
+      "    if id <= 0 {",
+      "        return nil, ErrInvalidID",
+      "    }",
+      "    u, err := db.Find(id)",
+      "    return u, err",
+      "}"
+    ].join("\n");
+    $b.value = [
+      "func GetUser(ctx context.Context, id int) (*User, error) {",
+      "    if id <= 0 {",
+      "        return nil, ErrInvalidID",
+      "    }",
+      "    u, err := db.WithContext(ctx).Find(id)",
+      "    if err != nil {",
+      "        return nil, fmt.Errorf(\"get user: %w\", err)",
+      "    }",
+      "    return u, nil",
+      "}"
+    ].join("\n");
+    run();
+  });
+
+  document.getElementById("btnCopy").addEventListener("click", function () {
+    var lines = [];
+    Array.prototype.forEach.call($res.querySelectorAll(".ln"), function (ln) {
+      var cls = ln.className;
+      var sign = cls.indexOf("add") >= 0 ? "+ " : (cls.indexOf("del") >= 0 ? "- " : "  ");
+      lines.push(sign + ln.querySelector(".body").textContent);
+    });
+    var text = lines.join("\n"), btn = this, old = btn.textContent;
+    var done = function () { btn.textContent = "已复制 ✓"; setTimeout(function () { btn.textContent = old; }, 1400); };
+    if (navigator.clipboard && location.protocol !== "file:") {
+      navigator.clipboard.writeText(text).then(done, function () { fb(text, done); });
+    } else { fb(text, done); }
+    function fb(v, cb) {
+      var ta = document.createElement("textarea");
+      ta.value = v; ta.style.position = "fixed"; ta.style.opacity = "0";
+      document.body.appendChild(ta); ta.select();
+      try { document.execCommand("copy"); cb(); } catch (e) {}
+      document.body.removeChild(ta);
+    }
+  });
+
+  $a.addEventListener("input", run);
+  $b.addEventListener("input", run);
+  $ic.addEventListener("change", run);
+  $is.addEventListener("change", run);
+
+  $a.value = "let count = 1;\nconsole.log(count);";
+  $b.value = "let count = 2;\nconsole.log(count, \"items\");";
+  run();
+})();
+</script>
+</body>
+</html>

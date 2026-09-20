@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>仓位管理 · WhaleTool</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐳</text></svg>">
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+
+<div class="wt-back"><a href="../">← 工具合辑</a></div>
+
+<div class="tool-head">
+  <h1>⚖️ 仓位管理</h1>
+  <p>先定「这笔最多亏多少」，再反推该买多少股。附金字塔分批补仓与减仓计划。</p>
+</div>
+
+<div class="wrap">
+  <div class="panel">
+    <div class="panel-title"><span>模块</span></div>
+    <div class="row tight">
+      <button class="btn btn-primary" data-tab="size">单笔仓位计算</button>
+      <button class="btn btn-ghost" data-tab="pyramid">分批建仓 / 补仓</button>
+      <button class="btn btn-ghost" data-tab="scale">分批止盈</button>
+      <button class="btn btn-ghost" data-tab="risk">组合风险</button>
+    </div>
+  </div>
+
+  <!-- 单笔仓位 -->
+  <div id="pane-size">
+    <div class="grid2">
+      <div class="panel">
+        <div class="panel-title"><span>参数</span></div>
+        <div class="row">
+          <label class="lb" style="margin:0;min-width:110px">总资金</label>
+          <input class="wt mono" id="capital" value="100000" style="flex:1 1 140px">
+        </div>
+        <div class="row" style="margin-top:10px">
+          <label class="lb" style="margin:0;min-width:110px">单笔最大风险</label>
+          <input class="wt mono" id="riskPct" value="2" style="flex:0 0 92px">
+          <span class="muted" style="font-size:13px">% of 总资金</span>
+        </div>
+        <div class="row" style="margin-top:10px">
+          <label class="lb" style="margin:0;min-width:110px">买入价</label>
+          <input class="wt mono" id="entry" value="100" style="flex:1 1 140px">
+        </div>
+        <div class="row" style="margin-top:10px">
+          <label class="lb" style="margin:0;min-width:110px">止损价</label>
+          <input class="wt mono" id="stop" value="92" style="flex:1 1 140px">
+        </div>
+        <div class="row" style="margin-top:10px">
+          <label class="lb" style="margin:0;min-width:110px">每手股数</label>
+          <input class="wt mono" id="lot" value="100" style="flex:1 1 140px">
+        </div>
+        <div class="row" style="margin-top:14px">
+          <button class="btn btn-primary" id="btnSize">计算仓位</button>
+          <label class="lb" style="margin:0;font-weight:500"><input type="checkbox" id="roundLot" checked> 按整手取整</label>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-title"><span>建议仓位</span><span class="spacer"></span>
+          <span class="pill" id="sizePill">—</span></div>
+        <div class="stat-row">
+          <div class="stat"><div class="k">可承受亏损</div><div class="v" id="sRisk">—</div></div>
+          <div class="stat"><div class="k">每股风险</div><div class="v" id="sPerRisk">—</div></div>
+          <div class="stat"><div class="k">建议股数</div><div class="v" id="sShares">—</div></div>
+          <div class="stat"><div class="k">占用资金</div><div class="v" id="sCost">—</div></div>
+          <div class="stat"><div class="k">占总资金</div><div class="v" id="sRatio">—</div></div>
+          <div class="stat"><div class="k">实际止损亏损</div><div class="v" id="sReal">—</div></div>
+        </div>
+        <div class="note" style="margin-top:14px" id="sizeNote"></div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-title"><span>止损幅度速查</span><span class="hint">按不同止损位，看该买多少</span></div>
+      <table class="wt" id="stopTable">
+        <thead><tr><th class="num">止损幅度</th><th class="num">止损价</th><th class="num">建议股数</th><th class="num">占用资金</th><th class="num">仓位占比</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- 分批建仓 -->
+  <div id="pane-pyramid" style="display:none">
+    <div class="panel">
+      <div class="panel-title"><span>分批建仓计划</span><span class="hint">跌多少加多少，摊薄成本</span></div>
+      <div class="row">
+        <label class="lb" style="margin:0">首次买入价</label>
+        <input class="wt mono" id="pBase" value="100" style="width:110px">
+        <label class="lb" style="margin:0 0 0 8px">总预算</label>
+        <input class="wt mono" id="pBudget" value="100000" style="width:130px">
+        <label class="lb" style="margin:0 0 0 8px">批数</label>
+        <input class="wt mono" id="pTimes" type="number" value="4" min="2" max="8" style="width:76px">
+        <label class="lb" style="margin:0 0 0 8px">每跌</label>
+        <input class="wt mono" id="pStep" value="5" style="width:76px">
+        <span class="muted" style="font-size:13px">% 加一批</span>
+      </div>
+      <div class="row tight" style="margin-top:12px">
+        <button class="btn btn-primary btn-sm" id="btnPyramid">生成计划</button>
+        <select class="wt" id="pMode" style="width:auto">
+          <option value="equal">等金额加仓</option>
+          <option value="pyramid">金字塔（越跌加越多）</option>
+          <option value="inverse">倒金字塔（越跌加越少）</option>
+        </select>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-title"><span>执行计划</span><span class="spacer"></span>
+        <span class="pill" id="pSummary">—</span></div>
+      <table class="wt" id="pTable">
+        <thead><tr><th class="num">批次</th><th class="num">买入价</th><th class="num">较首笔</th><th class="num">买入股数</th><th class="num">投入金额</th><th class="num">累计股数</th><th class="num">摊薄成本</th></tr></thead>
+        <tbody></tbody>
+      </table>
+      <div class="note" style="margin-top:14px" id="pNote"></div>
+    </div>
+  </div>
+
+  <!-- 分批止盈 -->
+  <div id="pane-scale" style="display:none">
+    <div class="panel">
+      <div class="panel-title"><span>分批止盈计划</span><span class="hint">越涨越卖，落袋为安</span></div>
+      <div class="row">
+        <label class="lb" style="margin:0">成本价</label>
+        <input class="wt mono" id="sCostP" value="100" style="width:110px">
+        <label class="lb" style="margin:0 0 0 8px">持有股数</label>
+        <input class="wt mono" id="sSharesP" value="1000" style="width:110px">
+        <label class="lb" style="margin:0 0 0 8px">批数</label>
+        <input class="wt mono" id="sTimes" type="number" value="4" min="2" max="8" style="width:76px">
+        <label class="lb" style="margin:0 0 0 8px">每涨</label>
+        <input class="wt mono" id="sStep" value="10" style="width:76px">
+        <span class="muted" style="font-size:13px">% 卖一批</span>
+      </div>
+      <div class="row tight" style="margin-top:12px">
+        <button class="btn btn-primary btn-sm" id="btnScale">生成计划</button>
+        <select class="wt" id="sMode" style="width:auto">
+          <option value="equal">每批等量</option>
+          <option value="front">越涨卖越多</option>
+          <option value="back">越涨卖越少</option>
+        </select>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-title"><span>执行计划</span><span class="spacer"></span>
+        <span class="pill" id="sSummary">—</span></div>
+      <table class="wt" id="sTable">
+        <thead><tr><th class="num">批次</th><th class="num">卖出价</th><th class="num">较成本</th><th class="num">卖出股数</th><th class="num">回款</th><th class="num">该笔盈亏</th><th class="num">剩余股数</th></tr></thead>
+        <tbody></tbody>
+      </table>
+      <div class="note" style="margin-top:14px" id="sNote"></div>
+    </div>
+  </div>
+
+  <!-- 组合风险 -->
+  <div id="pane-risk" style="display:none">
+    <div class="panel">
+      <div class="panel-title"><span>持仓列表</span><span class="hint">一行一笔：名称 | 市值 | 成本 | 波动率%</span>
+        <span class="spacer"></span>
+        <button class="btn btn-ghost btn-sm" id="btnRSample">示例</button></div>
+      <textarea class="wt mono" id="rList" style="min-height:160px" spellcheck="false"></textarea>
+      <div class="row" style="margin-top:12px">
+        <button class="btn btn-primary" id="btnRisk">计算组合风险</button>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-title"><span>结果</span></div>
+      <div class="stat-row" id="rStats"></div>
+      <div class="note" style="margin-top:14px" id="rNote">
+        波动率请填你对这笔持仓的预估年化波动率。组合波动率按简单加权估算，未考虑相关性，实际会更低。
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="tool-foot">纯本地计算 · <a href="../">返回工具合辑</a></div>
+
+<script>
+(function () {
+  "use strict";
+
+  function num(id) { return parseFloat(document.getElementById(id).value) || 0; }
+  function money(n, cur) {
+    return (Math.abs(n) < 0.005 ? 0 : n).toLocaleString("zh-CN", { minimumFractionDigits: 0, maximumFractionDigits: 2 }) + (cur ? " " + cur : "");
+  }
+  function pct(n) { return (n * 100).toFixed(2) + "%"; }
+
+  /* ---------- 单笔仓位 ---------- */
+  function calcSize() {
+    var capital = num("capital"), riskPct = num("riskPct"), entry = num("entry"),
+        stop = num("stop"), lot = Math.max(1, num("lot"));
+
+    var maxLoss = capital * riskPct / 100;
+    var perRisk = entry - stop;
+    var pill = document.getElementById("sizePill");
+
+    if (!capital || !entry) { pill.className = "pill warn"; pill.textContent = "填完整参数"; return; }
+    if (perRisk <= 0) {
+      pill.className = "pill bad";
+      pill.textContent = "止损价必须低于买入价";
+      document.getElementById("sizeNote").textContent = "止损价高于或等于买入价时无法计算风险敞口。做空场景请把两者对调后再理解。";
+      return;
+    }
+
+    var rawShares = maxLoss / perRisk;
+    var shares = document.getElementById("roundLot").checked
+      ? Math.floor(rawShares / lot) * lot
+      : Math.floor(rawShares);
+    var cost = shares * entry;
+    var ratio = cost / capital;
+    var realLoss = shares * perRisk;
+
+    document.getElementById("sRisk").textContent = money(maxLoss);
+    document.getElementById("sPerRisk").textContent = perRisk.toFixed(3);
+    document.getElementById("sShares").textContent = shares.toLocaleString();
+    document.getElementById("sCost").textContent = money(cost);
+    document.getElementById("sRatio").textContent = pct(ratio);
+    document.getElementById("sReal").textContent = money(realLoss);
+    document.getElementById("sReal").className = "v up";
+
+    pill.className = "pill" + (ratio > 0.5 ? " warn" : "");
+    pill.textContent = ratio > 0.5
+      ? "仓位偏重（" + pct(ratio) + "）"
+      : "仓位合理（" + pct(ratio) + "）";
+
+    document.getElementById("sizeNote").innerHTML =
+      "逻辑：先用「总资金 × 风险比例」定出这笔最多能亏多少（" + money(maxLoss) +
+      "），再除以「买入价 − 止损价」得到股数。<br>" +
+      "这样无论止损多近或多远，每笔交易的最大亏损都是可控的。" +
+      (ratio > 0.5 ? "<br><b>注意：</b>止损位很近会让仓位变得极重，一旦跳空跌破止损，实际亏损可能远超预期。建议同时给仓位设个上限（例如总资金的 30%）。" : "");
+
+    // 止损幅度速查
+    var tiers = [0.03, 0.05, 0.08, 0.1, 0.15, 0.2, 0.3];
+    document.querySelector("#stopTable tbody").innerHTML = tiers.map(function (t) {
+      var sp = entry * (1 - t);
+      var pr = entry - sp;
+      var raw = maxLoss / pr;
+      var sh = document.getElementById("roundLot").checked ? Math.floor(raw / lot) * lot : Math.floor(raw);
+      var c = sh * entry;
+      return '<tr><td class="num">-' + (t * 100).toFixed(0) + '%</td><td class="num">' + sp.toFixed(2) +
+        '</td><td class="num">' + sh.toLocaleString() + '</td><td class="num">' + money(c) +
+        '</td><td class="num">' + pct(c / capital) + "</td></tr>";
+    }).join("");
+  }
+
+  /* ---------- 分批建仓 ---------- */
+  function calcPyramid() {
+    var base = num("pBase"), budget = num("pBudget"), times = Math.max(2, Math.min(8, num("pTimes") || 4)),
+        step = num("pStep") || 5, mode = document.getElementById("pMode").value;
+
+    if (!base || !budget) return;
+
+    var weights = [];
+    for (var i = 0; i < times; i++) {
+      if (mode === "equal") weights.push(1);
+      else if (mode === "pyramid") weights.push(i + 1);
+      else weights.push(times - i);
+    }
+    var wsum = weights.reduce(function (a, b) { return a + b; }, 0);
+    var amounts = weights.map(function (w) { return budget * w / wsum; });
+
+    var cumShares = 0, cumCost = 0, rows = "";
+    for (i = 0; i < times; i++) {
+      var price = base * Math.pow(1 - step / 100, i);
+      var sh = Math.floor(amounts[i] / price);
+      cumShares += sh; cumCost += sh * price;
+      var avg = cumShares ? cumCost / cumShares : 0;
+      rows += '<tr><td class="num">' + (i + 1) + '</td><td class="num">' + price.toFixed(3) +
+        '</td><td class="num muted">' + (i === 0 ? "首次" : "-" + (step * i).toFixed(1) + "%") +
+        '</td><td class="num">' + sh.toLocaleString() +
+        '</td><td class="num">' + money(sh * price) +
+        '</td><td class="num">' + cumShares.toLocaleString() +
+        '</td><td class="num" style="font-weight:600">' + avg.toFixed(3) + "</td></tr>";
+    }
+    document.querySelector("#pTable tbody").innerHTML = rows;
+
+    var lastPrice = base * Math.pow(1 - step / 100, times - 1);
+    var avgAll = cumShares ? cumCost / cumShares : 0;
+    var used = cumCost;
+    document.getElementById("pSummary").textContent =
+      "均成本 " + avgAll.toFixed(3) + " · 实际投入 " + money(used);
+
+    document.getElementById("pNote").innerHTML =
+      "如果全部批次都成交，持有 " + cumShares.toLocaleString() + " 股，摊薄成本 <b>" + avgAll.toFixed(3) +
+      "</b>，累计投入 " + money(used) + "（预算 " + money(budget) + "）。<br>" +
+      "注意最坏情况：股价一路跌到 " + lastPrice.toFixed(3) + "，此时账面亏损 " +
+      money(cumShares * lastPrice - cumCost) + "。分批建仓能摊低成本，但不会消灭方向性风险——加仓前先想清楚逻辑是否还成立。";
+  }
+
+  /* ---------- 分批止盈 ---------- */
+  function calcScale() {
+    var cost = num("sCostP"), shares = num("sSharesP"), times = Math.max(2, Math.min(8, num("sTimes") || 4)),
+        step = num("sStep") || 10, mode = document.getElementById("sMode").value;
+    if (!cost || !shares) return;
+
+    var weights = [];
+    for (var i = 0; i < times; i++) {
+      if (mode === "equal") weights.push(1);
+      else if (mode === "front") weights.push(times - i);
+      else weights.push(i + 1);
+    }
+    var wsum = weights.reduce(function (a, b) { return a + b; }, 0);
+
+    var remain = shares, totalIncome = 0, totalProfit = 0, rows = "";
+    for (i = 0; i < times; i++) {
+      var price = cost * Math.pow(1 + step / 100, i + 1);
+      var sh = Math.floor(shares * weights[i] / wsum / 100) * 100;
+      if (i === times - 1) sh = remain;
+      sh = Math.min(sh, remain);
+      if (sh <= 0) continue;
+      remain -= sh;
+      var income = sh * price;
+      var profit = sh * (price - cost);
+      totalIncome += income; totalProfit += profit;
+      rows += '<tr><td class="num">' + (i + 1) + '</td><td class="num">' + price.toFixed(3) +
+        '</td><td class="num down">+' + ((price / cost - 1) * 100).toFixed(1) + "%" +
+        '</td><td class="num">' + sh.toLocaleString() +
+        '</td><td class="num">' + money(income) +
+        '</td><td class="num down">+' + money(profit) +
+        '</td><td class="num">' + remain.toLocaleString() + "</td></tr>";
+    }
+    document.querySelector("#sTable tbody").innerHTML = rows;
+
+    document.getElementById("sSummary").textContent =
+      "全部卖出可回款 " + money(totalIncome) + " · 盈利 " + money(totalProfit);
+
+    var firstPrice = cost * (1 + step / 100);
+    var lastPrice = cost * Math.pow(1 + step / 100, times);
+    document.getElementById("sNote").innerHTML =
+      "从 " + firstPrice.toFixed(3) + " 一路卖到 " + lastPrice.toFixed(3) + "，全部成交后共回款 " +
+      money(totalIncome) + "，相对成本 " + money(shares * cost) + " 盈利 <b>" + money(totalProfit) + "</b>（" +
+      pct(totalProfit / (shares * cost)) + "）。<br>" +
+      "分批止盈的代价是：如果股价继续大涨，你会少赚后半段。换来的是不会因为一次回撤把浮盈全吐回去。";
+  }
+
+  /* ---------- 组合风险 ---------- */
+  function calcRisk() {
+    var lines = document.getElementById("rList").value.split("\n").map(function (l) { return l.trim(); }).filter(Boolean);
+    var items = lines.map(function (l) {
+      var s = l.split("|").map(function (x) { return x.trim(); });
+      return { name: s[0] || "未命名", value: parseFloat(s[1]) || 0, cost: parseFloat(s[2]) || 0, vol: parseFloat(s[3]) || 0 };
+    }).filter(function (x) { return x.value > 0; });
+
+    if (!items.length) {
+      document.getElementById("rStats").innerHTML = '<div class="muted" style="font-size:13px">没有有效持仓。</div>';
+      return;
+    }
+
+    var total = items.reduce(function (s, x) { return s + x.value; }, 0);
+    var totalCost = items.reduce(function (s, x) { return s + x.cost; }, 0);
+    // 加权波动率（未考虑相关性，偏保守）
+    var wVol = items.reduce(function (s, x) { return s + (x.value / total) * x.vol; }, 0);
+    // 集中度：赫芬达尔指数
+    var hhi = items.reduce(function (s, x) { return s + Math.pow(x.value / total, 2); }, 0);
+    var maxWeight = Math.max.apply(null, items.map(function (x) { return x.value / total; }));
+
+    // 估算组合 1 日 95% VaR（正态近似，1.645σ，日波动≈年波动/√252）
+    var dailyVol = wVol / Math.sqrt(252);
+    var var95 = total * dailyVol * 1.645;
+
+    document.getElementById("rStats").innerHTML =
+      '<div class="stat"><div class="k">总市值</div><div class="v">' + money(total) + "</div></div>" +
+      '<div class="stat"><div class="k">总成本</div><div class="v">' + money(totalCost) + "</div></div>" +
+      '<div class="stat"><div class="k">浮动盈亏</div><div class="v ' + (total >= totalCost ? "up" : "down") + '">' +
+        money(total - totalCost) + "</div></div>" +
+      '<div class="stat"><div class="k">加权年化波动</div><div class="v">' + wVol.toFixed(2) + "%</div></div>" +
+      '<div class="stat"><div class="k">最大单一占比</div><div class="v">' + pct(maxWeight) + "</div></div>" +
+      '<div class="stat"><div class="k">持仓数</div><div class="v">' + items.length + "</div></div>" +
+      '<div class="stat"><div class="k">估算 1 日 VaR(95%)</div><div class="v up">' + money(var95) + "</div></div>" +
+      '<div class="stat"><div class="k">集中度 HHI</div><div class="v">' + hhi.toFixed(3) + "</div></div>";
+
+    var advice = [];
+    if (maxWeight > 0.4) advice.push("单一持仓占比 " + pct(maxWeight) + "，超过 40%，集中度偏高。");
+    else advice.push("最大单一占比 " + pct(maxWeight) + "，集中度还算健康。");
+    if (wVol > 35) advice.push("加权波动率 " + wVol.toFixed(1) + "%，属于高波动组合，注意单日回撤可能到 " + pct(dailyVol * 2) + "。");
+    else if (wVol > 20) advice.push("加权波动率 " + wVol.toFixed(1) + "%，中等水平。");
+    else advice.push("加权波动率 " + wVol.toFixed(1) + "%，偏稳健。");
+    advice.push("乐观假设下（各标的相关性为 0），真实组合波动会明显低于 " + wVol.toFixed(1) + "%，上表按最坏情况线性叠加估算，偏保守。");
+
+    document.getElementById("rNote").innerHTML = advice.map(function (a) { return "· " + a; }).join("<br>");
+  }
+
+  /* ---------- tab 切换 ---------- */
+  Array.prototype.forEach.call(document.querySelectorAll("[data-tab]"), function (b) {
+    b.addEventListener("click", function () {
+      var t = this.dataset.tab;
+      Array.prototype.forEach.call(document.querySelectorAll("[data-tab]"), function (x) {
+        x.className = "btn btn-ghost";
+      });
+      this.className = "btn btn-primary";
+      ["size", "pyramid", "scale", "risk"].forEach(function (k) {
+        document.getElementById("pane-" + k).style.display = k === t ? "" : "none";
+      });
+    });
+  });
+
+  ["capital", "riskPct", "entry", "stop", "lot"].forEach(function (id) {
+    document.getElementById(id).addEventListener("input", calcSize);
+  });
+  document.getElementById("roundLot").addEventListener("change", calcSize);
+  document.getElementById("btnSize").addEventListener("click", calcSize);
+
+  ["pBase", "pBudget", "pTimes", "pStep"].forEach(function (id) {
+    document.getElementById(id).addEventListener("input", calcPyramid);
+  });
+  document.getElementById("pMode").addEventListener("change", calcPyramid);
+  document.getElementById("btnPyramid").addEventListener("click", calcPyramid);
+
+  ["sCostP", "sSharesP", "sTimes", "sStep"].forEach(function (id) {
+    document.getElementById(id).addEventListener("input", calcScale);
+  });
+  document.getElementById("sMode").addEventListener("change", calcScale);
+  document.getElementById("btnScale").addEventListener("click", calcScale);
+
+  document.getElementById("btnRisk").addEventListener("click", calcRisk);
+  document.getElementById("btnRSample").addEventListener("click", function () {
+    document.getElementById("rList").value = [
+      "腾讯控股 | 240000 | 210000 | 30",
+      "恒生科技 ETF | 80000 | 78000 | 28",
+      "黄金 ETF | 60000 | 55000 | 16",
+      "货币基金 | 100000 | 100000 | 1",
+      "港股创新药 ETF | 40000 | 42000 | 42"
+    ].join("\n");
+    calcRisk();
+  });
+
+  document.getElementById("rList").value = [
+    "腾讯控股 | 240000 | 210000 | 30",
+    "恒生科技 ETF | 80000 | 78000 | 28",
+    "黄金 ETF | 60000 | 55000 | 16",
+    "货币基金 | 100000 | 100000 | 1"
+  ].join("\n");
+
+  calcSize();
+  calcPyramid();
+  calcScale();
+  calcRisk();
+})();
+</script>
+</body>
+</html>

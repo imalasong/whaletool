@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>中英排版助手 · WhaleTool</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐳</text></svg>">
+<link rel="stylesheet" href="../assets/style.css">
+<style>
+  .diffview ins { background: rgba(23,138,90,.22); text-decoration: none; border-radius: 2px; }
+  .diffview del { background: rgba(209,59,59,.18); text-decoration: none; border-radius: 2px; opacity: .7; }
+</style>
+</head>
+<body>
+
+<div class="wt-back"><a href="../">← 工具合辑</a></div>
+
+<div class="tool-head">
+  <h1>🈳 中英排版助手</h1>
+  <p>自动在中英文、数字之间补空格，顺手修全角标点和多余空行。写文档、发公众号前先跑一遍。</p>
+</div>
+
+<div class="wrap">
+  <div class="panel">
+    <div class="panel-title"><span>输入</span><span class="spacer"></span>
+      <span class="pill" id="inInfo">0 字符</span></div>
+    <textarea class="wt" id="input" style="min-height:230px" placeholder="把要排版的文字粘进来…"></textarea>
+    <div class="row" style="margin-top:12px">
+      <button class="btn btn-primary" id="btnRun">开始排版</button>
+      <button class="btn btn-ghost" id="btnSample">示例</button>
+      <button class="btn btn-ghost" id="btnClear">清空</button>
+      <span class="spacer"></span>
+      <button class="btn btn-ghost btn-sm" id="btnSwap">结果转输入</button>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-title"><span>输出</span><span class="spacer"></span>
+      <span class="pill" id="outInfo">—</span>
+      <button class="btn btn-ghost btn-sm" id="btnCopy">复制输出</button></div>
+    <textarea class="wt" id="output" style="min-height:230px" readonly spellcheck="false"></textarea>
+  </div>
+
+  <div class="panel">
+    <div class="panel-title"><span>修改预览</span><span class="hint">绿色是新增，红色是去掉</span></div>
+    <div class="out diffview" id="diffview" style="font-family:inherit;font-size:14px;white-space:pre-wrap">—</div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-title"><span>处理规则</span><span class="hint">可逐条开关</span></div>
+    <div class="row" style="flex-direction:column;align-items:flex-start;gap:9px">
+      <label class="lb" style="margin:0;font-weight:500"><input type="checkbox" class="opt" data-k="space" checked> 中英文 / 中文数字之间补空格</label>
+      <label class="lb" style="margin:0;font-weight:500"><input type="checkbox" class="opt" data-k="punct" checked> 中文语境里的英文标点换成全角</label>
+      <label class="lb" style="margin:0;font-weight:500"><input type="checkbox" class="opt" data-k="quote" checked> 直引号换成弯引号</label>
+      <label class="lb" style="margin:0;font-weight:500"><input type="checkbox" class="opt" data-k="fullwidth" checked> 全角字母数字换成半角</label>
+      <label class="lb" style="margin:0;font-weight:500"><input type="checkbox" class="opt" data-k="ellipsis" checked> 三个点合成省略号</label>
+      <label class="lb" style="margin:0;font-weight:500"><input type="checkbox" class="opt" data-k="trim" checked> 去掉行尾空格与多余空行</label>
+      <label class="lb" style="margin:0;font-weight:500"><input type="checkbox" class="opt" data-k="bracket" checked> 中英混合括号外补空格</label>
+    </div>
+  </div>
+</div>
+
+<div class="tool-foot">处理在浏览器本地完成 · <a href="../">返回工具合辑</a></div>
+
+<script>
+(function () {
+  "use strict";
+  var $in = document.getElementById("input"), $out = document.getElementById("output"),
+      $inInfo = document.getElementById("inInfo"), $outInfo = document.getElementById("outInfo"),
+      $diff = document.getElementById("diffview");
+
+  function opts() {
+    var o = {};
+    Array.prototype.forEach.call(document.querySelectorAll(".opt"), function (c) { o[c.dataset.k] = c.checked; });
+    return o;
+  }
+
+  var CJK = "\\u4e00-\\u9fa5\\u3000-\\u303f\\uff00-\\uffef";
+  var CN_CHAR = "[\\u4e00-\\u9fa5]";
+  var EN_CHAR = "[a-zA-Z0-9@#$%&*\\u00c0-\\u024f]";
+
+  function pangu(text) {
+    var s = text;
+    // 中文 + 英文
+    s = s.replace(new RegExp("(" + CN_CHAR + ")(" + EN_CHAR + ")", "g"), "$1 $2");
+    s = s.replace(new RegExp("(" + EN_CHAR + ")(" + CN_CHAR + ")", "g"), "$1 $2");
+    return s;
+  }
+
+  function protect(text) {
+    // 保护代码块、行内代码、URL
+    var store = [];
+    var s = text
+      .replace(/```[\s\S]*?```/g, function (m) { store.push(m); return "\u0002" + (store.length - 1) + "\u0002"; })
+      .replace(/`[^`\n]+`/g, function (m) { store.push(m); return "\u0002" + (store.length - 1) + "\u0002"; })
+      .replace(/https?:\/\/[^\s，。！？）】]+/g, function (m) { store.push(m); return "\u0002" + (store.length - 1) + "\u0002"; });
+    return { s: s, store: store };
+  }
+
+  function restore(text, store) {
+    return text.replace(/\u0002(\d+)\u0002/g, function (_, i) { return store[+i]; });
+  }
+
+  function process(text) {
+    var o = opts();
+    var p = protect(text);
+    var s = p.s;
+
+    if (o.fullwidth) {
+      s = s.replace(/[\uff01-\uff5e]/g, function (ch) {
+        var code = ch.charCodeAt(0);
+        // 全角字母数字 → 半角（保留全角标点）
+        if ((code >= 0xff10 && code <= 0xff19) || (code >= 0xff21 && code <= 0xff3a) || (code >= 0xff41 && code <= 0xff5a)) {
+          return String.fromCharCode(code - 0xfee0);
+        }
+        return ch;
+      });
+    }
+
+    if (o.ellipsis) {
+      s = s.replace(/\.{3,}/g, "…");
+      s = s.replace(/。{2,}/g, "……");
+    }
+
+    if (o.quote) {
+      s = s.replace(/"([^"\n]*)"/g, "\u201c$1\u201d");
+      s = s.replace(/'([^'\n]*)'/g, "\u2018$1\u2019");
+    }
+
+    if (o.punct) {
+      // 仅当标点紧邻中文字符时才转全角
+      s = s.replace(new RegExp("(" + CN_CHAR + ")\\s*,\\s*", "g"), "$1，");
+      s = s.replace(new RegExp("(" + CN_CHAR + ")\\s*\\.\\s*", "g"), "$1。");
+      s = s.replace(new RegExp("(" + CN_CHAR + ")\\s*\\?\\s*", "g"), "$1？");
+      s = s.replace(new RegExp("(" + CN_CHAR + ")\\s*!\\s*", "g"), "$1！");
+      s = s.replace(new RegExp("(" + CN_CHAR + ")\\s*;\\s*", "g"), "$1；");
+      s = s.replace(new RegExp("(" + CN_CHAR + ")\\s*:\\s*", "g"), "$1：");
+      s = s.replace(new RegExp(",\\s*(" + CN_CHAR + ")", "g"), "，$1");
+      s = s.replace(new RegExp(";\\s*(" + CN_CHAR + ")", "g"), "；$1");
+      s = s.replace(new RegExp(":\\s*(" + CN_CHAR + ")", "g"), "：$1");
+    }
+
+    if (o.space) s = pangu(s);
+
+    if (o.bracket) {
+      // 中文外层的英文括号补齐
+      s = s.replace(new RegExp("(" + CN_CHAR + ")\\(([^()\\n]*)\\)", "g"), "$1（$2）");
+      s = s.replace(new RegExp("(" + CN_CHAR + ")\\s*\\(" , "g"), "$1（");
+    }
+
+    if (o.trim) {
+      s = s.split("\n").map(function (l) { return l.replace(/[ \t]+$/, ""); }).join("\n");
+      s = s.replace(/\n{3,}/g, "\n\n");
+      s = s.replace(/^\s+|\s+$/g, "");
+    }
+
+    return restore(s, p.store);
+  }
+
+  function charDiff(a, b) {
+    var n = a.length, m = b.length;
+    if (n * m > 250000) return [null, null];
+    var dp = [];
+    for (var i = 0; i <= n; i++) dp.push(new Int32Array(m + 1));
+    for (i = n - 1; i >= 0; i--) {
+      for (var j = m - 1; j >= 0; j--) {
+        dp[i][j] = a[i] === b[j] ? dp[i + 1][j + 1] + 1 : Math.max(dp[i + 1][j], dp[i][j + 1]);
+      }
+    }
+    var left = "", right = "";
+    i = 0; var j2 = 0;
+    function esc(x) { return x.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
+    while (i < n && j2 < m) {
+      if (a[i] === b[j2]) { left += esc(a[i]); right += esc(b[j2]); i++; j2++; }
+      else if (dp[i + 1][j2] >= dp[i][j2 + 1]) { left += "<del>" + esc(a[i]) + "</del>"; i++; }
+      else { right += "<ins>" + esc(b[j2]) + "</ins>"; j2++; }
+    }
+    while (i < n) { left += "<del>" + esc(a[i]) + "</del>"; i++; }
+    while (j2 < m) { right += "<ins>" + esc(b[j2]) + "</ins>"; j2++; }
+    return [left, right];
+  }
+
+  function run() {
+    var src = $in.value;
+    $inInfo.textContent = src.length + " 字符";
+    if (!src.trim()) {
+      $out.value = "";
+      $outInfo.textContent = "—";
+      $diff.innerHTML = '<span class="muted">输入文字后这里会显示改动。</span>';
+      return;
+    }
+    var res = process(src);
+    $out.value = res;
+    var changed = res.length - src.replace(/\s+$/, "").length;
+    $outInfo.textContent = res.length + " 字符 · "
+      + (changed === 0 ? "无改动" : "长度 " + (changed > 0 ? "+" : "") + changed);
+
+    var d = charDiff(src, res);
+    $diff.innerHTML = d[0] === null
+      ? "文本较长，跳过逐字对比。"
+      : d[0] + "\n" + "\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n" + d[1];
+  }
+
+  document.getElementById("btnRun").addEventListener("click", run);
+  Array.prototype.forEach.call(document.querySelectorAll(".opt"), function (c) {
+    c.addEventListener("change", run);
+  });
+
+  document.getElementById("btnSwap").addEventListener("click", function () {
+    if (!$out.value) return;
+    $in.value = $out.value; run();
+  });
+
+  document.getElementById("btnClear").addEventListener("click", function () {
+    $in.value = ""; run();
+  });
+
+  document.getElementById("btnCopy").addEventListener("click", function () {
+    if (!$out.value) return;
+    var btn = this, old = btn.textContent, text = $out.value;
+    var done = function () { btn.textContent = "已复制 ✓"; setTimeout(function () { btn.textContent = old; }, 1400); };
+    if (navigator.clipboard && location.protocol !== "file:") {
+      navigator.clipboard.writeText(text).then(done, function () { fb(text, done); });
+    } else { fb(text, done); }
+    function fb(v, cb) {
+      var ta = document.createElement("textarea");
+      ta.value = v; ta.style.position = "fixed"; ta.style.opacity = "0";
+      document.body.appendChild(ta); ta.select();
+      try { document.execCommand("copy"); cb(); } catch (e) {}
+      document.body.removeChild(ta);
+    }
+  });
+
+  document.getElementById("btnSample").addEventListener("click", function () {
+    $in.value = [
+      "我们用 Golang 写了 1 个服务,部署在 K8s 上。",
+      "",
+      "QPS 峰值大概 3000,平均响应时间 45ms(不含网络)。",
+      "后来把 Redis 的 key 拆成 64 个分片,效果不错...",
+      "",
+      "相关文档见 https://github.com/imalasong/whaletool 这个地址。",
+      "代码里有个 `getUserInfo(id)` 函数需要重构。"
+    ].join("\n");
+    run();
+  });
+
+  document.getElementById("btnRun").click();
+})();
+</script>
+</body>
+</html>

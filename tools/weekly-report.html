@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>周报生成器 · WhaleTool</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐳</text></svg>">
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+
+<div class="wt-back"><a href="../">← 工具合辑</a></div>
+
+<div class="tool-head">
+  <h1>📋 周报生成器</h1>
+  <p>按项目分组粘贴 commits 或手写记录，自动套用「分类 + 状态标签 + 下周计划」模板成稿。</p>
+</div>
+
+<div class="wrap">
+  <div class="grid2">
+    <div class="panel">
+      <div class="panel-title"><span>填写内容</span></div>
+
+      <div class="row" style="margin-bottom:12px">
+        <label class="lb" style="margin:0">姓名</label>
+        <input class="wt" id="who" value="xiaochangbai" style="flex:1 1 120px">
+        <label class="lb" style="margin:0 0 0 8px">周期</label>
+        <input class="wt" id="period" style="flex:1 1 140px">
+      </div>
+
+      <label class="lb">本周工作（一行一条，格式：项目 | 内容 | 状态）</label>
+      <textarea class="wt mono" id="did" style="min-height:170px" spellcheck="false"></textarea>
+      <div class="hint" style="font-size:12px;color:var(--faint);margin-top:6px">状态可填：已完成 / 进行中 / 已完成(80%) / 待验证 / 已上线</div>
+
+      <label class="lb" style="margin-top:14px">下周计划（一行一条，格式同上，状态可省）</label>
+      <textarea class="wt mono" id="todo" style="min-height:120px" spellcheck="false"></textarea>
+
+      <label class="lb" style="margin-top:14px">风险与阻塞（可选，一行一条）</label>
+      <textarea class="wt" id="risk" style="min-height:80px" spellcheck="false"></textarea>
+
+      <div class="row" style="margin-top:14px">
+        <button class="btn btn-primary" id="btnGen">生成周报</button>
+        <button class="btn btn-ghost" id="btnSample">填充示例</button>
+        <button class="btn btn-ghost" id="btnClear">清空</button>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-title"><span>预览</span><span class="spacer"></span>
+        <span class="hint">可直接编辑</span></div>
+      <textarea class="wt" id="out" style="min-height:640px;font-family:ui-monospace,Consolas,monospace;font-size:12.8px" spellcheck="false"></textarea>
+      <div class="row" style="margin-top:12px">
+        <button class="btn btn-primary btn-sm" id="btnCopy">复制</button>
+        <button class="btn btn-ghost btn-sm" id="btnDownMd">下载 .md</button>
+        <button class="btn btn-ghost btn-sm" id="btnDownTxt">下载 .txt</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-title"><span>本周概览</span></div>
+    <div class="stat-row" id="stats"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-title"><span>格式说明</span></div>
+    <div class="note">
+      每行用 <b>|</b> 分隔三列：<code>项目 | 内容 | 状态</code>。状态会自动转成图标标签：
+      <span class="pill">✅ 已完成</span>
+      <span class="pill warn">🔄 进行中</span>
+      <span class="pill warn">🔍 待验证</span>
+      <span class="pill">🚀 已上线</span>
+      只写两列时默认按「进行中」处理。
+    </div>
+  </div>
+</div>
+
+<div class="tool-foot">生成在浏览器本地完成 · <a href="../">返回工具合辑</a></div>
+
+<script>
+(function () {
+  "use strict";
+  var $did = document.getElementById("did"), $todo = document.getElementById("todo"),
+      $risk = document.getElementById("risk"), $out = document.getElementById("out"),
+      $who = document.getElementById("who"), $period = document.getElementById("period"),
+      $stats = document.getElementById("stats");
+
+  function stateTag(s) {
+    if (!s) return "🔄 进行中";
+    var t = s.trim();
+    if (/上线|发布|上线了/.test(t)) return "🚀 已上线";
+    if (/完成|done|100/.test(t)) return "✅ 已完成";
+    if (/验证|测试|review|检查/.test(t)) return "🔍 待验证";
+    if (/进行|开发中|doing|wip/.test(t)) return "🔄 进行中";
+    if (/阻塞|卡住|挂起/.test(t)) return "⛔ 阻塞";
+    if (/规划|设计|评估/.test(t)) return "📐 规划中";
+    return "🔄 " + t;
+  }
+
+  function parse(text) {
+    return text.split("\n").map(function (l) { return l.trim(); })
+      .filter(function (l) { return l && !/^#/.test(l); })
+      .map(function (line) {
+        var seg = line.split("|").map(function (x) { return x.trim(); });
+        if (seg.length >= 3) return { proj: seg[0], what: seg[1], state: seg[2] };
+        if (seg.length === 2) return { proj: seg[0], what: seg[1], state: "" };
+        return { proj: "其他", what: seg[0], state: "" };
+      });
+  }
+
+  function esc(s) {
+    return String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  }
+
+  function build() {
+    var did = parse($did.value);
+    var todo = parse($todo.value);
+    var risk = $risk.value.split("\n").map(function (l) { return l.trim(); }).filter(Boolean);
+
+    var L = [];
+    L.push("# 周报 · " + ($who.value || "—"));
+    L.push("");
+    L.push("**周期：** " + ($period.value || "—"));
+    L.push("");
+
+    L.push("## 本周完成");
+    L.push("");
+    if (!did.length) {
+      L.push("_（无记录）_");
+    } else {
+      var byProj = {};
+      did.forEach(function (d) { (byProj[d.proj] = byProj[d.proj] || []).push(d); });
+      Object.keys(byProj).forEach(function (p) {
+        L.push("### " + p);
+        L.push("");
+        byProj[p].forEach(function (d) {
+          L.push("- " + stateTag(d.state) + " " + d.what);
+        });
+        L.push("");
+      });
+    }
+
+    L.push("## 下周计划");
+    L.push("");
+    if (!todo.length) {
+      L.push("_（无记录）_");
+    } else {
+      var byP2 = {};
+      todo.forEach(function (d) { (byP2[d.proj] = byP2[d.proj] || []).push(d); });
+      Object.keys(byP2).forEach(function (p) {
+        L.push("### " + p);
+        L.push("");
+        byP2[p].forEach(function (d) {
+          L.push("- " + (d.state ? stateTag(d.state) + " " : "") + d.what);
+        });
+        L.push("");
+      });
+    }
+
+    if (risk.length) {
+      L.push("## 风险与阻塞");
+      L.push("");
+      risk.forEach(function (r) { L.push("- ⚠️ " + r); });
+      L.push("");
+    }
+
+    L.push("---");
+    L.push("");
+    var total = did.length;
+    var done = did.filter(function (d) { return /完成|上线|done|100/i.test(d.state); }).length;
+    var rate = total ? Math.round(done / total * 100) : 0;
+    L.push("**本周概览：** 记录 " + total + " 项，完成 " + done + " 项（完成率 " + rate + "%），下周计划 " + todo.length + " 项。");
+
+    $out.value = L.join("\n");
+
+    var projs = {};
+    did.forEach(function (d) { projs[d.proj] = 1; });
+    $stats.innerHTML =
+      '<div class="stat"><div class="k">本周记录</div><div class="v">' + total + "</div></div>" +
+      '<div class="stat"><div class="k">已完成</div><div class="v down">' + done + "</div></div>" +
+      '<div class="stat"><div class="k">完成率</div><div class="v">' + rate + "%</div></div>" +
+      '<div class="stat"><div class="k">涉及项目</div><div class="v">' + Object.keys(projs).length + "</div></div>" +
+      '<div class="stat"><div class="k">下周计划</div><div class="v">' + todo.length + "</div></div>" +
+      '<div class="stat"><div class="k">风险项</div><div class="v up">' + risk.length + "</div></div>";
+  }
+
+  function copyOr(a, b) {
+    var text = $out.value;
+    var btn = b, old = btn.textContent;
+    var done = function () { btn.textContent = "已复制 ✓"; setTimeout(function () { btn.textContent = old; }, 1400); };
+    if (navigator.clipboard && location.protocol !== "file:") {
+      navigator.clipboard.writeText(text).then(done, function () { fb(text, done); });
+    } else { fb(text, done); }
+    function fb(v, cb) {
+      var ta = document.createElement("textarea");
+      ta.value = v; ta.style.position = "fixed"; ta.style.opacity = "0";
+      document.body.appendChild(ta); ta.select();
+      try { document.execCommand("copy"); cb(); } catch (e) {}
+      document.body.removeChild(ta);
+    }
+  }
+
+  function download(ext, mime) {
+    if (!$out.value) return;
+    var blob = new Blob([$out.value], { type: mime });
+    var a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "周报-" + ($period.value || "本周").replace(/[\/\s]/g, "") + "." + ext;
+    a.click();
+    setTimeout(function () { URL.revokeObjectURL(a.href); }, 3000);
+  }
+
+  document.getElementById("btnGen").addEventListener("click", build);
+  document.getElementById("btnCopy").addEventListener("click", function () { copyOr(null, this); });
+  document.getElementById("btnDownMd").addEventListener("click", function () { download("md", "text/markdown"); });
+  document.getElementById("btnDownTxt").addEventListener("click", function () { download("txt", "text/plain"); });
+
+  document.getElementById("btnClear").addEventListener("click", function () {
+    $did.value = ""; $todo.value = ""; $risk.value = ""; build();
+  });
+
+  document.getElementById("btnSample").addEventListener("click", function () {
+    $did.value = [
+      "topi-ai | 重构 AI 聊天流程，把会话状态从内存挪到 Redis | 已完成",
+      "topi-ai | 接入豆包模型做多模型路由，压测 QPS 到 800 | 已完成",
+      "topi-ai | 联网搜索工具调用链路调优，延迟从 1.8s 降到 900ms | 已完成",
+      "fantopia-back-service | 邀请码购票选座接口开发 | 已完成",
+      "fantopia-back-service | 苹果订阅回调验签逻辑 | 进行中",
+      "fantopia-back-service | 活动列表排序优化，加了缓存层 | 已完成",
+      "RuoYi 后台 | BiDashboard Redis 查询改 64 分片 key | 已完成",
+      "RuoYi 后台 | task_config cron 任务缺 task_key 导致的报错排查 | 待验证"
+    ].join("\n");
+    $todo.value = [
+      "fantopia-back-service | 完成苹果订阅验签并上线",
+      "fantopia-back-service | Topi 塔罗模块迁移到 Fantopia",
+      "topi-ai | 实时语音链路接入火山引擎 WS",
+      "topi-ai | SSE 网关转发压测",
+      "RuoYi 后台 | 分片 key 上线后观察一周查询耗时"
+    ].join("\n");
+    $risk.value = [
+      "苹果订阅沙箱环境的回调不稳定，联调时间可能被拉长",
+      "Redis 分片 key 上线后需要灰度观察，回滚方案要准备好"
+    ].join("\n");
+    build();
+  });
+
+  [$did, $todo, $risk, $who, $period].forEach(function (el) {
+    el.addEventListener("input", build);
+  });
+
+  var d = new Date();
+  var mon = (d.getDay() + 6) % 7;
+  var start = new Date(d); start.setDate(d.getDate() - mon);
+  var end = new Date(start); end.setDate(start.getDate() + 6);
+  function f(x) { return (x.getMonth() + 1) + "月" + x.getDate() + "日"; }
+  $period.value = f(start) + " - " + f(end);
+
+  build();
+})();
+</script>
+</body>
+</html>

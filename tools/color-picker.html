@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>图片取色器 · WhaleTool</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐳</text></svg>">
+<link rel="stylesheet" href="../assets/style.css">
+<style>
+  .pickbox { position: relative; display: inline-block; line-height: 0; max-width: 100%; }
+  .pickbox canvas { max-width: 100%; border-radius: 10px; cursor: crosshair; display: block; border: 1px solid var(--border); }
+  .swatch-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(112px, 1fr)); gap: 10px; }
+  .sw-item { border: 1px solid var(--border); border-radius: 10px; overflow: hidden; cursor: pointer; background: #fff; }
+  .sw-item .c { height: 62px; }
+  .sw-item .t { padding: 6px 8px; font-size: 11.5px; font-family: ui-monospace,Consolas,monospace; color: var(--text-soft); text-align: center; }
+  .hintdot { position: absolute; width: 14px; height: 14px; border: 2px solid #fff; border-radius: 50%; box-shadow: 0 0 0 1px rgba(0,0,0,.5); pointer-events: none; transform: translate(-50%,-50%); display: none; }
+</style>
+</head>
+<body>
+
+<div class="wt-back"><a href="../">← 工具合辑</a></div>
+
+<div class="tool-head">
+  <h1>🎨 图片取色器</h1>
+  <p>点图片上任意位置取色，给出 HEX / RGB / HSL。也会自动提取整张图的主色调，方便配 UI。</p>
+</div>
+
+<div class="wrap">
+  <div class="panel">
+    <div class="drop" id="drop">
+      <div class="di">🖼</div>
+      <p>把图片拖到这里，或点击选择</p>
+      <small>也可以在下面直接用系统取色器</small>
+    </div>
+    <input type="file" id="file" accept="image/*" style="display:none">
+  </div>
+
+  <div class="grid2">
+    <div class="panel">
+      <div class="panel-title"><span>点击取色</span><span class="spacer"></span>
+        <span class="pill" id="posInfo">—</span></div>
+      <div style="text-align:center">
+        <div class="pickbox" id="pickbox">
+          <canvas id="cv" width="10" height="10"></canvas>
+          <div class="hintdot" id="dot"></div>
+        </div>
+        <div class="muted" id="phMsg" style="font-size:13px;margin-top:14px">还没加载图片</div>
+      </div>
+      <div class="row" style="margin-top:14px;justify-content:center">
+        <label class="lb" style="margin:0">系统取色器</label>
+        <input type="color" id="sysColor" value="#0f766e" style="width:52px;height:36px;border:1px solid var(--border);border-radius:8px;cursor:pointer;background:none">
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-title"><span>当前颜色</span></div>
+      <div class="swatch" id="bigSwatch" style="height:96px;background:#0f766e"></div>
+      <table class="wt" style="margin-top:12px" id="vals">
+        <tbody>
+          <tr data-copy="#0f766e" style="cursor:pointer"><td style="width:78px">HEX</td><td class="mono" id="vHex">#0F766E</td></tr>
+          <tr data-copy="rgb(15, 118, 110)" style="cursor:pointer"><td>RGB</td><td id="vRgb">rgb(15, 118, 110)</td></tr>
+          <tr data-copy="hsl(177, 77%, 26%)" style="cursor:pointer"><td>HSL</td><td id="vHsl">hsl(177, 77%, 26%)</td></tr>
+          <tr data-copy="15,118,110" style="cursor:pointer"><td>RGB 数组</td><td id="vArr">15,118,110</td></tr>
+          <tr data-copy="#0f766e" style="cursor:pointer"><td>CSS 变量</td><td id="vCss">--brand: #0f766e;</td></tr>
+        </tbody>
+      </table>
+      <div class="hint" style="margin-top:8px;font-size:12px;color:var(--faint)">点击任意一行复制该值</div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-title"><span>自动配色</span><span class="hint">基于当前颜色生成，点一下取用</span></div>
+    <div class="swatch-grid" id="scheme"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-title"><span>主色调提取</span><span class="hint">加载图片后自动分析</span></div>
+    <div class="swatch-grid" id="palette">
+      <div class="muted" style="font-size:13px;grid-column:1/-1">加载图片后这里会列出画面里的主要颜色。</div>
+    </div>
+  </div>
+</div>
+
+<div class="tool-foot">取色在浏览器本地完成 · <a href="../">返回工具合辑</a></div>
+
+<script>
+(function () {
+  "use strict";
+  var $drop = document.getElementById("drop"), $file = document.getElementById("file"),
+      $cv = document.getElementById("cv"), $dot = document.getElementById("dot"),
+      $pos = document.getElementById("posInfo"), $phMsg = document.getElementById("phMsg"),
+      $big = document.getElementById("bigSwatch"), $scheme = document.getElementById("scheme"),
+      $palette = document.getElementById("palette"), $sys = document.getElementById("sysColor");
+
+  var ctx = $cv.getContext("2d", { willReadFrequently: true });
+  var hasImg = false;
+
+  function hx(r, g, b) {
+    return "#" + [r, g, b].map(function (v) { return Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2, "0"); }).join("");
+  }
+  function hxUp(r, g, b) { return hx(r, g, b).toUpperCase(); }
+
+  function rgb2hsl(r, g, b) {
+    r /= 255; g /= 255; b /= 255;
+    var mx = Math.max(r, g, b), mn = Math.min(r, g, b);
+    var h = 0, s = 0, l = (mx + mn) / 2;
+    var d = mx - mn;
+    if (d) {
+      s = l > 0.5 ? d / (2 - mx - mn) : d / (mx + mn);
+      if (mx === r) h = ((g - b) / d + (g < b ? 6 : 0));
+      else if (mx === g) h = (b - r) / d + 2;
+      else h = (r - g) / d + 4;
+      h /= 6;
+    }
+    return [Math.round(h * 360), Math.round(s * 100), Math.round(l * 100)];
+  }
+
+  function hsl2rgb(h, s, l) {
+    h = ((h % 360) + 360) % 360 / 360; s /= 100; l /= 100;
+    if (!s) { var v = Math.round(l * 255); return [v, v, v]; }
+    function hue(p, q, t) {
+      if (t < 0) t += 1; if (t > 1) t -= 1;
+      if (t < 1 / 6) return p + (q - p) * 6 * t;
+      if (t < 1 / 2) return q;
+      if (t < 2 / 3) return p + (q - p) * (2 / 3 - t) * 6;
+      return p;
+    }
+    var q = l < 0.5 ? l * (1 + s) : l + s - l * s, p = 2 * l - q;
+    return [Math.round(hue(p, q, h + 1 / 3) * 255), Math.round(hue(p, q, h) * 255), Math.round(hue(p, q, h - 1 / 3) * 255)];
+  }
+
+  function setColor(r, g, b, src) {
+    var H = hxUp(r, g, b), hx2 = hx(r, g, b);
+    var hsl = rgb2hsl(r, g, b);
+    var hslText = "hsl(" + hsl[0] + ", " + hsl[1] + "%, " + hsl[2] + "%)";
+    var rgbText = "rgb(" + Math.round(r) + ", " + Math.round(g) + ", " + Math.round(b) + ")";
+    var arrText = Math.round(r) + "," + Math.round(g) + "," + Math.round(b);
+
+    $big.style.background = hx2;
+    document.getElementById("vHex").textContent = H;
+    document.getElementById("vRgb").textContent = rgbText;
+    document.getElementById("vHsl").textContent = hslText;
+    document.getElementById("vArr").textContent = arrText;
+    document.getElementById("vCss").textContent = "--brand: " + hx2 + ";";
+
+    var rows = document.querySelectorAll("#vals tr");
+    rows[0].setAttribute("data-copy", hx2);
+    rows[1].setAttribute("data-copy", rgbText);
+    rows[2].setAttribute("data-copy", hslText);
+    rows[3].setAttribute("data-copy", arrText);
+    rows[4].setAttribute("data-copy", "--brand: " + hx2 + ";");
+
+    buildScheme(hsl);
+    if (src) $sys.value = hx2;
+  }
+
+  function buildScheme(hsl) {
+    var h = hsl[0], s = hsl[1], l = hsl[2];
+    var items = [
+      ["补色", (h + 180) % 360, s, l],
+      ["邻近色 A", (h + 30) % 360, s, l],
+      ["邻近色 B", (h - 30 + 360) % 360, s, l],
+      ["三角配色", (h + 120) % 360, s, l],
+      ["变亮", h, s, Math.min(92, l + 22)],
+      ["变暗", h, s, Math.max(8, l - 22)],
+      ["低饱和", h, Math.max(8, s - 45), l],
+      ["高饱和", h, Math.min(100, s + 25), l]
+    ];
+    $scheme.innerHTML = items.map(function (it) {
+      var rgb = hsl2rgb(it[1], it[2], it[3]);
+      var c = hx(rgb[0], rgb[1], rgb[2]);
+      return '<div class="sw-item" data-c="' + c + '"><div class="c" style="background:' + c + '"></div>' +
+        '<div class="t">' + c.toUpperCase() + "</div></div>";
+    }).join("");
+    Array.prototype.forEach.call($scheme.querySelectorAll(".sw-item"), function (el) {
+      el.addEventListener("click", function () {
+        var c = this.dataset.c;
+        var r = parseInt(c.slice(1, 3), 16), g = parseInt(c.slice(3, 5), 16), b = parseInt(c.slice(5, 7), 16);
+        setColor(r, g, b);
+        $pos.textContent = "取用配色 " + c.toUpperCase();
+      });
+    });
+  }
+
+  function loadImage(file) {
+    if (!file || !/^image\//.test(file.type)) return;
+    var url = URL.createObjectURL(file);
+    var img = new Image();
+    img.onload = function () {
+      var maxW = 900;
+      var scale = Math.min(1, maxW / img.naturalWidth);
+      $cv.width = Math.round(img.naturalWidth * scale);
+      $cv.height = Math.round(img.naturalHeight * scale);
+      ctx.drawImage(img, 0, 0, $cv.width, $cv.height);
+      hasImg = true;
+      $phMsg.style.display = "none";
+      $pos.textContent = img.naturalWidth + "×" + img.naturalHeight + "（显示已缩放）";
+      $dot.style.display = "none";
+      URL.revokeObjectURL(url);
+      extractPalette();
+      // 默认取中心点
+      var cd = ctx.getImageData(Math.floor($cv.width / 2), Math.floor($cv.height / 2), 1, 1).data;
+      setColor(cd[0], cd[1], cd[2]);
+    };
+    img.onerror = function () { alert("无法解码这张图片"); URL.revokeObjectURL(url); };
+    img.src = url;
+  }
+
+  function pickAt(clientX, clientY) {
+    if (!hasImg) return;
+    var rect = $cv.getBoundingClientRect();
+    var x = Math.floor((clientX - rect.left) * ($cv.width / rect.width));
+    var y = Math.floor((clientY - rect.top) * ($cv.height / rect.height));
+    if (x < 0 || y < 0 || x >= $cv.width || y >= $cv.height) return;
+    var d = ctx.getImageData(x, y, 1, 1).data;
+    setColor(d[0], d[1], d[2]);
+    $pos.textContent = "坐标 (" + x + ", " + y + ")";
+    var box = $cv.getBoundingClientRect();
+    var wrapBox = document.getElementById("pickbox").getBoundingClientRect();
+    $dot.style.display = "block";
+    $dot.style.left = (x * (rect.width / $cv.width)) + (box.left - wrapBox.left) + "px";
+    $dot.style.top = (y * (rect.height / $cv.height)) + (box.top - wrapBox.top) + "px";
+  }
+
+  $cv.addEventListener("click", function (e) { pickAt(e.clientX, e.clientY); });
+  $cv.addEventListener("mousemove", function (e) {
+    if (!hasImg || e.buttons !== 1) return;
+    pickAt(e.clientX, e.clientY);
+  });
+
+  function extractPalette() {
+    var w = $cv.width, h = $cv.height;
+    if (!w || !h) return;
+    var data;
+    try { data = ctx.getImageData(0, 0, w, h).data; }
+    catch (e) { $palette.innerHTML = '<div class="muted" style="font-size:13px">跨域图片无法读取像素。</div>'; return; }
+
+    var buckets = {};
+    var step = Math.max(1, Math.floor(Math.sqrt(w * h / 12000)));
+    for (var y = 0; y < h; y += step) {
+      for (var x = 0; x < w; x += step) {
+        var i = (y * w + x) * 4;
+        var a = data[i + 3];
+        if (a < 128) continue;
+        var r = data[i], g = data[i + 1], b = data[i + 2];
+        // 量化到 32 级
+        var key = (r >> 3) + "," + (g >> 3) + "," + (b >> 3);
+        if (!buckets[key]) buckets[key] = { n: 0, r: 0, g: 0, b: 0 };
+        buckets[key].n++;
+        buckets[key].r += r; buckets[key].g += g; buckets[key].b += b;
+      }
+    }
+    var arr = Object.keys(buckets).map(function (k) {
+      var o = buckets[k];
+      return { n: o.n, r: o.r / o.n, g: o.g / o.n, b: o.b / o.n };
+    }).sort(function (a, b) { return b.n - a.n; });
+
+    // 去重：颜色太接近的合并
+    var picked = [];
+    arr.forEach(function (c) {
+      if (picked.length >= 8) return;
+      for (var i = 0; i < picked.length; i++) {
+        var p = picked[i];
+        var d = Math.abs(p.r - c.r) + Math.abs(p.g - c.g) + Math.abs(p.b - c.b);
+        if (d < 66) return;
+      }
+      picked.push(c);
+    });
+
+    var total = arr.reduce(function (s, x) { return s + x.n; }, 0);
+    $palette.innerHTML = picked.map(function (c) {
+      var col = hx(c.r, c.g, c.b);
+      var pct = Math.round(c.n / total * 100);
+      return '<div class="sw-item" data-c="' + col + '"><div class="c" style="background:' + col + '"></div>' +
+        '<div class="t">' + col.toUpperCase() + " · " + pct + "%</div></div>";
+    }).join("") || '<div class="muted" style="font-size:13px">没提取到颜色。</div>';
+
+    Array.prototype.forEach.call($palette.querySelectorAll(".sw-item"), function (el) {
+      el.addEventListener("click", function () {
+        var c = this.dataset.c;
+        setColor(parseInt(c.slice(1, 3), 16), parseInt(c.slice(3, 5), 16), parseInt(c.slice(5, 7), 16));
+      });
+    });
+  }
+
+  Array.prototype.forEach.call(document.querySelectorAll("#vals tr"), function (tr) {
+    tr.addEventListener("click", function () {
+      var v = tr.getAttribute("data-copy");
+      var done = function () { $pos.textContent = "已复制 " + v; };
+      if (navigator.clipboard && location.protocol !== "file:") {
+        navigator.clipboard.writeText(v).then(done, function () { fb(v, done); });
+      } else { fb(v, done); }
+    });
+  });
+
+  function fb(v, cb) {
+    var ta = document.createElement("textarea");
+    ta.value = v; ta.style.position = "fixed"; ta.style.opacity = "0";
+    document.body.appendChild(ta); ta.select();
+    try { document.execCommand("copy"); cb(); } catch (e) {}
+    document.body.removeChild(ta);
+  }
+
+  $sys.addEventListener("input", function () {
+    var c = this.value;
+    setColor(parseInt(c.slice(1, 3), 16), parseInt(c.slice(3, 5), 16), parseInt(c.slice(5, 7), 16));
+    $pos.textContent = "来自系统取色器";
+  });
+
+  $drop.addEventListener("click", function () { $file.click(); });
+  $file.addEventListener("change", function () { loadImage(this.files[0]); });
+  ["dragenter", "dragover"].forEach(function (ev) {
+    $drop.addEventListener(ev, function (e) { e.preventDefault(); $drop.classList.add("over"); });
+  });
+  ["dragleave", "drop"].forEach(function (ev) {
+    $drop.addEventListener(ev, function (e) { e.preventDefault(); $drop.classList.remove("over"); });
+  });
+  $drop.addEventListener("drop", function (e) { loadImage(e.dataTransfer.files[0]); });
+
+  setColor(15, 118, 110);
+})();
+</script>
+</body>
+</html>
