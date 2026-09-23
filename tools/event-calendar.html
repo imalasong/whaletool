@@ -46,7 +46,7 @@ body{
   -webkit-backdrop-filter:saturate(180%) blur(20px);
   border-bottom:1px solid rgba(0,0,0,.07);
 }
-.ev-nav-in{max-width:1180px;margin:0 auto;padding:0 24px;height:52px;display:flex;align-items:center;gap:14px}
+.ev-nav-in{max-width:1320px;margin:0 auto;padding:0 24px;height:52px;display:flex;align-items:center;gap:14px}
 .ev-back{font-size:13px;color:var(--gray);font-weight:500;transition:color .18s var(--ease)}
 .ev-back:hover{color:var(--blue)}
 .ev-nav-t{font-size:14px;font-weight:600;letter-spacing:-.01em}
@@ -65,7 +65,7 @@ body{
 @keyframes evspin{to{transform:rotate(360deg)}}
 
 /* ---------------- Hero ---------------- */
-.ev-hero{max-width:1180px;margin:0 auto;padding:60px 24px 0}
+.ev-hero{max-width:1320px;margin:0 auto;padding:60px 24px 0}
 .ev-kicker{font-size:12px;font-weight:600;letter-spacing:.09em;color:var(--blue);text-transform:uppercase}
 .ev-hero h1{
   margin-top:10px;font-size:clamp(34px,5.4vw,56px);font-weight:700;
@@ -83,7 +83,7 @@ body{
 .ev-stat u{display:block;text-decoration:none;font-size:11.5px;color:var(--gray);margin-top:5px;letter-spacing:0}
 
 /* ---------------- 工具栏 ---------------- */
-.ev-main{max-width:1180px;margin:0 auto;padding:40px 24px 40px}
+.ev-main{max-width:1320px;margin:0 auto;padding:40px 24px 40px}
 .ev-bar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:18px}
 .ev-bar-nav{display:flex;align-items:center;gap:10px}
 .ev-areapick{
@@ -147,7 +147,7 @@ body{
 .ev-chip.on{background:var(--ink);border-color:var(--ink);color:#fff}
 
 /* ---------------- 主体两栏 ---------------- */
-.ev-body{display:grid;grid-template-columns:minmax(0,1fr) 336px;gap:20px;align-items:start}
+.ev-body{display:grid;grid-template-columns:minmax(0,1fr) 318px;gap:20px;align-items:start}
 @media (max-width:960px){ .ev-body{grid-template-columns:1fr} }
 
 /* ---------------- 月历 ---------------- */
@@ -180,19 +180,21 @@ body{
   display:flex;align-items:center;gap:4px;background:var(--blue-bg);
   border-radius:6px;padding:3px 4px;min-width:0;
 }
-.ev-mini img{width:13px;height:13px;border-radius:3px;object-fit:cover;flex:none;background:#dbe6f5}
+.ev-mini img{width:14px;height:14px;border-radius:3px;object-fit:cover;flex:none;background:#dbe6f5}
 .ev-mini em{
-  font-style:normal;font-size:9.5px;font-weight:600;color:var(--blue);
+  font-style:normal;font-size:10px;font-weight:600;color:var(--blue);
   font-variant-numeric:tabular-nums;flex:none;letter-spacing:-.02em;
 }
 .ev-mini s{
-  text-decoration:none;font-size:10px;color:var(--ink-2);white-space:nowrap;
+  text-decoration:none;font-size:10.5px;color:var(--ink-2);white-space:nowrap;
   overflow:hidden;text-overflow:ellipsis;min-width:0;flex:1;
 }
+/* 已开售的场次：降饱和，跟待开售区分开 */
+.ev-mini.over{background:#f1f1f4}
+.ev-mini.over em{color:var(--gray-2)}
+.ev-mini.over s{color:var(--gray-2)}
+.ev-mini.over img{opacity:.55}
 .ev-more{margin-top:3px;font-size:10px;color:var(--gray-2);padding-left:2px}
-.ev-dots{display:flex;gap:3px;margin-top:6px;flex-wrap:wrap}
-.ev-dots i{width:5px;height:5px;border-radius:50%;background:var(--line);display:block}
-.ev-dots i.w{background:var(--blue)}
 
 /* 日历下方提示（如：有 N 场开售时间待定，不上日历） */
 .ev-tip{
@@ -222,6 +224,11 @@ body{
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .ev-row-m span{display:block;font-size:11.5px;color:var(--gray);margin-top:3px;
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ev-rtags{display:flex;gap:5px;margin-top:5px;flex-wrap:wrap;text-decoration:none}
+.ev-rtags i{
+  font-style:normal;font-size:10px;font-weight:600;letter-spacing:0;
+  padding:2px 7px;border-radius:980px;background:var(--blue-bg);color:var(--blue);
+}
 .ev-row-r{text-align:right;flex:none}
 .ev-row-r b{display:block;font-size:13px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:-.01em}
 .ev-row-r span{display:block;font-size:11px;color:var(--gray-2);margin-top:3px}
@@ -246,17 +253,24 @@ body{
   background:rgba(255,255,255,.92);color:var(--ink);backdrop-filter:blur(8px);
 }
 .ev-tag.blue{background:rgba(0,113,227,.94);color:#fff}
+.ev-tag.warn{background:rgba(29,29,31,.88);color:#fff}
 .ev-cd{
   position:absolute;right:10px;bottom:10px;font-size:11px;font-weight:600;
   background:rgba(29,29,31,.78);color:#fff;padding:4px 10px;border-radius:980px;
   font-variant-numeric:tabular-nums;backdrop-filter:blur(8px);letter-spacing:0;
 }
 .ev-cd.soon{background:rgba(227,0,0,.9)}
+.ev-cd.over{background:rgba(29,29,31,.5)}
 .ev-card-b{padding:14px 15px 15px}
 .ev-card-b h3{font-size:14.5px;font-weight:600;line-height:1.35;letter-spacing:-.015em;margin-bottom:9px}
+.ev-remark{
+  font-size:11px;color:var(--gray);background:var(--paper-2);border-radius:7px;
+  padding:5px 9px;margin:-3px 0 8px;line-height:1.5;letter-spacing:0;
+}
 .ev-kv{display:flex;gap:8px;font-size:12px;color:var(--gray);line-height:1.6;margin-top:5px;letter-spacing:0}
 .ev-kv i{font-style:normal;flex:none;width:34px;color:var(--gray-2)}
 .ev-kv b{font-weight:500;color:var(--ink-2)}
+.ev-kv em{font-style:normal;color:var(--gray-2);font-weight:400}
 .ev-card-f{display:flex;gap:8px;margin-top:13px}
 .ev-go{
   flex:1;text-align:center;font-size:12.5px;font-weight:500;padding:8px;border-radius:980px;
@@ -295,7 +309,7 @@ body{
 @keyframes evsk{0%{background-position:100% 50%}100%{background-position:0 50%}}
 
 .ev-foot{
-  max-width:1180px;margin:0 auto;padding:0 24px 56px;
+  max-width:1320px;margin:0 auto;padding:0 24px 56px;
   font-size:11.5px;color:var(--gray-2);line-height:1.85;letter-spacing:0;
 }
 .ev-foot b{color:var(--gray);font-weight:600}
@@ -331,7 +345,7 @@ body{
 <header class="ev-hero">
   <p class="ev-kicker">Fantopia · 开售日历</p>
   <h1>待开售演出</h1>
-  <p class="ev-sub">只收录「待开售」状态的场次，按开售时间归入日历。接口按 <code>area</code> 请求头分区返回该地区上架的活动，可切换地区或合并全部地区查看。直连 Fantopia 公开接口实时拉取，不经过任何中间服务。</p>
+  <p class="ev-sub">以<b>场次</b>为单位收录待开售的开售时间 —— 一个活动下的每个场次各有自己的开售时间，日历按场次铺。直连 Fantopia 公开接口实时拉取，不经过任何中间服务。</p>
   <div class="ev-stats" id="stats">
     <div class="ev-sk" style="flex:1 1 158px"><div class="bar" style="width:60%"></div><div class="bar" style="width:40%;height:22px"></div></div>
     <div class="ev-sk" style="flex:1 1 158px"><div class="bar" style="width:60%"></div><div class="bar" style="width:40%;height:22px"></div></div>
@@ -344,6 +358,13 @@ body{
     <label class="ev-areapick" title="接口按 area 请求头只返回该地区上架的活动">
       <span>上架地区</span>
       <select class="ev-sel" id="areaSel"></select>
+    </label>
+    <label class="ev-areapick" title="查哪些活动的场次。活动一旦有票可买，服务端就判「热卖中」并停止往下判断场次，所以热卖中的活动里可能还藏着未开售的加场">
+      <span>场次范围</span>
+      <select class="ev-sel" id="scanSel">
+        <option value="waiting" selected>待开售活动</option>
+        <option value="all">全部未结束活动</option>
+      </select>
     </label>
     <span class="ev-bar-nav" id="barNav">
       <div class="ev-mnav">
@@ -360,13 +381,12 @@ body{
   </div>
 
   <div class="ev-filters">
-    <input class="ev-search" id="q" type="search" placeholder="搜索演出、场地…" autocomplete="off">
+    <input class="ev-search" id="q" type="search" placeholder="搜索演出、场地、场次备注…" autocomplete="off">
     <div class="ev-chips" id="typeChips"></div>
     <select class="ev-sel" id="regionSel"><option value="">全部举办地</option></select>
-    <select class="ev-sel" id="statusSel">
-      <option value="0" selected>仅待开售</option>
-      <option value="0,1">待开售 + 热卖中</option>
-      <option value="all">全部状态</option>
+    <select class="ev-sel" id="whenSel" title="按场次的开售时间过滤">
+      <option value="wait" selected>仅待开售场次</option>
+      <option value="all">含已开售场次</option>
     </select>
   </div>
 
@@ -384,10 +404,11 @@ body{
 </main>
 
 <footer class="ev-foot">
-  <p><b>数据来源</b> <code>fantopia.io/fanapiWeb/eventsInfo/getEventsInfoPageV2</code> —— 服务端可能有 3 分钟缓存，刷新拿到的未必是毫秒级最新。</p>
-  <p><b>上架地区</b> 接口按请求头 <code>area</code> 只返回该地区上架的活动，各地区的活动池并不互相包含（实测 <code>area=MY</code> 有 101 条在 <code>area=MO</code> 视角下不存在）。不传 <code>area</code> 时等同 <code>area=MO</code>。选「全部地区（合并）」会并发请求 10 个地区并按活动 id 去重，故耗时与流量都会明显增加。</p>
-  <p><b>状态取值</b> <code>sellStatus</code> 实际枚举为 <code>0 待开始(待开售)</code> / <code>1 进行中</code> / <code>2 已售罄</code> / <code>3 已结束</code> / <code>4 缺货登记</code>；本页默认只取 <code>0</code>。</p>
-  <p><b>时间口径</b> <code>sellDateTime</code> 为北京时间（服务端 <code>siteTimeZone = +08:00</code>）。开售时间显示 2099 年的场次，代表该活动暂无公开场次、开售时间未定。</p>
+  <p><b>数据来源</b> <code>…/eventsInfo/getEventsInfoPageV2</code>（活动列表）+ <code>…/eventsInfo/inside/getEventsDetailByKey</code>（场次明细），均为 GET，浏览器直连。服务端有 3 分钟缓存，刷新拿到的未必是毫秒级最新。</p>
+  <p><b>为什么按场次</b> 活动列表里的 <code>sellDateTime</code> 只是「尚未开售的场次里最晚的那一个」，会漏掉更早开售的场次。实测 TXT 澳门站：活动层显示 <code>09-24 12:00</code>（公开发售），但场次里 <code>09-23 12:00</code> 还有一场会员购预售 —— 只有拉场次才能看到。所以本页开售时间一律取场次的 <code>sellStartTime</code>。</p>
+  <p><b>场次字段</b> <code>sellStartTime</code> / <code>sellEndTime</code> 是开售起止（北京时间；<code>sellEndTime</code> 通常只有会员购场次才有，为空表示不限时）。<code>sellType</code> 为 <code>1 公开发售</code> / <code>2 缺货登记</code> / <code>3 会员购</code>。<code>status</code> 表示场次是否有效（<code>1</code> 有效），<b>不是</b>开售状态，判断开售与否只能比时间。</p>
+  <p><b>场次范围</b> 「待开售活动」只查活动层状态为待开售的活动（服务端判定「还有场次没到开售时间」）。「全部未结束活动」连热卖中 / 已售罄的一起查 —— 服务端只要活动里有票可买就直接判「热卖中」并停止往下判断场次，所以热卖中的活动也可能藏着未开售的加场。</p>
+  <p><b>上架地区</b> 接口按请求头 <code>area</code> 只返回该地区上架的活动，各地区活动池并不互相包含（实测 <code>area=MY</code> 有 101 条在 <code>area=MO</code> 视角下不存在）。不传 <code>area</code> 时等同 <code>area=MO</code>。选「全部地区（合并）」会并发请求 10 个地区并按活动 id 去重。</p>
 </footer>
 
 <script>
@@ -395,6 +416,12 @@ body{
   "use strict";
 
   var API = "https://www.fantopia.io/fanapiWeb/eventsInfo/getEventsInfoPageV2";
+  /* 场次接口：一个活动下有多个场次，每个场次有各自的开售时间。
+     活动列表里的 sellDateTime 是「该活动尚未开售场次里最晚的一个」，
+     会漏掉更早开售的场次（如会员预售场），所以开售时间必须以场次为准。 */
+  var API_SESS = "https://www.fantopia.io/fanapiWeb/eventsInfo/inside/getEventsDetailByKey";
+  /* 活动详情页 */
+  var SITE = "https://www.fantopia.io/events-tickets";
 
   /* 上架地区：接口按请求头 area 返回该地区上架的活动。
      注意：这不是「活动举办地」筛选 —— 各地区的活动池不同，
@@ -424,8 +451,9 @@ body{
     4: { t: "缺货登记", c: ""     }
   };
   var TYPE  = { 1: "音乐节", 2: "演唱会", 3: "签售会", 4: "只卖周边" };
+  /* 场次 sellType（EventsSeriesInfoVo：场次类型 1首发 2缺货登记 3会员购） */
+  var STYPE = { 1: "公开发售", 2: "缺货登记", 3: "会员购" };
   var SEAT  = { 0: "非关联座位", 1: "选座", 2: "关联座位" };
-  var PRE   = { 0: "关闭", 1: "开启·会员码先填", 2: "开启·会员码后填" };
   var WD    = ["日", "一", "二", "三", "四", "五", "六"];
 
   /* -------------------- 工具 -------------------- */
@@ -436,20 +464,48 @@ body{
   }
   function pad(n) { return (n < 10 ? "0" : "") + n; }
 
-  /* "2026-09-24 12:00:00" 视作北京时间(+08:00)。
+  /* 所有时间字符串都视作北京时间(+08:00)。
      同时保留日历用的年月日分量，避免时区来回换算出错。 */
   var RE_DT = /^(\d{4})-(\d{2})-(\d{2})(?:[ T](\d{2}):(\d{2})(?::(\d{2}))?)?/;
-  function parseBJ(s) {
-    if (!s) return null;
-    var m = RE_DT.exec(String(s));
-    if (!m) return null;
-    var y = +m[1], mo = +m[2], d = +m[3], hh = +(m[4] || 0), mi = +(m[5] || 0), ss = +(m[6] || 0);
+  function mkDT(y, mo, d, hh, mi, ss) {
     return {
       y: y, mo: mo, d: d, hh: hh, mi: mi, ss: ss,
       ts: Date.UTC(y, mo - 1, d, hh - 8, mi, ss),   /* 真实 UTC 毫秒，用于倒计时 */
       key: y + "-" + pad(mo) + "-" + pad(d),
       hhmm: pad(hh) + ":" + pad(mi)
     };
+  }
+  function parseBJ(s) {
+    if (!s) return null;
+    var m = RE_DT.exec(String(s));
+    if (!m) return null;
+    return mkDT(+m[1], +m[2], +m[3], +(m[4] || 0), +(m[5] || 0), +(m[6] || 0));
+  }
+  /* 场次的演出时间。注意格式和别处不一样：
+     - seriesDate 形如 "2026-11-20"（有值时优先）
+     - title 形如 "2026/11/20 20:00"，也有 "2027/01/10 7PM" 这种 12 小时制 */
+  function parseShow(s) {
+    var raw = (s.seriesDate && String(s.seriesDate).trim()) || String(s.title || "");
+    var m = /(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})/.exec(raw);
+    if (!m) return null;
+    var y = +m[1], mo = +m[2], d = +m[3], hh = 0, mi = 0;
+    var rest = raw.slice(m.index + m[0].length);
+    var hm = /(\d{1,2})\s*[:：]\s*(\d{2})/.exec(rest);
+    if (hm) {
+      hh = +hm[1]; mi = +hm[2];
+    } else {
+      var ap = /(\d{1,2})\s*(AM|PM)/i.exec(rest);
+      if (ap) {
+        hh = +ap[1]; mi = 0;
+        if (/PM/i.test(ap[2]) && hh < 12) hh += 12;
+        if (/AM/i.test(ap[2]) && hh === 12) hh = 0;
+      } else {
+        var h3 = /(\d{1,2})/.exec(rest);
+        if (h3) hh = +h3[1];
+      }
+    }
+    if (hh > 23) hh = 0;
+    return mkDT(y, mo, d, hh, mi, 0);
   }
   /* 开售时间未定的哨兵值（服务端塞 2099-01-01） */
   function isTBD(dt) { return !dt || dt.y >= 2099; }
@@ -464,14 +520,6 @@ body{
   function fmtYMD(dt) { return dt.mo + "月" + dt.d + "日"; }
   function fmtFull(dt) {
     return dt.y + "-" + pad(dt.mo) + "-" + pad(dt.d) + " " + dt.hhmm;
-  }
-  function fmtSpan(a, b) {
-    if (!a) return "—";
-    var s = a.y + "-" + pad(a.mo) + "-" + pad(a.d);
-    if (!b) return s;
-    if (a.y === b.y && a.mo === b.mo) return s + " ~ " + b.d + "日";
-    if (a.y === b.y) return s + " ~ " + pad(b.mo) + "-" + pad(b.d);
-    return s + " ~ " + b.y + "-" + pad(b.mo) + "-" + pad(b.d);
   }
   /* 分 → 货币字符串 */
   function fmtPrice(cents, sym) {
@@ -508,17 +556,20 @@ body{
   }
 
   /* -------------------- 状态 -------------------- */
-  var ALL = [];          /* 全量（已解析） */
+  var EVENTS = [];       /* 活动（按 area 拉到的原始列表，已解析） */
+  var ALL = [];          /* 全量场次（已展开，一条 = 一个场次） */
   var VIEW = [];         /* 过滤后 */
-  var byDay = {};        /* dayKey → [rec] */
+  var byDay = {};        /* dayKey → [sess] */
   var cur = null;        /* {y, mo} 当前月 */
   var selKey = null;     /* 选中日期 */
   var mode = "month";
   var fType = 0;         /* 0 = 全部 */
   var fRegion = "";      /* 活动举办地筛选（从标题/场地提取） */
-  var fStatus = "0";
+  var fWhen = "wait";    /* wait = 只看待开售场次；selling = 含正在开售 */
   var fText = "";
   var srcArea = "MO";    /* area 请求头：拉哪个地区上架的；"all" = 并行合并全部地区 */
+  var scan = "waiting";  /* 深扫范围：waiting = 只查待开售活动；all = 查全部未结束活动 */
+  var sessCache = {};    /* eventsKey → 场次原始数组；换地区时清空 */
   var loaded = false;
   var picked = false;
 
@@ -549,7 +600,57 @@ body{
     });
   }
 
-  function load() {
+  /* 简单并发池：避免一次性打出上百个请求 */
+  function pool(items, limit, worker, onProg) {
+    return new Promise(function (resolve) {
+      var out = new Array(items.length), i = 0, running = 0, done = 0;
+      if (!items.length) { resolve(out); return; }
+      function launch() {
+        while (running < limit && i < items.length) {
+          (function (idx) {
+            running++;
+            Promise.resolve()
+              .then(function () { return worker(items[idx], idx); })
+              .then(function (v) { out[idx] = { ok: v }; },
+                    function (e) { out[idx] = { err: e }; })
+              .then(function () {
+                running--; done++;
+                if (onProg) onProg(done, items.length);
+                if (done === items.length) resolve(out); else launch();
+              });
+          })(i++);
+        }
+      }
+      launch();
+    });
+  }
+
+  /* 拉某个活动的场次。code=500「There is currently no data available」
+     表示该活动暂无公开场次，属正常情况，返回空数组而不抛错。 */
+  function fetchSessions(key) {
+    var url = API_SESS + "?eventsKey=" + encodeURIComponent(key) + "&_t=" + Date.now();
+    return fetch(url, {
+      method: "GET",
+      headers: {
+        "Accept": "application/json, text/plain, */*",
+        "Accept-Language": "zh-CN"
+      },
+      credentials: "omit",
+      cache: "no-store"
+    }).then(function (r) {
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      return r.json();
+    }).then(function (j) {
+      if (j.code !== 200) {
+        if (/no data available/i.test(j.msg || "")) return [];
+        throw new Error(j.msg || ("code=" + j.code));
+      }
+      return j.data || [];
+    });
+  }
+
+  /* keepCache=true 时保留已拉到的场次（切扫描范围用它，只补拉新活动） */
+  function load(keepCache) {
     var btn = $("refresh");
     btn.disabled = true;
     btn.classList.add("spin");
@@ -559,50 +660,116 @@ body{
       : [srcArea];
     $("sync").textContent = codes.length > 1 ? ("并发拉取 " + codes.length + " 个地区…") : "拉取中…";
 
+    if (!keepCache) sessCache = {};
+
     Promise.all(codes.map(function (c) {
       /* 单个地区失败不拖垮整体 */
       return fetchArea(c).catch(function (e) { return { code: c, error: e, records: [], total: 0 }; });
-    })).then(function (groups) {
-      var ok = [], bad = [];
-      groups.forEach(function (g) { (g.error ? bad : ok).push(g); });
+    }))
+      .then(function (groups) {
+        var ok = [], bad = [];
+        groups.forEach(function (g) { (g.error ? bad : ok).push(g); });
 
-      if (!ok.length) throw (bad[0] && bad[0].error) || new Error("全部地区拉取失败");
+        if (!ok.length) throw (bad[0] && bad[0].error) || new Error("全部地区拉取失败");
 
-      /* 合并去重：同 id 只留一条，记录它出现在哪些地区 */
-      var idx = {}, merged = [];
-      ok.forEach(function (g) {
-        g.records.forEach(function (r) {
-          var k = String(r.id);
-          if (idx[k]) { idx[k].areas.push(g.code); return; }
-          var rec = parseOne(r);
-          rec.areas = [g.code];
-          idx[k] = rec;
-          merged.push(rec);
+        /* 合并去重：同 id 只留一条，记录它出现在哪些地区 */
+        var idx = {}, merged = [];
+        ok.forEach(function (g) {
+          g.records.forEach(function (r) {
+            var k = String(r.id);
+            if (idx[k]) { idx[k].areas.push(g.code); return; }
+            var rec = parseOne(r);
+            rec.areas = [g.code];
+            idx[k] = rec;
+            merged.push(rec);
+          });
         });
+        EVENTS = merged;
+
+        var truncated = false;
+        ok.forEach(function (g) { if (g.total != null && g.total > g.records.length) truncated = true; });
+
+        /* 只深扫「有可能还有未开售场次」的活动：
+           - waiting：活动层状态 = 待开售（服务端判定「还有场次没到开售时间」）
+           - all    ：放宽到热卖中 / 已售罄，捞「已在卖但后面还有加场」的情况
+           已结束(3) 的活动不可能有未开售场次，直接跳过 —— 能省掉八成以上请求。 */
+        var targets = EVENTS.filter(function (e) {
+          if (!e.key) return false;
+          return scan === "all" ? (e.status !== 3) : (e.status === 0);
+        });
+
+        if (!targets.length) {
+          ALL = [];
+          renderAll();
+          finish(btn, ok, bad, truncated, [], 0);
+          return;
+        }
+
+        var keys = targets.map(function (e) { return e.key; });
+        /* 场次数据按 eventsKey 缓存：从「待开售活动」切到「全部未结束活动」
+           只需补拉新增的那些，切回来则是零请求。 */
+        var need = keys.filter(function (k) { return !sessCache[k]; });
+        var sessOf = {};
+        keys.forEach(function (k) { if (sessCache[k]) sessOf[k] = sessCache[k]; });
+
+        var expand = function (failed) {
+          /* 展开：一条 = 一个场次 */
+          ALL = [];
+          targets.forEach(function (ev) {
+            var list = sessOf[ev.key];
+            if (list == null) { addFallback(ALL, ev); return; }
+            var live = [], k;
+            for (k = 0; k < list.length; k++) {
+              if (list[k].status != null && list[k].status !== 1) continue;   /* 0 = 场次无效 */
+              if (!list[k].sellStartTime) continue;
+              live.push(list[k]);
+            }
+            for (k = 0; k < live.length; k++) {
+              var rec = mkSess(ev, live[k], k + 1, live.length);
+              if (rec) ALL.push(rec);
+            }
+            /* 该活动一个可用场次都没有（无公开场次 / 请求失败）→ 退回活动层兜底 */
+            if (!live.length) addFallback(ALL, ev);
+          });
+          renderAll();
+          finish(btn, ok, bad, truncated, failed, targets.length);
+        };
+
+        if (!need.length) { expand([]); return; }
+
+        $("sync").textContent = "拉取 " + need.length + " 个活动的场次… 0/" + need.length;
+
+        pool(need, 6, fetchSessions, function (n, tot) {
+          if (n === tot || n % 4 === 0) $("sync").textContent = "拉取场次 " + n + "/" + tot;
+        }).then(function (res) {
+          var failed = [];
+          res.forEach(function (r, i) {
+            if (r.err) { failed.push(need[i]); sessOf[need[i]] = null; return; }
+            sessCache[need[i]] = r.ok;
+            sessOf[need[i]] = r.ok;
+          });
+          expand(failed);
+        });
+      })
+      .catch(function (e) {
+        btn.disabled = false;
+        btn.classList.remove("spin");
+        $("sync").textContent = "载入失败";
+        fail(e);
       });
-      ALL = merged;
+  }
 
-      var truncated = false;
-      ok.forEach(function (g) { if (g.total != null && g.total > g.records.length) truncated = true; });
-
-      loaded = true;
-      btn.disabled = false;
-      btn.classList.remove("spin");
-
-      var t = new Date().toLocaleTimeString("zh-CN", { hour12: false });
-      var msg = "更新于 " + t;
-      if (codes.length > 1) msg += "（已合并 " + ok.length + "/" + codes.length + " 个地区）";
-      if (bad.length) msg += "，失败 " + bad.map(function (g) { return AREA_NAME[g.code]; }).join("/");
-      if (truncated) msg += "（已截断）";
-      $("sync").textContent = msg;
-
-      renderAll();
-    }).catch(function (e) {
-      btn.disabled = false;
-      btn.classList.remove("spin");
-      $("sync").textContent = "载入失败";
-      fail(e);
-    });
+  function finish(btn, ok, bad, truncated, failed, nActs) {
+    loaded = true;
+    btn.disabled = false;
+    btn.classList.remove("spin");
+    var msg = "更新于 " + new Date().toLocaleTimeString("zh-CN", { hour12: false });
+    if (ok.length > 1) msg += "（已合并 " + ok.length + " 个地区）";
+    if (bad.length) msg += "，地区失败 " + bad.map(function (g) { return AREA_NAME[g.code]; }).join("/");
+    if (nActs) msg += " · 查了 " + nActs + " 个活动的场次";
+    if (failed && failed.length) msg += "，场次失败 " + failed.length + " 个";
+    if (truncated) msg += "（已截断）";
+    $("sync").textContent = msg;
   }
 
   function parseOne(r) {
@@ -612,7 +779,6 @@ body{
       type: r.type,
       status: r.sellStatus,
       sell: parseBJ(r.sellDateTime),
-      sellTsRaw: r.sellTimeStamp || null,
       start: parseBJ(r.startTime),
       end: parseBJ(r.endTime),
       loc: r.location || "",
@@ -627,21 +793,86 @@ body{
     };
   }
 
-  /* -------------------- 过滤 -------------------- */
-  function statusOK(s) {
-    if (fStatus === "all") return true;
-    var list = fStatus.split(",");
-    for (var i = 0; i < list.length; i++) if (+list[i] === s) return true;
-    return false;
+  /* 把「活动 + 一个场次」压成一条日历记录。
+     注意：开售时间取场次的 sellStartTime，不是活动的 sellDateTime。 */
+  function mkSess(ev, s, seq, total) {
+    var sell = parseBJ(s.sellStartTime);
+    if (!sell) return null;
+    var tks = s.eventsTypes || [];
+    var lo = null;
+    for (var i = 0; i < tks.length; i++) {
+      var p = tks[i].price;
+      if (p == null || p <= 0) continue;
+      if (!lo || p < lo.price) lo = tks[i];
+    }
+    return {
+      sid: s.id,
+      seq: seq, total: total,
+      /* —— 活动侧 —— */
+      title: ev.title,
+      type: ev.type,
+      status: ev.status,          /* 活动层状态，仅作参考展示 */
+      loc: ev.loc,
+      region: ev.region,
+      seat: ev.seat,
+      pre: ev.pre,
+      img: ev.img,
+      key: ev.key,
+      areas: ev.areas,
+      /* —— 场次侧，开售时间以这里为准 —— */
+      sell: sell,
+      sellEnd: parseBJ(s.sellEndTime),
+      show: parseShow(s),
+      showEnd: parseBJ(s.endDate),
+      stype: s.sellType,
+      remark: String(s.remark || "").trim(),
+      limit: s.limitCount,
+      tickets: tks.length,
+      minPrice: lo ? lo.price : null,
+      symbol: lo ? (lo.symbol || lo.symbolUnit || "") : ""
+    };
   }
+
+  /* 场次接口拿不到（请求失败 / 该活动无公开场次）时的兜底：
+     退回活动层的 sellDateTime，总比整条丢掉好 */
+  function addFallback(arr, ev) {
+    if (!ev.sell) return;
+    arr.push({
+      sid: "ev-" + ev.id,
+      seq: 0, total: 0,
+      title: ev.title, type: ev.type, status: ev.status,
+      loc: ev.loc, region: ev.region, seat: ev.seat, pre: ev.pre,
+      img: ev.img, key: ev.key, areas: ev.areas,
+      sell: ev.sell, sellEnd: null,
+      show: null, showEnd: ev.end, stype: null, remark: "",
+      limit: null, tickets: 0, minPrice: ev.minPrice, symbol: ev.symbol,
+      fallback: true
+    });
+  }
+
+  /* -------------------- 过滤 -------------------- */
+  /* 「场次是否还没开售」只看场次的 sellStartTime，与活动的 sellStatus 无关 */
+  function isWait(r) { return !!r.sell && r.sell.ts > Date.now(); }
+  function whenOK(r) { return fWhen === "all" ? true : isWait(r); }
+
+  /* 日历格子窄，用去前缀的简称 */
+  function shortName(t) {
+    var s = String(t || "")
+      .replace(/^\s*[\[【][^\]】]{1,8}[\]】]\s*/, "")   /* 去掉 [地区] 前缀 */
+      .replace(/^\s*(?:19|20)\d{2}\s*/, "")            /* 去掉开头的年份 */
+      .trim();
+    return s.length > 26 ? s.slice(0, 25) + "…" : s;
+  }
+
   function apply() {
     var q = fText.trim().toLowerCase();
     VIEW = ALL.filter(function (r) {
-      if (!statusOK(r.status)) return false;
+      if (!whenOK(r)) return false;
       if (fType && r.type !== fType) return false;
       if (fRegion && r.region !== fRegion) return false;
       if (q) {
-        var hay = (r.title + " " + r.loc + " " + (TYPE[r.type] || "")).toLowerCase();
+        var hay = (r.title + " " + r.loc + " " + (TYPE[r.type] || "") + " " +
+          (STYPE[r.stype] || "") + " " + r.remark).toLowerCase();
         if (hay.indexOf(q) < 0) return false;
       }
       return true;
@@ -652,10 +883,7 @@ body{
       (byDay[r.sell.key] = byDay[r.sell.key] || []).push(r);
     });
     Object.keys(byDay).forEach(function (k) {
-      byDay[k].sort(function (a, b) {
-        var av = a.sell ? a.sell.ts : 0, bv = b.sell ? b.sell.ts : 0;
-        return av - bv;
-      });
+      byDay[k].sort(function (a, b) { return a.sell.ts - b.sell.ts; });
     });
   }
 
@@ -672,21 +900,19 @@ body{
   }
 
   function renderStats() {
-    var waiting = ALL.filter(function (r) { return r.status === 0; });
-    var soon = waiting.filter(function (r) { return r.sell && r.sell.ts > Date.now(); })
-      .sort(function (a, b) { return a.sell.ts - b.sell.ts; });
-    var regions = {};
-    waiting.forEach(function (r) { regions[r.region] = 1; });
+    var wait = ALL.filter(isWait).sort(function (a, b) { return a.sell.ts - b.sell.ts; });
+    var acts = {}, regions = {};
+    wait.forEach(function (r) { acts[r.key] = 1; regions[r.region] = 1; });
 
     var nextTxt = "—";
-    if (soon.length) {
-      var c = countdown(soon[0].sell.ts);
+    if (wait.length) {
+      var c = countdown(wait[0].sell.ts);
       nextTxt = c.over ? "已开售" : c.t;
     }
     $("stats").innerHTML =
-      stat(waiting.length, "场", "待开售场次") +
-      stat(soon.length ? fmtYMD(soon[0].sell) + " " + soon[0].sell.hhmm : "—", "", "最近一场开售", true) +
-      stat(Object.keys(regions).length, "个", "覆盖地区") +
+      stat(wait.length, "个", "待开售场次") +
+      stat(Object.keys(acts).length, "个", "涉及活动") +
+      stat(wait.length ? fmtYMD(wait[0].sell) + " " + wait[0].sell.hhmm : "—", "", "最近一场开售", true) +
       '<div class="ev-stat"><b id="statCd" style="font-size:19px">' + esc(nextTxt) +
       "</b><u>距最近开售</u></div>";
   }
@@ -710,7 +936,7 @@ body{
     var sel = $("regionSel");
     var have = {}, total = 0;
     ALL.forEach(function (r) {
-      if (!statusOK(r.status)) return;
+      if (!whenOK(r)) return;
       have[r.region] = (have[r.region] || 0) + 1;
       total++;
     });
@@ -726,7 +952,7 @@ body{
     var want = [0].concat(Object.keys(TYPE).map(Number));
     chips.innerHTML = want.map(function (t) {
       var n = ALL.filter(function (r) {
-        return statusOK(r.status) && (!t || r.type === t);
+        return whenOK(r) && (!t || r.type === t);
       }).length;
       return '<button class="ev-chip' + (fType === t ? " on" : "") + '" data-t="' + t + '">' +
         (t ? esc(TYPE[t]) : "全部") + " " + n + "</button>";
@@ -756,9 +982,12 @@ body{
       if (list.length) {
         inner += '<div class="ev-minis">';
         list.slice(0, 2).forEach(function (r) {
-          inner += '<div class="ev-mini" title="' + esc(r.sell.hhmm + " " + r.title) + '">' +
+          inner += '<div class="ev-mini' + (isWait(r) ? "" : " over") + '" title="' +
+            esc(r.sell.hhmm + " 开售 · " + r.title +
+              (r.show ? " ｜ 演出 " + fmtYMD(r.show) + " " + r.show.hhmm : "") +
+              (STYPE[r.stype] ? " ｜ " + STYPE[r.stype] : "")) + '">' +
             (r.img ? '<img src="' + esc(r.img) + '" alt="" loading="lazy" referrerpolicy="no-referrer">' : "") +
-            "<em>" + esc(r.sell.hhmm) + "</em><s>" + esc(r.title) + "</s></div>";
+            "<em>" + esc(r.sell.hhmm) + "</em><s>" + esc(shortName(r.title)) + "</s></div>";
         });
         inner += "</div>";
         if (list.length > 2) inner += '<div class="ev-more">还有 ' + (list.length - 2) + " 场</div>";
@@ -772,17 +1001,23 @@ body{
     updCalTip();
   }
 
-  /* 日历上只放"有确定开售时间"的场次；其余状态服务端不回填 sellDateTime，
-     放在这里说明一句，免得以为数据丢了。 */
+  /* 扫描范围有限：服务端一旦活动里有票可买就直接判「热卖中」返回，
+     不再往下看场次，所以热卖中的活动里也可能藏着未开售的加场。
+     这里提示还剩多少活动没查，并给一键放大范围的入口。 */
   function updCalTip() {
     var tip = $("calTip");
     if (!tip) return;
-    var tbd = (byDay["TBD"] || []).length;
-    if (!tbd) { tip.hidden = true; tip.innerHTML = ""; return; }
+    var skip = 0;
+    if (scan === "waiting") {
+      skip = EVENTS.filter(function (e) {
+        return e.key && (e.status === 1 || e.status === 2);
+      }).length;
+    }
+    if (!skip) { tip.hidden = true; tip.innerHTML = ""; return; }
     tip.hidden = false;
-    tip.innerHTML = "另有 <b>" + tbd + " 场</b>没有确定的开售时间（非「待开售」状态时服务端不回填 " +
-      "<code style='font-size:11px'>sellDateTime</code>），这些场次只在列表视图里出现。" +
-      '<a href="#" data-go="list">切到列表 →</a>';
+    tip.innerHTML = "还有 <b>" + skip + " 个</b>「热卖中 / 已售罄」的活动没查场次 —— " +
+      "服务端只要活动里有票可买就判「热卖中」并停止往下判断，这些活动可能藏着后续加场。" +
+      '<a href="#" data-go="deep">深扫这些活动 →</a>';
   }
 
   /* 月份标题 + 该月开售场次 */
@@ -795,7 +1030,7 @@ body{
       if (+p[0] === cur.y && +p[1] === cur.mo) n += byDay[k].length;
     });
     $("mLabel").innerHTML = "<b>" + cur.y + " 年 " + cur.mo + " 月</b>" +
-      "<small>" + (n ? n + " 场开售" : "无待开售") + "</small>";
+      "<small>" + (n ? n + " 个场次开售" : "无待开售") + "</small>";
   }
 
   function renderList() {
@@ -805,7 +1040,7 @@ body{
     var tbd = VIEW.filter(function (r) { return isTBD(r.sell); });
 
     if (!upcoming.length && !tbd.length) {
-      box.innerHTML = emptyHTML("当前筛选下没有活动");
+      box.innerHTML = emptyHTML("当前筛选下没有场次");
       return;
     }
     var groups = {};
@@ -832,15 +1067,24 @@ body{
   }
 
   function rowHTML(r) {
-    var st = SELL[r.status] || { t: "?" };
     var price = fmtPrice(r.minPrice, r.symbol);
-    return '<div class="ev-row" data-id="' + r.id + '">' +
+    var over = r.sell.ts <= Date.now();
+    var tags = [];
+    if (r.seq && r.total > 1) tags.push("第 " + r.seq + "/" + r.total + " 场");
+    if (STYPE[r.stype]) tags.push(STYPE[r.stype]);
+    var sub = [];
+    if (r.loc) sub.push(r.loc);
+    if (r.show) sub.push("演出 " + fmtYMD(r.show) + " " + r.show.hhmm);
+    if (price) sub.push(price + " 起");
+
+    return '<div class="ev-row" data-id="' + esc(r.sid) + '">' +
       (r.img ? '<img src="' + esc(r.img) + '" alt="" loading="lazy" referrerpolicy="no-referrer">' : "<img alt=''>") +
-      '<div class="ev-row-m"><b>' + esc(r.title) + "</b><span>" +
-      esc((TYPE[r.type] || "") + (r.loc ? " · " + r.loc : "")) +
-      (price ? " · " + esc(price) + " 起" : "") + "</span></div>" +
+      '<div class="ev-row-m"><b>' + esc(r.title) + "</b><span>" + esc(sub.join(" · ")) + "</span>" +
+      (tags.length ? '<u class="ev-rtags">' +
+        tags.map(function (t) { return "<i>" + esc(t) + "</i>"; }).join("") + "</u>" : "") +
+      "</div>" +
       '<div class="ev-row-r"><b>' + (isTBD(r.sell) ? "待定" : esc(r.sell.hhmm)) + "</b><span>" +
-      esc(st.t) + (isTBD(r.sell) ? "" : " · " + esc(fmtYMD(r.sell))) + "</span></div></div>";
+      (isTBD(r.sell) ? "时间待定" : (over ? "已开售 · " : "") + esc(fmtYMD(r.sell))) + "</span></div></div>";
   }
 
   function emptyHTML(msg) {
@@ -855,18 +1099,24 @@ body{
       var p = selKey.split("-");
       var dt = new Date(Date.UTC(+p[0], +p[1] - 1, +p[2]));
       head = "周" + WD[dt.getUTCDay()] + " · " + (+p[1]) + "月" + (+p[2]) + "日";
-      sub = list.length + " 场开售";
+      sub = list.length + " 个场次开售";
     } else {
-      list = VIEW.filter(function (r) { return !isTBD(r.sell) && r.sell.ts > Date.now(); })
-        .sort(function (a, b) { return a.sell.ts - b.sell.ts; });
+      /* 未选日期：给整体列表。待开售的按「最近要开售」升序排前面，
+         已开售的按「刚开售」降序排后面 —— 两个方向各自最有用。 */
+      list = VIEW.filter(function (r) { return !isTBD(r.sell); })
+        .sort(function (a, b) {
+          var aw = isWait(a), bw = isWait(b);
+          if (aw !== bw) return aw ? -1 : 1;
+          return aw ? a.sell.ts - b.sell.ts : b.sell.ts - a.sell.ts;
+        });
       if (!list.length) list = VIEW.slice(0, 12);
-      head = "即将开售";
-      sub = list.length + " 场";
+      head = fWhen === "all" ? "全部场次" : "即将开售";
+      sub = list.length + " 个场次";
     }
 
     if (!list.length) {
       box.innerHTML = '<div class="ev-side-h"><b>' + esc(head) + "</b></div>" +
-        '<div class="ev-note">这一天没有符合条件的活动。</div>';
+        '<div class="ev-note">这一天没有符合条件的场次。</div>';
       return;
     }
     var html = '<div class="ev-side-h"><b>' + esc(head) + "</b><span>" + esc(sub) + "</span></div>";
@@ -875,49 +1125,66 @@ body{
   }
 
   function cardHTML(r) {
-    var st = SELL[r.status] || { t: "?" };
     var price = fmtPrice(r.minPrice, r.symbol);
     var cd = r.sell && !isTBD(r.sell) ? countdown(r.sell.ts) : null;
     var showCd = cd && !cd.over;
+
+    var tags = [];
+    if (STYPE[r.stype]) tags.push({ t: STYPE[r.stype], on: r.stype === 3 });
+    if (r.seq && r.total > 1) tags.push({ t: "第 " + r.seq + "/" + r.total + " 场" });
+    if (TYPE[r.type]) tags.push({ t: TYPE[r.type] });
+    /* 活动层状态非「待开售」却仍有未开售场次 —— 深扫时才会遇到，标出来免得困惑 */
+    if (r.status !== 0 && SELL[r.status]) tags.push({ t: "活动" + SELL[r.status].t, warn: true });
 
     return '<article class="ev-card">' +
       '<div class="ev-card-pic">' +
       (r.img ? '<img src="' + esc(r.img) + '" alt="" loading="lazy" referrerpolicy="no-referrer">' : "") +
       '<div class="ev-card-tags">' +
-      '<span class="ev-tag' + (st.c === "blue" ? " blue" : "") + '">' + esc(st.t) + "</span>" +
-      (TYPE[r.type] ? '<span class="ev-tag">' + esc(TYPE[r.type]) + "</span>" : "") +
-      (r.pre ? '<span class="ev-tag">预下单 ' + esc(PRE[r.pre] || r.pre) + "</span>" : "") +
+      tags.map(function (x) {
+        return '<span class="ev-tag' + (x.on ? " blue" : "") + (x.warn ? " warn" : "") + '">' + esc(x.t) + "</span>";
+      }).join("") +
       "</div>" +
-      (showCd ? '<div class="ev-cd' + (cd.soon ? " soon" : "") + '" data-cd="' + r.sell.ts + '">距开售 ' +
-        esc(cd.t) + "</div>" : "") +
+      (showCd
+        ? '<div class="ev-cd' + (cd.soon ? " soon" : "") + '" data-cd="' + r.sell.ts + '">距开售 ' + esc(cd.t) + "</div>"
+        : (cd ? '<div class="ev-cd over">已开售</div>' : "")) +
       "</div>" +
       '<div class="ev-card-b">' +
       "<h3>" + esc(r.title) + "</h3>" +
+      (r.remark ? '<p class="ev-remark">' + esc(r.remark) + "</p>" : "") +
+      '<div class="ev-kv"><i>开售</i><b>' + (isTBD(r.sell) ? "时间待定" : esc(fmtFull(r.sell))) +
+      (r.sellEnd ? ' <em>售止 ' + esc(fmtFull(r.sellEnd)) + "</em>" : "") + "</b></div>" +
+      (r.show ? '<div class="ev-kv"><i>演出</i><b>' + esc(fmtFull(r.show)) + "</b></div>" : "") +
       (r.loc ? '<div class="ev-kv"><i>场地</i><b>' + esc(r.loc) + "</b></div>" : "") +
-      '<div class="ev-kv"><i>开售</i><b>' +
-      (isTBD(r.sell) ? "时间待定" : esc(fmtFull(r.sell))) + "</b></div>" +
-      '<div class="ev-kv"><i>演出</i><b>' + esc(fmtSpan(r.start, r.end)) + "</b></div>" +
       (r.seat != null ? '<div class="ev-kv"><i>座位</i><b>' + esc(SEAT[r.seat] || ("模式 " + r.seat)) + "</b></div>" : "") +
-      (price ? '<div class="ev-kv"><i>票价</i><b>' + esc(price) + " 起</b></div>" : "") +
+      (r.tickets ? '<div class="ev-kv"><i>票种</i><b>' + r.tickets + " 种" +
+        (price ? " · " + esc(price) + " 起" : "") + "</b></div>"
+        : (price ? '<div class="ev-kv"><i>票价</i><b>' + esc(price) + " 起</b></div>" : "")) +
+      (r.limit ? '<div class="ev-kv"><i>限购</i><b>' + r.limit + " 张/人</b></div>" : "") +
       (r.areas && r.areas.length > 1 ? '<div class="ev-kv"><i>上架</i><b>' +
         esc(r.areas.map(function (c) { return AREA_NAME[c] || c; }).join(" / ")) + "</b></div>" : "") +
       '<div class="ev-card-f">' +
-      '<a class="ev-go" href="https://www.fantopia.io/" target="_blank" rel="noopener">去 Fantopia</a>' +
+      '<a class="ev-go" href="' + esc(SITE + "?eventsKey=" + r.key) + '" target="_blank" rel="noopener">去 Fantopia 抢票</a>' +
       '<button class="ev-copy" data-copy="' + esc(copyText(r)) + '">复制信息</button>' +
       "</div></div></article>";
   }
 
   function copyText(r) {
+    var price = fmtPrice(r.minPrice, r.symbol);
     return [
-      r.title,
-      r.loc ? "场地：" + r.loc : "",
+      r.title + (r.seq && r.total > 1 ? "（第 " + r.seq + " / 共 " + r.total + " 场）" : ""),
+      r.remark ? "场次备注：" + r.remark : "",
       isTBD(r.sell) ? "开售：时间待定" : "开售：" + fmtFull(r.sell),
-      "演出：" + fmtSpan(r.start, r.end),
-      TYPE[r.type] ? "类型：" + TYPE[r.type] : "",
-      r.seat != null ? "座位模式：" + (SEAT[r.seat] || r.seat) : "",
-      fmtPrice(r.minPrice, r.symbol) ? "票价：" + fmtPrice(r.minPrice, r.symbol) + " 起" : "",
+      r.sellEnd ? "售止：" + fmtFull(r.sellEnd) : "",
+      r.show ? "演出：" + fmtFull(r.show) : "",
+      r.loc ? "场地：" + r.loc : "",
+      STYPE[r.stype] ? "发售方式：" + STYPE[r.stype] : "",
+      r.tickets ? "票种：共 " + r.tickets + " 种" : "",
+      price ? "最低价：" + price : "",
+      r.limit ? "限购：" + r.limit + " 张/人" : "",
+      TYPE[r.type] ? "活动类型：" + TYPE[r.type] : "",
       (r.areas && r.areas.length > 1)
-        ? "上架地区：" + r.areas.map(function (c) { return AREA_NAME[c] || c; }).join(" / ") : ""
+        ? "上架地区：" + r.areas.map(function (c) { return AREA_NAME[c] || c; }).join(" / ") : "",
+      "详情：" + SITE + "?eventsKey=" + r.key
     ].filter(Boolean).join("\n");
   }
 
@@ -942,8 +1209,10 @@ body{
   }
 
   function gotoFirst() {
-    var soon = VIEW.filter(function (r) { return !isTBD(r.sell); })
-      .sort(function (a, b) { return a.sell.ts - b.sell.ts; });
+    /* 优先跳到最近一个「还没开售」的场次所在月 */
+    var soon = VIEW.filter(isWait);
+    if (!soon.length) soon = VIEW.filter(function (r) { return !isTBD(r.sell); });
+    soon.sort(function (a, b) { return a.sell.ts - b.sell.ts; });
     if (soon.length) cur = { y: soon[0].sell.y, mo: soon[0].sell.mo };
     else { var t = todayBJ(); cur = { y: t.y, mo: t.mo }; }
     selKey = null;
@@ -966,9 +1235,9 @@ body{
     if (!row) return;
     var id = row.getAttribute("data-id");
     var r = null;
-    for (var i = 0; i < VIEW.length; i++) if (String(VIEW[i].id) === String(id)) { r = VIEW[i]; break; }
+    for (var i = 0; i < VIEW.length; i++) if (String(VIEW[i].sid) === String(id)) { r = VIEW[i]; break; }
     if (!r) return;
-    if (!isTBD(r.sell)) { cur = { y: r.sell.y, mo: r.sell.mo }; selKey = r.sell.key; }
+    if (r.sell && !isTBD(r.sell)) { cur = { y: r.sell.y, mo: r.sell.mo }; selKey = r.sell.key; }
     setMode("month");
     renderMonth();
     renderSide();
@@ -1020,9 +1289,9 @@ body{
     if (el) {
       var soon = null, i;
       for (i = 0; i < ALL.length; i++) {
-        if (ALL[i].status !== 0) continue;
+        if (!isWait(ALL[i])) continue;
         var s = ALL[i].sell;
-        if (s && !isTBD(s) && s.ts > Date.now() && (soon === null || s.ts < soon)) soon = s.ts;
+        if (soon === null || s.ts < soon) soon = s.ts;
       }
       var cc = soon === null ? null : countdown(soon);
       el.textContent = cc ? (cc.over ? "已开售" : cc.t) : "—";
@@ -1052,9 +1321,16 @@ body{
   $("grid").addEventListener("click", onGridClick);
   $("viewList").addEventListener("click", onRowClick);
   $("side").addEventListener("click", onCopy);
-  $("refresh").addEventListener("click", load);
+  /* 刷新 = 重新取数，缓存一并作废 */
+  $("refresh").addEventListener("click", function () { load(false); });
   $("calTip").addEventListener("click", function (e) {
-    if (e.target.getAttribute("data-go") === "list") { e.preventDefault(); setMode("list"); }
+    if (e.target.getAttribute("data-go") === "deep") {
+      e.preventDefault();
+      scan = "all";
+      $("scanSel").value = "all";
+      picked = false;
+      load(true);
+    }
   });
 
   $("viewSeg").addEventListener("click", function (e) {
@@ -1076,13 +1352,20 @@ body{
     $("q").value = "";
     selKey = null;
     picked = false;
-    load();
+    load(false);
   });
   $("regionSel").addEventListener("change", function () {
     fRegion = this.value; apply(); renderMonth(); renderList(); renderSide();
   });
-  $("statusSel").addEventListener("change", function () {
-    fStatus = this.value; apply(); renderRegions(); renderMonth(); renderList(); renderSide();
+  $("whenSel").addEventListener("change", function () {
+    fWhen = this.value; apply(); renderRegions(); renderMonth(); renderList(); renderSide();
+  });
+  /* 换扫描范围 = 换请求规模，要重新拉；已拉到的场次保留，只补新的 */
+  $("scanSel").addEventListener("change", function () {
+    scan = this.value;
+    picked = false;
+    selKey = null;
+    load(true);
   });
   var qt = null;
   $("q").addEventListener("input", function () {
@@ -1110,7 +1393,7 @@ body{
       '<div class="bar" style="width:80%"></div><div class="bar" style="width:60%"></div></div>';
   })();
 
-  load();
+  load(false);
   setInterval(tick, 1000);
 })();
 </script>
