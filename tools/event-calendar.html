@@ -271,6 +271,21 @@ body{
 .ev-kv i{font-style:normal;flex:none;width:34px;color:var(--gray-2)}
 .ev-kv b{font-weight:500;color:var(--ink-2)}
 .ev-kv em{font-style:normal;color:var(--gray-2);font-weight:400}
+/* 同一天多场开售 → 折叠成一张卡，用日程块逐场列出开售时间 */
+.ev-sched{margin-top:6px;border:1px solid var(--line-2);border-radius:9px;overflow:hidden}
+.ev-slot{
+  display:flex;align-items:baseline;gap:8px;padding:6px 10px;
+  font-size:12px;line-height:1.5;color:var(--gray);letter-spacing:0;
+}
+.ev-slot+.ev-slot{border-top:1px solid var(--line-2)}
+.ev-slot b{
+  flex:none;font-size:12.5px;font-weight:600;color:var(--ink);
+  font-variant-numeric:tabular-nums;letter-spacing:-.01em;
+}
+.ev-slot span{color:var(--gray-2)}
+.ev-slot em{font-style:normal;margin-left:auto;flex:none;color:var(--gray-2);font-size:11px}
+.ev-slot.over{background:var(--paper-2)}
+.ev-slot.over b{color:var(--gray-2);font-weight:500}
 .ev-card-f{display:flex;gap:8px;margin-top:13px}
 .ev-go{
   flex:1;text-align:center;font-size:12.5px;font-weight:500;padding:8px;border-radius:980px;
@@ -1073,15 +1088,42 @@ body{
     return '<div class="ev-empty"><u>✦</u>' + esc(msg) + "</div>";
   }
 
+  /* 一个活动一张卡：同一天开售的多场折叠成一张，用日程块逐场列出。
+     分组按 eventsKey（同活动的场次共享同一 key）。 */
+  function groupByEvent(list) {
+    var order = [], map = {};
+    list.forEach(function (r) {
+      var k = String(r.key);
+      var g = map[k];
+      if (!g) { g = map[k] = { key: r.key, items: [] }; order.push(g); }
+      g.items.push(r);
+    });
+    return order;
+  }
+
+  /* 去重（保序、丢空值），用于把多场次里重复的场地 / 演出时间等并成一项 */
+  function uniq(arr) {
+    var seen = {}, out = [];
+    arr.forEach(function (x) {
+      var k = String(x == null ? "" : x);
+      if (!k || seen[k]) return;
+      seen[k] = 1;
+      out.push(x);
+    });
+    return out;
+  }
+
   function renderSide() {
     var box = $("side");
-    var list, head, sub;
+    var list, groups, head, sub;
     if (selKey && selKey !== "TBD") {
       list = byDay[selKey] || [];
+      groups = groupByEvent(list);
       var p = selKey.split("-");
       var dt = new Date(Date.UTC(+p[0], +p[1] - 1, +p[2]));
       head = "周" + WD[dt.getUTCDay()] + " · " + (+p[1]) + "月" + (+p[2]) + "日";
-      sub = list.length + " 个场次开售";
+      /* 报数按活动去重，不然一个活动 4 场会让人以为有 4 个活动 */
+      sub = groups.length + " 个活动 · 共 " + list.length + " 场";
     } else {
       /* 未选日期：不铺列表 —— 日历已经把全部场次铺开了，右侧再列一遍是冗余。
          只给一句引导，让用户知道点哪里。 */
@@ -1090,78 +1132,159 @@ body{
       return;
     }
 
-    if (!list.length) {
+    if (!groups.length) {
       box.innerHTML = '<div class="ev-side-h"><b>' + esc(head) + "</b></div>" +
         '<div class="ev-note">这一天没有符合条件的场次。</div>';
       return;
     }
     var html = '<div class="ev-side-h"><b>' + esc(head) + "</b><span>" + esc(sub) + "</span></div>";
-    html += list.slice(0, 20).map(cardHTML).join("");
+    html += groups.slice(0, 20).map(cardHTML).join("");
     box.innerHTML = html;
   }
 
-  function cardHTML(r) {
-    var price = fmtPrice(r.minPrice, r.symbol);
-    var cd = r.sell && !isTBD(r.sell) ? countdown(r.sell.ts) : null;
+  /* 同一天多场开售时，逐场列开售时间 + 发售方式 + 场次序号 */
+  function schedHTML(items) {
+    return '<div class="ev-sched">' + items.map(function (r) {
+      var bits = [];
+      if (STYPE[r.stype]) bits.push(STYPE[r.stype]);
+      if (r.seq && r.total > 1) bits.push("第 " + r.seq + "/" + r.total + " 场");
+      return '<div class="ev-slot' + (isWait(r) ? "" : " over") + '">' +
+        "<b>" + (isTBD(r.sell) ? "待定" : esc(r.sell.hhmm)) + "</b>" +
+        "<span>" + esc(bits.length ? bits.join(" · ") : "开售") + "</span>" +
+        (r.sellEnd ? "<em>售止 " + esc(fmtFull(r.sellEnd)) + "</em>" : "") +
+        "</div>";
+    }).join("") + "</div>";
+  }
+
+  /* g = { key, items:[场次] } —— 同一活动当天的全部开售场次 */
+  function cardHTML(g) {
+    var items = g.items, first = items[0], multi = items.length > 1;
+
+    /* 倒计时对准「最近一个还没开售的场次」；当天全开售了才显示「已开售」 */
+    var next = null;
+    items.forEach(function (r) {
+      if (isTBD(r.sell) || r.sell.ts <= Date.now()) return;
+      if (!next || r.sell.ts < next.sell.ts) next = r;
+    });
+    var cd = next ? countdown(next.sell.ts) : null;
     var showCd = cd && !cd.over;
 
     var tags = [];
-    if (STYPE[r.stype]) tags.push({ t: STYPE[r.stype], on: r.stype === 3 });
-    if (r.seq && r.total > 1) tags.push({ t: "第 " + r.seq + "/" + r.total + " 场" });
-    if (TYPE[r.type]) tags.push({ t: TYPE[r.type] });
+    if (multi) {
+      /* 多场时把「发售方式」收成集合，再补一个当天场次数 */
+      uniq(items.map(function (r) { return r.stype; })).forEach(function (st) {
+        if (STYPE[st]) tags.push({ t: STYPE[st], on: st === 3 });
+      });
+      tags.push({ t: "当天 " + items.length + " 场", on: true });
+    } else {
+      if (STYPE[first.stype]) tags.push({ t: STYPE[first.stype], on: first.stype === 3 });
+      if (first.seq && first.total > 1) tags.push({ t: "第 " + first.seq + "/" + first.total + " 场" });
+    }
+    if (TYPE[first.type]) tags.push({ t: TYPE[first.type] });
     /* 活动层状态非「待开售」却仍有未开售场次 —— 深扫时才会遇到，标出来免得困惑 */
-    if (r.status !== 0 && SELL[r.status]) tags.push({ t: "活动" + SELL[r.status].t, warn: true });
+    if (first.status !== 0 && SELL[first.status]) tags.push({ t: "活动" + SELL[first.status].t, warn: true });
 
-    return '<article class="ev-card">' +
+    /* 同一天各场次的演出时间 / 场地 / 座位 / 备注可能不同，去重后并排 */
+    var shows = uniq(items.map(function (r) { return r.show ? fmtFull(r.show) : null; }));
+    var locs = uniq(items.map(function (r) { return r.loc || null; }));
+    var seats = uniq(items.map(function (r) { return r.seat; }))
+      .map(function (s) { return SEAT[s] || ("模式 " + s); });
+    var limits = uniq(items.map(function (r) { return r.limit; }));
+    var remarks = uniq(items.map(function (r) { return r.remark || null; }));
+    var tks = uniq(items.map(function (r) { return r.tickets; }));
+    var best = null;
+    items.forEach(function (r) {
+      if (r.minPrice != null && (!best || r.minPrice < best.minPrice)) best = r;
+    });
+    var price = best ? fmtPrice(best.minPrice, best.symbol) : "";
+    var areas = first.areas || [];
+
+    var body = "<h3>" + esc(first.title) + "</h3>";
+    if (remarks.length) body += '<p class="ev-remark">' + esc(remarks.join(" · ")) + "</p>";
+
+    if (multi) {
+      body += schedHTML(items);
+    } else {
+      body += '<div class="ev-kv"><i>开售</i><b>' + (isTBD(first.sell) ? "时间待定" : esc(fmtFull(first.sell))) +
+        (first.sellEnd ? ' <em>售止 ' + esc(fmtFull(first.sellEnd)) + "</em>" : "") + "</b></div>";
+    }
+    if (shows.length) body += '<div class="ev-kv"><i>演出</i><b>' + esc(shows.join(" / ")) + "</b></div>";
+    if (locs.length) body += '<div class="ev-kv"><i>场地</i><b>' + esc(locs.join(" / ")) + "</b></div>";
+    if (seats.length) body += '<div class="ev-kv"><i>座位</i><b>' + esc(seats.join(" / ")) + "</b></div>";
+    if (tks.length === 1 && tks[0]) {
+      body += '<div class="ev-kv"><i>票种</i><b>' + tks[0] + " 种" +
+        (price ? " · " + esc(price) + " 起" : "") + "</b></div>";
+    } else if (price) {
+      body += '<div class="ev-kv"><i>票价</i><b>' + esc(price) + " 起</b></div>";
+    }
+    if (limits.length) body += '<div class="ev-kv"><i>限购</i><b>' + esc(limits.join("/")) + " 张/人</b></div>";
+    if (areas.length > 1) body += '<div class="ev-kv"><i>上架</i><b>' +
+      esc(areas.map(function (c) { return AREA_NAME[c] || c; }).join(" / ")) + "</b></div>";
+
+    body += '<div class="ev-card-f">' +
+      '<a class="ev-go" href="' + esc(SITE + "?eventsKey=" + first.key) + '" target="_blank" rel="noopener">去 Fantopia 抢票</a>' +
+      '<button class="ev-copy" data-copy="' + esc(copyText(g)) + '">复制信息</button>' +
+      "</div>";
+
+    return '<article class="ev-card" data-key="' + esc(first.key) + '">' +
       '<div class="ev-card-pic">' +
-      (r.img ? '<img src="' + esc(r.img) + '" alt="" loading="lazy" referrerpolicy="no-referrer">' : "") +
+      (first.img ? '<img src="' + esc(first.img) + '" alt="" loading="lazy" referrerpolicy="no-referrer">' : "") +
       '<div class="ev-card-tags">' +
       tags.map(function (x) {
         return '<span class="ev-tag' + (x.on ? " blue" : "") + (x.warn ? " warn" : "") + '">' + esc(x.t) + "</span>";
       }).join("") +
       "</div>" +
       (showCd
-        ? '<div class="ev-cd' + (cd.soon ? " soon" : "") + '" data-cd="' + r.sell.ts + '">距开售 ' + esc(cd.t) + "</div>"
+        ? '<div class="ev-cd' + (cd.soon ? " soon" : "") + '" data-cd="' + next.sell.ts + '">距开售 ' + esc(cd.t) + "</div>"
         : (cd ? '<div class="ev-cd over">已开售</div>' : "")) +
       "</div>" +
-      '<div class="ev-card-b">' +
-      "<h3>" + esc(r.title) + "</h3>" +
-      (r.remark ? '<p class="ev-remark">' + esc(r.remark) + "</p>" : "") +
-      '<div class="ev-kv"><i>开售</i><b>' + (isTBD(r.sell) ? "时间待定" : esc(fmtFull(r.sell))) +
-      (r.sellEnd ? ' <em>售止 ' + esc(fmtFull(r.sellEnd)) + "</em>" : "") + "</b></div>" +
-      (r.show ? '<div class="ev-kv"><i>演出</i><b>' + esc(fmtFull(r.show)) + "</b></div>" : "") +
-      (r.loc ? '<div class="ev-kv"><i>场地</i><b>' + esc(r.loc) + "</b></div>" : "") +
-      (r.seat != null ? '<div class="ev-kv"><i>座位</i><b>' + esc(SEAT[r.seat] || ("模式 " + r.seat)) + "</b></div>" : "") +
-      (r.tickets ? '<div class="ev-kv"><i>票种</i><b>' + r.tickets + " 种" +
-        (price ? " · " + esc(price) + " 起" : "") + "</b></div>"
-        : (price ? '<div class="ev-kv"><i>票价</i><b>' + esc(price) + " 起</b></div>" : "")) +
-      (r.limit ? '<div class="ev-kv"><i>限购</i><b>' + r.limit + " 张/人</b></div>" : "") +
-      (r.areas && r.areas.length > 1 ? '<div class="ev-kv"><i>上架</i><b>' +
-        esc(r.areas.map(function (c) { return AREA_NAME[c] || c; }).join(" / ")) + "</b></div>" : "") +
-      '<div class="ev-card-f">' +
-      '<a class="ev-go" href="' + esc(SITE + "?eventsKey=" + r.key) + '" target="_blank" rel="noopener">去 Fantopia 抢票</a>' +
-      '<button class="ev-copy" data-copy="' + esc(copyText(r)) + '">复制信息</button>' +
-      "</div></div></article>";
+      '<div class="ev-card-b">' + body + "</div></article>";
   }
 
-  function copyText(r) {
-    var price = fmtPrice(r.minPrice, r.symbol);
-    return [
-      r.title + (r.seq && r.total > 1 ? "（第 " + r.seq + " / 共 " + r.total + " 场）" : ""),
-      r.remark ? "场次备注：" + r.remark : "",
-      isTBD(r.sell) ? "开售：时间待定" : "开售：" + fmtFull(r.sell),
-      r.sellEnd ? "售止：" + fmtFull(r.sellEnd) : "",
-      r.show ? "演出：" + fmtFull(r.show) : "",
-      r.loc ? "场地：" + r.loc : "",
-      STYPE[r.stype] ? "发售方式：" + STYPE[r.stype] : "",
-      r.tickets ? "票种：共 " + r.tickets + " 种" : "",
-      price ? "最低价：" + price : "",
-      r.limit ? "限购：" + r.limit + " 张/人" : "",
-      TYPE[r.type] ? "活动类型：" + TYPE[r.type] : "",
-      (r.areas && r.areas.length > 1)
-        ? "上架地区：" + r.areas.map(function (c) { return AREA_NAME[c] || c; }).join(" / ") : "",
-      "详情：" + SITE + "?eventsKey=" + r.key
-    ].filter(Boolean).join("\n");
+  function copyText(g) {
+    var items = g.items, first = items[0], multi = items.length > 1;
+    var best = null;
+    items.forEach(function (r) {
+      if (r.minPrice != null && (!best || r.minPrice < best.minPrice)) best = r;
+    });
+    var price = best ? fmtPrice(best.minPrice, best.symbol) : "";
+    var remarks = uniq(items.map(function (r) { return r.remark || null; }));
+    var shows = uniq(items.map(function (r) { return r.show ? fmtFull(r.show) : null; }));
+    var locs = uniq(items.map(function (r) { return r.loc || null; }));
+    var stypes = uniq(items.map(function (r) { return STYPE[r.stype] || null; }));
+    var limits = uniq(items.map(function (r) { return r.limit; }));
+    var tks = uniq(items.map(function (r) { return r.tickets; }));
+
+    var lines = [];
+    lines.push(first.title + (multi
+      ? "（当天 " + items.length + " 场开售）"
+      : (first.seq && first.total > 1 ? "（第 " + first.seq + " / 共 " + first.total + " 场）" : "")));
+    if (remarks.length) lines.push("场次备注：" + remarks.join(" · "));
+    if (multi) {
+      lines.push("开售日程：");
+      items.forEach(function (r) {
+        var bits = [r.sell.hhmm];
+        if (STYPE[r.stype]) bits.push(STYPE[r.stype]);
+        if (r.seq && r.total > 1) bits.push("第 " + r.seq + "/" + r.total + " 场");
+        if (r.sellEnd) bits.push("售止 " + fmtFull(r.sellEnd));
+        lines.push("  " + bits.join(" · "));
+      });
+    } else {
+      lines.push(isTBD(first.sell) ? "开售：时间待定" : "开售：" + fmtFull(first.sell));
+      if (first.sellEnd) lines.push("售止：" + fmtFull(first.sellEnd));
+    }
+    if (shows.length) lines.push("演出：" + shows.join(" / "));
+    if (locs.length) lines.push("场地：" + locs.join(" / "));
+    if (stypes.length) lines.push("发售方式：" + stypes.join(" / "));
+    if (tks.length === 1 && tks[0]) lines.push("票种：共 " + tks[0] + " 种");
+    if (price) lines.push("最低价：" + price);
+    if (limits.length) lines.push("限购：" + limits.join("/") + " 张/人");
+    if (TYPE[first.type]) lines.push("活动类型：" + TYPE[first.type]);
+    if (first.areas && first.areas.length > 1) {
+      lines.push("上架地区：" + first.areas.map(function (c) { return AREA_NAME[c] || c; }).join(" / "));
+    }
+    lines.push("详情：" + SITE + "?eventsKey=" + first.key);
+    return lines.filter(Boolean).join("\n");
   }
 
   /* -------------------- 交互 -------------------- */
