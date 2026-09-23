@@ -83,7 +83,7 @@ body{
 .ev-stat u{display:block;text-decoration:none;font-size:11.5px;color:var(--gray);margin-top:5px;letter-spacing:0}
 
 /* ---------------- 工具栏 ---------------- */
-.ev-main{max-width:1320px;margin:0 auto;padding:40px 24px 40px}
+.ev-main{max-width:1320px;margin:0 auto;padding:40px 24px 64px}
 .ev-bar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:18px}
 .ev-bar-nav{display:flex;align-items:center;gap:10px}
 .ev-areapick{
@@ -308,16 +308,6 @@ body{
 }
 @keyframes evsk{0%{background-position:100% 50%}100%{background-position:0 50%}}
 
-.ev-foot{
-  max-width:1320px;margin:0 auto;padding:0 24px 56px;
-  font-size:11.5px;color:var(--gray-2);line-height:1.85;letter-spacing:0;
-}
-.ev-foot b{color:var(--gray);font-weight:600}
-.ev-foot code{
-  font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:11px;
-  background:var(--paper-2);padding:1px 5px;border-radius:4px;color:var(--ink-2);
-}
-
 @media (max-width:640px){
   .ev-hero{padding-top:40px}
   .ev-main{padding-left:16px;padding-right:16px}
@@ -402,14 +392,6 @@ body{
     <aside class="ev-side" id="side"></aside>
   </div>
 </main>
-
-<footer class="ev-foot">
-  <p><b>数据来源</b> <code>…/eventsInfo/getEventsInfoPageV2</code>（活动列表）+ <code>…/eventsInfo/inside/getEventsDetailByKey</code>（场次明细），均为 GET，浏览器直连。服务端有 3 分钟缓存，刷新拿到的未必是毫秒级最新。</p>
-  <p><b>为什么按场次</b> 活动列表里的 <code>sellDateTime</code> 只是「尚未开售的场次里最晚的那一个」，会漏掉更早开售的场次。实测 TXT 澳门站：活动层显示 <code>09-24 12:00</code>（公开发售），但场次里 <code>09-23 12:00</code> 还有一场会员购预售 —— 只有拉场次才能看到。所以本页开售时间一律取场次的 <code>sellStartTime</code>。</p>
-  <p><b>场次字段</b> <code>sellStartTime</code> / <code>sellEndTime</code> 是开售起止（北京时间；<code>sellEndTime</code> 通常只有会员购场次才有，为空表示不限时）。<code>sellType</code> 为 <code>1 公开发售</code> / <code>2 缺货登记</code> / <code>3 会员购</code>。<code>status</code> 表示场次是否有效（<code>1</code> 有效），<b>不是</b>开售状态，判断开售与否只能比时间。</p>
-  <p><b>场次范围</b> 「待开售活动」只查活动层状态为待开售的活动（服务端判定「还有场次没到开售时间」）。「全部未结束活动」连热卖中 / 已售罄的一起查 —— 服务端只要活动里有票可买就直接判「热卖中」并停止往下判断场次，所以热卖中的活动也可能藏着未开售的加场。</p>
-  <p><b>上架地区</b> 接口按请求头 <code>area</code> 只返回该地区上架的活动，各地区活动池并不互相包含（实测 <code>area=MY</code> 有 101 条在 <code>area=MO</code> 视角下不存在）。不传 <code>area</code> 时等同 <code>area=MO</code>。选「全部地区（合并）」会并发请求 10 个地区并按活动 id 去重。</p>
-</footer>
 
 <script>
 (function () {
@@ -567,7 +549,7 @@ body{
   var fRegion = "";      /* 活动举办地筛选（从标题/场地提取） */
   var fWhen = "wait";    /* wait = 只看待开售场次；selling = 含正在开售 */
   var fText = "";
-  var srcArea = "MO";    /* area 请求头：拉哪个地区上架的；"all" = 并行合并全部地区 */
+  var srcArea = "all";   /* area 请求头：拉哪个地区上架的；"all" = 并行合并全部地区（默认） */
   var scan = "waiting";  /* 深扫范围：waiting = 只查待开售活动；all = 查全部未结束活动 */
   var sessCache = {};    /* eventsKey → 场次原始数组；换地区时清空 */
   var loaded = false;
@@ -1101,17 +1083,11 @@ body{
       head = "周" + WD[dt.getUTCDay()] + " · " + (+p[1]) + "月" + (+p[2]) + "日";
       sub = list.length + " 个场次开售";
     } else {
-      /* 未选日期：给整体列表。待开售的按「最近要开售」升序排前面，
-         已开售的按「刚开售」降序排后面 —— 两个方向各自最有用。 */
-      list = VIEW.filter(function (r) { return !isTBD(r.sell); })
-        .sort(function (a, b) {
-          var aw = isWait(a), bw = isWait(b);
-          if (aw !== bw) return aw ? -1 : 1;
-          return aw ? a.sell.ts - b.sell.ts : b.sell.ts - a.sell.ts;
-        });
-      if (!list.length) list = VIEW.slice(0, 12);
-      head = fWhen === "all" ? "全部场次" : "即将开售";
-      sub = list.length + " 个场次";
+      /* 未选日期：不铺列表 —— 日历已经把全部场次铺开了，右侧再列一遍是冗余。
+         只给一句引导，让用户知道点哪里。 */
+      box.innerHTML = '<div class="ev-side-h"><b>开售场次</b></div>' +
+        '<div class="ev-note">点左侧日历上带场次的日期，查看当天开售的场次。</div>';
+      return;
     }
 
     if (!list.length) {
