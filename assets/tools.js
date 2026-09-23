@@ -348,5 +348,17 @@ const TOOLS = [
     category: "other",
     date: "2026-09-20",
     pop: 4
+  },
+  {
+    id: "event-calendar",
+    name: "演出日历",
+    desc: "直连 Fantopia 拉取待开售演出，按开售时间铺进月历，带开售倒计时和列表视图。",
+    icon: "🎫",
+    href: "tools/event-calendar.html",
+    tags: ["演出", "日历", "开售", "抢票", "倒计时", "Fantopia", "演唱会"],
+    category: "other",
+    badge: "NEW",
+    date: "2026-09-23",
+    pop: 8
   }
 ];

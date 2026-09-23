@@ -16,12 +16,12 @@ whaletool/
 │   ├── style.css           # 全站共享样式（含子工具页公用组件）
 │   ├── tools.js            # ⭐ 工具注册表（加工具只改这里）
 │   └── app.js              # 首页渲染、搜索与排序逻辑
-├── tools/                  # 27 个自包含工具页
+├── tools/                  # 28 个自包含工具页
 ├── .nojekyll               # 让 GitHub Pages 跳过 Jekyll 处理
 └── README.md
 ```
 
-## 已上线工具（27 个）
+## 已上线工具（28 个）
 
 ### 🖼️ 图片（4）
 
@@ -67,13 +67,14 @@ whaletool/
 | 定投回测 | CSV / 季节模拟 / 随机三源，输出 IRR、最大回撤与 SVG 曲线 | `tools/dcar.html` |
 | 规则化选股器 | 自定义字段与规则筛选候选池，自动生成伪代码 / Python / SQL 留痕 | `tools/stock-screener.html` |
 
-### 🧮 其他（3）
+### 🧮 其他（4）
 
 | 工具 | 说明 | 目录 |
 | --- | --- | --- |
 | 随机抽签 | 支持无放回模式与滚动动画，适合决策 / 抽奖 | `tools/random-pick.html` |
 | 周报生成器 | 分类列表 + 状态标签 + 下周计划，贴合日常汇报格式 | `tools/weekly-report.html` |
 | 全屏时钟 | 全屏显示 + 倒计时 + 番茄钟，附 8 时区对照 | `tools/clock.html` |
+| 演出日历 | 直连 Fantopia 拉取待开售演出，按开售时间铺进月历，带倒计时 | `tools/event-calendar.html` |
 
 ---
 

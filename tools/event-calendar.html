@@ -1,0 +1,1017 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>演出日历 · WhaleTool</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎫</text></svg>">
+<link rel="stylesheet" href="../assets/style.css">
+<style>
+/* ============================================================
+ * 演出日历 —— 苹果风格皮肤
+ * 色板 / 字重 / 圆角 / 留白 均照 Apple 官网规范
+ * ============================================================ */
+:root{
+  --ink:#1d1d1f;
+  --ink-2:#424245;
+  --gray:#86868b;
+  --gray-2:#a1a1a6;
+  --line:#d2d2d7;
+  --line-2:#e8e8ed;
+  --paper:#ffffff;
+  --paper-2:#f5f5f7;
+  --blue:#0071e3;
+  --blue-h:#0077ed;
+  --blue-bg:#eaf3ff;
+  --red:#e30000;
+  --green:#00a862;
+  --sh-sm:0 1px 3px rgba(0,0,0,.04), 0 4px 12px rgba(0,0,0,.05);
+  --sh-md:0 2px 8px rgba(0,0,0,.05), 0 12px 32px rgba(0,0,0,.08);
+  --sh-lg:0 4px 16px rgba(0,0,0,.06), 0 24px 60px rgba(0,0,0,.12);
+  --r-md:12px; --r-lg:18px; --r-xl:24px;
+  --ease:cubic-bezier(.4,0,.2,1);
+}
+html,body{background-color:#fbfbfd !important;background-image:none !important;}
+body{
+  font-family:-apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Segoe UI",
+              "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  color:var(--ink); letter-spacing:-.01em;
+}
+
+/* ---------------- 顶栏 ---------------- */
+.ev-nav{
+  position:sticky; top:0; z-index:60;
+  background:rgba(251,251,253,.8);
+  backdrop-filter:saturate(180%) blur(20px);
+  -webkit-backdrop-filter:saturate(180%) blur(20px);
+  border-bottom:1px solid rgba(0,0,0,.07);
+}
+.ev-nav-in{max-width:1180px;margin:0 auto;padding:0 24px;height:52px;display:flex;align-items:center;gap:14px}
+.ev-back{font-size:13px;color:var(--gray);font-weight:500;transition:color .18s var(--ease)}
+.ev-back:hover{color:var(--blue)}
+.ev-nav-t{font-size:14px;font-weight:600;letter-spacing:-.01em}
+.ev-nav-r{margin-left:auto;display:flex;align-items:center;gap:12px}
+.ev-sync{font-size:12px;color:var(--gray-2);font-variant-numeric:tabular-nums}
+.ev-ibtn{
+  font:inherit;font-size:12.5px;font-weight:500;color:var(--ink);
+  background:var(--paper-2);border:none;border-radius:980px;
+  padding:6px 14px;cursor:pointer;transition:background .18s var(--ease);
+}
+.ev-ibtn:hover{background:#eaeaef}
+.ev-ibtn:disabled{opacity:.45;cursor:default}
+.ev-ibtn.spin::before{content:"";display:inline-block;width:9px;height:9px;margin-right:6px;
+  border:1.5px solid var(--gray-2);border-top-color:var(--blue);border-radius:50%;
+  animation:evspin .7s linear infinite;vertical-align:0}
+@keyframes evspin{to{transform:rotate(360deg)}}
+
+/* ---------------- Hero ---------------- */
+.ev-hero{max-width:1180px;margin:0 auto;padding:60px 24px 0}
+.ev-kicker{font-size:12px;font-weight:600;letter-spacing:.09em;color:var(--blue);text-transform:uppercase}
+.ev-hero h1{
+  margin-top:10px;font-size:clamp(34px,5.4vw,56px);font-weight:700;
+  letter-spacing:-.028em;line-height:1.05;
+}
+.ev-sub{margin-top:16px;font-size:15px;line-height:1.65;color:var(--gray);max-width:620px;letter-spacing:0}
+
+.ev-stats{display:flex;gap:12px;flex-wrap:wrap;margin-top:34px}
+.ev-stat{
+  flex:1 1 158px;background:var(--paper);border-radius:var(--r-lg);
+  padding:18px 20px 16px;box-shadow:var(--sh-sm);
+}
+.ev-stat b{display:block;font-size:27px;font-weight:600;letter-spacing:-.03em;line-height:1.15;font-variant-numeric:tabular-nums}
+.ev-stat b i{font-style:normal;font-size:14px;font-weight:500;color:var(--gray);margin-left:3px}
+.ev-stat u{display:block;text-decoration:none;font-size:11.5px;color:var(--gray);margin-top:5px;letter-spacing:0}
+
+/* ---------------- 工具栏 ---------------- */
+.ev-main{max-width:1180px;margin:0 auto;padding:40px 24px 40px}
+.ev-bar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:18px}
+.ev-bar-nav{display:flex;align-items:center;gap:10px}
+.ev-mnav{display:flex;align-items:center;gap:4px;background:var(--paper);border-radius:980px;padding:4px;box-shadow:var(--sh-sm)}
+.ev-mnav button{
+  font:inherit;width:30px;height:30px;border:none;background:transparent;border-radius:50%;
+  cursor:pointer;color:var(--ink-2);font-size:16px;line-height:1;transition:background .18s var(--ease);
+}
+.ev-mnav button:hover{background:var(--paper-2)}
+.ev-mlabel{padding:0 10px;min-width:118px;text-align:center;line-height:1.25}
+.ev-mlabel b{display:block;font-size:15px;font-weight:600;letter-spacing:-.02em}
+.ev-mlabel small{display:block;font-size:10.5px;font-weight:500;color:var(--gray-2);letter-spacing:0}
+.ev-pill{
+  font:inherit;font-size:12.5px;font-weight:500;border:none;border-radius:980px;
+  padding:7px 15px;cursor:pointer;background:var(--paper-2);color:var(--ink);
+  transition:background .18s var(--ease);
+}
+.ev-pill:hover{background:#eaeaef}
+.ev-pill.on{background:var(--ink);color:#fff}
+
+.ev-seg{display:flex;background:var(--paper-2);border-radius:980px;padding:3px;margin-left:auto}
+.ev-seg button{
+  font:inherit;font-size:12.5px;font-weight:500;border:none;background:transparent;
+  padding:6px 16px;border-radius:980px;cursor:pointer;color:var(--ink-2);
+  transition:all .2s var(--ease);
+}
+.ev-seg button.on{background:var(--paper);color:var(--ink);box-shadow:0 1px 3px rgba(0,0,0,.1)}
+
+.ev-filters{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:22px}
+.ev-search{
+  flex:1 1 200px;min-width:170px;font:inherit;font-size:13.5px;
+  padding:9px 15px;border:1px solid var(--line-2);border-radius:980px;
+  background:var(--paper);outline:none;transition:border-color .18s var(--ease),box-shadow .18s var(--ease);
+}
+.ev-search:focus{border-color:var(--blue);box-shadow:0 0 0 3.5px var(--blue-bg)}
+.ev-sel{
+  font:inherit;font-size:13px;padding:9px 14px;border:1px solid var(--line-2);
+  border-radius:980px;background:var(--paper);outline:none;cursor:pointer;color:var(--ink);
+}
+.ev-sel:focus{border-color:var(--blue);box-shadow:0 0 0 3.5px var(--blue-bg)}
+.ev-chips{display:flex;gap:6px;flex-wrap:wrap}
+.ev-chip{
+  font:inherit;font-size:12.5px;font-weight:500;border:1px solid var(--line-2);
+  background:var(--paper);padding:7px 14px;border-radius:980px;cursor:pointer;
+  color:var(--ink-2);transition:all .18s var(--ease);
+}
+.ev-chip:hover{border-color:var(--line)}
+.ev-chip.on{background:var(--ink);border-color:var(--ink);color:#fff}
+
+/* ---------------- 主体两栏 ---------------- */
+.ev-body{display:grid;grid-template-columns:minmax(0,1fr) 336px;gap:20px;align-items:start}
+@media (max-width:960px){ .ev-body{grid-template-columns:1fr} }
+
+/* ---------------- 月历 ---------------- */
+.ev-cal{background:var(--paper-2);border-radius:var(--r-xl);padding:16px}
+.ev-week{display:grid;grid-template-columns:repeat(7,1fr);gap:5px;margin-bottom:6px}
+.ev-week span{text-align:left;padding-left:9px;font-size:11.5px;font-weight:600;color:var(--gray);letter-spacing:0}
+.ev-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:5px}
+.ev-cell{
+  min-height:106px;border-radius:var(--r-md);padding:6px;
+  background:transparent;cursor:pointer;border:1.5px solid transparent;
+  transition:background .18s var(--ease),box-shadow .18s var(--ease),
+             border-color .18s var(--ease),transform .18s var(--ease);
+  overflow:hidden;position:relative;
+}
+.ev-cell:hover{background:rgba(0,0,0,.035)}
+.ev-cell.pad{background:transparent;cursor:default;pointer-events:none}
+.ev-cell.has{background:var(--paper);border-color:transparent;box-shadow:0 1px 2px rgba(0,0,0,.05)}
+.ev-cell.has:hover{background:var(--paper);box-shadow:var(--sh-sm);transform:translateY(-1px)}
+.ev-cell.sel{border-color:var(--blue);box-shadow:0 0 0 3.5px var(--blue-bg)}
+.ev-cell.today .dn{background:var(--ink);color:#fff}
+.ev-dn{
+  display:inline-flex;align-items:center;justify-content:center;
+  width:22px;height:22px;border-radius:50%;font-size:11.5px;font-weight:600;
+  color:var(--gray);font-variant-numeric:tabular-nums;
+}
+.ev-cell.has .ev-dn{color:var(--ink)}
+.ev-cell.today .ev-dn{color:#fff}
+.ev-minis{margin-top:4px;display:flex;flex-direction:column;gap:3px}
+.ev-mini{
+  display:flex;align-items:center;gap:4px;background:var(--blue-bg);
+  border-radius:6px;padding:3px 4px;min-width:0;
+}
+.ev-mini img{width:13px;height:13px;border-radius:3px;object-fit:cover;flex:none;background:#dbe6f5}
+.ev-mini em{
+  font-style:normal;font-size:9.5px;font-weight:600;color:var(--blue);
+  font-variant-numeric:tabular-nums;flex:none;letter-spacing:-.02em;
+}
+.ev-mini s{
+  text-decoration:none;font-size:10px;color:var(--ink-2);white-space:nowrap;
+  overflow:hidden;text-overflow:ellipsis;min-width:0;flex:1;
+}
+.ev-more{margin-top:3px;font-size:10px;color:var(--gray-2);padding-left:2px}
+.ev-dots{display:flex;gap:3px;margin-top:6px;flex-wrap:wrap}
+.ev-dots i{width:5px;height:5px;border-radius:50%;background:var(--line);display:block}
+.ev-dots i.w{background:var(--blue)}
+
+/* 日历下方提示（如：有 N 场开售时间待定，不上日历） */
+.ev-tip{
+  margin-top:10px;padding:9px 14px;border-radius:10px;
+  background:rgba(255,255,255,.72);font-size:12px;color:var(--gray);
+  letter-spacing:0;line-height:1.6;
+}
+.ev-tip b{color:var(--ink-2);font-weight:600}
+.ev-tip a{color:var(--blue);font-weight:500;margin-left:4px}
+.ev-tip a:hover{text-decoration:underline}
+
+/* ---------------- 列表时间轴 ---------------- */
+.ev-list{background:var(--paper);border-radius:var(--r-xl);padding:8px 20px 20px;box-shadow:var(--sh-sm)}
+.ev-grp{padding:18px 0 4px;border-top:1px solid var(--line-2);margin-top:14px}
+.ev-grp:first-child{border-top:none;margin-top:6px}
+.ev-grp-h{display:flex;align-items:baseline;gap:9px;margin-bottom:12px}
+.ev-grp-h b{font-size:15px;font-weight:600;letter-spacing:-.02em}
+.ev-grp-h span{font-size:12px;color:var(--gray-2)}
+.ev-row{
+  display:flex;gap:14px;align-items:center;padding:11px 10px;border-radius:14px;
+  cursor:pointer;transition:background .16s var(--ease);
+}
+.ev-row:hover{background:var(--paper-2)}
+.ev-row img{width:46px;height:46px;border-radius:11px;object-fit:cover;flex:none;background:var(--paper-2)}
+.ev-row-m{min-width:0;flex:1}
+.ev-row-m b{display:block;font-size:13.5px;font-weight:500;letter-spacing:-.01em;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ev-row-m span{display:block;font-size:11.5px;color:var(--gray);margin-top:3px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ev-row-r{text-align:right;flex:none}
+.ev-row-r b{display:block;font-size:13px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:-.01em}
+.ev-row-r span{display:block;font-size:11px;color:var(--gray-2);margin-top:3px}
+
+/* ---------------- 侧栏 ---------------- */
+.ev-side{position:sticky;top:72px;display:flex;flex-direction:column;gap:14px}
+@media (max-width:960px){ .ev-side{position:static} }
+.ev-side-h{display:flex;align-items:baseline;gap:8px;padding:0 4px}
+.ev-side-h b{font-size:15px;font-weight:600;letter-spacing:-.02em}
+.ev-side-h span{font-size:12px;color:var(--gray-2);margin-left:auto}
+
+.ev-card{
+  background:var(--paper);border-radius:var(--r-lg);overflow:hidden;
+  box-shadow:var(--sh-sm);transition:box-shadow .22s var(--ease),transform .22s var(--ease);
+}
+.ev-card:hover{box-shadow:var(--sh-md);transform:translateY(-2px)}
+.ev-card-pic{position:relative;aspect-ratio:3/4;background:var(--paper-2);overflow:hidden}
+.ev-card-pic img{width:100%;height:100%;object-fit:cover;display:block}
+.ev-card-tags{position:absolute;left:10px;top:10px;display:flex;gap:5px;flex-wrap:wrap}
+.ev-tag{
+  font-size:10.5px;font-weight:600;letter-spacing:.01em;padding:3.5px 9px;border-radius:980px;
+  background:rgba(255,255,255,.92);color:var(--ink);backdrop-filter:blur(8px);
+}
+.ev-tag.blue{background:rgba(0,113,227,.94);color:#fff}
+.ev-cd{
+  position:absolute;right:10px;bottom:10px;font-size:11px;font-weight:600;
+  background:rgba(29,29,31,.78);color:#fff;padding:4px 10px;border-radius:980px;
+  font-variant-numeric:tabular-nums;backdrop-filter:blur(8px);letter-spacing:0;
+}
+.ev-cd.soon{background:rgba(227,0,0,.9)}
+.ev-card-b{padding:14px 15px 15px}
+.ev-card-b h3{font-size:14.5px;font-weight:600;line-height:1.35;letter-spacing:-.015em;margin-bottom:9px}
+.ev-kv{display:flex;gap:8px;font-size:12px;color:var(--gray);line-height:1.6;margin-top:5px;letter-spacing:0}
+.ev-kv i{font-style:normal;flex:none;width:34px;color:var(--gray-2)}
+.ev-kv b{font-weight:500;color:var(--ink-2)}
+.ev-card-f{display:flex;gap:8px;margin-top:13px}
+.ev-go{
+  flex:1;text-align:center;font-size:12.5px;font-weight:500;padding:8px;border-radius:980px;
+  background:var(--blue);color:#fff;transition:background .18s var(--ease);
+}
+.ev-go:hover{background:var(--blue-h)}
+.ev-copy{
+  font:inherit;font-size:12.5px;font-weight:500;padding:8px 14px;border-radius:980px;
+  border:1px solid var(--line-2);background:transparent;color:var(--ink);cursor:pointer;
+  transition:background .18s var(--ease);
+}
+.ev-copy:hover{background:var(--paper-2)}
+
+/* ---------------- 状态条 / 空态 ---------------- */
+.ev-note{
+  background:var(--paper);border-radius:var(--r-lg);padding:16px 18px;
+  box-shadow:var(--sh-sm);font-size:12.5px;color:var(--gray);line-height:1.7;letter-spacing:0;
+}
+.ev-note b{color:var(--ink);font-weight:600}
+.ev-empty{text-align:center;padding:64px 20px;color:var(--gray-2);font-size:13.5px;letter-spacing:0}
+.ev-empty u{display:block;text-decoration:none;font-size:34px;margin-bottom:12px;opacity:.5}
+.ev-err{
+  background:var(--paper);border-radius:var(--r-lg);padding:26px;box-shadow:var(--sh-sm);
+  text-align:center;letter-spacing:0;
+}
+.ev-err b{display:block;font-size:15px;font-weight:600;color:var(--red);margin-bottom:8px}
+.ev-err p{font-size:12.5px;color:var(--gray);line-height:1.7;word-break:break-all}
+
+/* 骨架 */
+.ev-sk{background:var(--paper);border-radius:var(--r-lg);box-shadow:var(--sh-sm);overflow:hidden}
+.ev-sk .bar{
+  height:12px;border-radius:6px;margin:12px 15px;
+  background:linear-gradient(90deg,#f0f0f4 25%,#e6e6ec 37%,#f0f0f4 63%);
+  background-size:400% 100%;animation:evsk 1.3s ease infinite;
+}
+@keyframes evsk{0%{background-position:100% 50%}100%{background-position:0 50%}}
+
+.ev-foot{
+  max-width:1180px;margin:0 auto;padding:0 24px 56px;
+  font-size:11.5px;color:var(--gray-2);line-height:1.85;letter-spacing:0;
+}
+.ev-foot b{color:var(--gray);font-weight:600}
+.ev-foot code{
+  font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:11px;
+  background:var(--paper-2);padding:1px 5px;border-radius:4px;color:var(--ink-2);
+}
+
+@media (max-width:640px){
+  .ev-hero{padding-top:40px}
+  .ev-main{padding-left:16px;padding-right:16px}
+  .ev-cell{min-height:64px;padding:5px}
+  .ev-mini s{display:none}
+  .ev-mini em{font-size:9.5px}
+  .ev-cal{padding:12px;border-radius:var(--r-lg)}
+  .ev-seg{margin-left:0}
+}
+</style>
+</head>
+<body>
+
+<nav class="ev-nav">
+  <div class="ev-nav-in">
+    <a class="ev-back" href="../">← 工具合辑</a>
+    <span class="ev-nav-t">演出日历</span>
+    <div class="ev-nav-r">
+      <span class="ev-sync" id="sync">载入中…</span>
+      <button class="ev-ibtn" id="refresh">刷新</button>
+    </div>
+  </div>
+</nav>
+
+<header class="ev-hero">
+  <p class="ev-kicker">Fantopia · 开售日历</p>
+  <h1>待开售演出</h1>
+  <p class="ev-sub">只收录「待开售」状态的场次，按开售时间归入日历。直连 Fantopia 公开接口实时拉取，不经过任何中间服务。</p>
+  <div class="ev-stats" id="stats">
+    <div class="ev-sk" style="flex:1 1 158px"><div class="bar" style="width:60%"></div><div class="bar" style="width:40%;height:22px"></div></div>
+    <div class="ev-sk" style="flex:1 1 158px"><div class="bar" style="width:60%"></div><div class="bar" style="width:40%;height:22px"></div></div>
+    <div class="ev-sk" style="flex:1 1 158px"><div class="bar" style="width:60%"></div><div class="bar" style="width:40%;height:22px"></div></div>
+  </div>
+</header>
+
+<main class="ev-main">
+  <div class="ev-bar">
+    <span class="ev-bar-nav" id="barNav">
+      <div class="ev-mnav">
+        <button id="prevM" title="上一月">‹</button>
+        <div class="ev-mlabel" id="mLabel">—</div>
+        <button id="nextM" title="下一月">›</button>
+      </div>
+      <button class="ev-pill" id="todayBtn">今天</button>
+    </span>
+    <div class="ev-seg" id="viewSeg">
+      <button data-v="month" class="on">月历</button>
+      <button data-v="list">列表</button>
+    </div>
+  </div>
+
+  <div class="ev-filters">
+    <input class="ev-search" id="q" type="search" placeholder="搜索演出、场地…" autocomplete="off">
+    <div class="ev-chips" id="typeChips"></div>
+    <select class="ev-sel" id="regionSel"><option value="">全部地区</option></select>
+    <select class="ev-sel" id="statusSel">
+      <option value="0" selected>仅待开售</option>
+      <option value="0,1">待开售 + 热卖中</option>
+      <option value="all">全部状态</option>
+    </select>
+  </div>
+
+  <div class="ev-body">
+    <div id="colMain">
+      <section class="ev-cal" id="viewMonth">
+        <div class="ev-week"><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span><span>日</span></div>
+        <div class="ev-grid" id="grid"></div>
+        <div class="ev-tip" id="calTip" hidden></div>
+      </section>
+      <section class="ev-list" id="viewList" hidden></section>
+    </div>
+    <aside class="ev-side" id="side"></aside>
+  </div>
+</main>
+
+<footer class="ev-foot">
+  <p><b>数据来源</b> <code>fantopia.io/fanapiWeb/eventsInfo/getEventsInfoPageV2</code> —— 服务端可能有 3 分钟缓存，刷新拿到的未必是毫秒级最新。</p>
+  <p><b>状态取值</b> <code>sellStatus</code> 实际枚举为 <code>0 待开始(待开售)</code> / <code>1 进行中</code> / <code>2 已售罄</code> / <code>3 已结束</code> / <code>4 缺货登记</code>；本页默认只取 <code>0</code>。</p>
+  <p><b>时间口径</b> <code>sellDateTime</code> 为北京时间（服务端 <code>siteTimeZone = +08:00</code>）。开售时间显示 2099 年的场次，代表该活动暂无公开场次、开售时间未定。</p>
+</footer>
+
+<script>
+(function () {
+  "use strict";
+
+  var API = "https://www.fantopia.io/fanapiWeb/eventsInfo/getEventsInfoPageV2";
+
+  /* 服务端 EventsTypeSellStatusEnum —— 注意：VO 上的注释是旧的，以枚举为准 */
+  var SELL = {
+    0: { t: "待开售",   c: "blue" },
+    1: { t: "热卖中",   c: ""     },
+    2: { t: "已售罄",   c: ""     },
+    3: { t: "已结束",   c: ""     },
+    4: { t: "缺货登记", c: ""     }
+  };
+  var TYPE  = { 1: "音乐节", 2: "演唱会", 3: "签售会", 4: "只卖周边" };
+  var SEAT  = { 0: "非关联座位", 1: "选座", 2: "关联座位" };
+  var PRE   = { 0: "关闭", 1: "开启·会员码先填", 2: "开启·会员码后填" };
+  var WD    = ["日", "一", "二", "三", "四", "五", "六"];
+
+  /* -------------------- 工具 -------------------- */
+  function esc(s) {
+    return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+    });
+  }
+  function pad(n) { return (n < 10 ? "0" : "") + n; }
+
+  /* "2026-09-24 12:00:00" 视作北京时间(+08:00)。
+     同时保留日历用的年月日分量，避免时区来回换算出错。 */
+  var RE_DT = /^(\d{4})-(\d{2})-(\d{2})(?:[ T](\d{2}):(\d{2})(?::(\d{2}))?)?/;
+  function parseBJ(s) {
+    if (!s) return null;
+    var m = RE_DT.exec(String(s));
+    if (!m) return null;
+    var y = +m[1], mo = +m[2], d = +m[3], hh = +(m[4] || 0), mi = +(m[5] || 0), ss = +(m[6] || 0);
+    return {
+      y: y, mo: mo, d: d, hh: hh, mi: mi, ss: ss,
+      ts: Date.UTC(y, mo - 1, d, hh - 8, mi, ss),   /* 真实 UTC 毫秒，用于倒计时 */
+      key: y + "-" + pad(mo) + "-" + pad(d),
+      hhmm: pad(hh) + ":" + pad(mi)
+    };
+  }
+  /* 开售时间未定的哨兵值（服务端塞 2099-01-01） */
+  function isTBD(dt) { return !dt || dt.y >= 2099; }
+
+  /* 北京时间下的"今天" */
+  function todayBJ() {
+    var n = new Date(Date.now() + 8 * 3600e3);
+    return { y: n.getUTCFullYear(), mo: n.getUTCMonth() + 1, d: n.getUTCDate() };
+  }
+  function dayKey(y, mo, d) { return y + "-" + pad(mo) + "-" + pad(d); }
+
+  function fmtYMD(dt) { return dt.mo + "月" + dt.d + "日"; }
+  function fmtFull(dt) {
+    return dt.y + "-" + pad(dt.mo) + "-" + pad(dt.d) + " " + dt.hhmm;
+  }
+  function fmtSpan(a, b) {
+    if (!a) return "—";
+    var s = a.y + "-" + pad(a.mo) + "-" + pad(a.d);
+    if (!b) return s;
+    if (a.y === b.y && a.mo === b.mo) return s + " ~ " + b.d + "日";
+    if (a.y === b.y) return s + " ~ " + pad(b.mo) + "-" + pad(b.d);
+    return s + " ~ " + b.y + "-" + pad(b.mo) + "-" + pad(b.d);
+  }
+  /* 分 → 货币字符串 */
+  function fmtPrice(cents, sym) {
+    if (cents == null || !isFinite(cents) || cents <= 0) return "";
+    var yuan = cents / 100;
+    var s = (yuan % 1 === 0) ? String(yuan) : yuan.toFixed(2);
+    return (sym || "") + " " + s;
+  }
+  function regionOf(title, loc) {
+    var t = String(title || "") + " " + String(loc || "");
+    var m = /[\[【]([^\]】]{1,8})[\]】]/.exec(t);
+    if (m) return m[1];
+    if (/香港|Hong Kong|Kowloon|AsiaWorld/i.test(t)) return "中国香港";
+    if (/澳门|Macau|MACAU/i.test(t)) return "中国澳门";
+    if (/台湾|Taipei|Kaohsiung/i.test(t)) return "中国台湾";
+    if (/泰国|Bangkok|Thailand|Rajamangala/i.test(t)) return "泰国";
+    if (/马来|Kuala|Malaysia|MYR/i.test(t)) return "马来西亚";
+    if (/新加坡|Singapore/i.test(t)) return "新加坡";
+    if (/日本|Tokyo|Osaka|Japan/i.test(t)) return "日本";
+    if (/韩国|Seoul|Korea|KRW/i.test(t)) return "韩国";
+    return "其他";
+  }
+  function countdown(ts) {
+    var left = ts - Date.now();
+    if (left <= 0) return { t: "已开售", over: true };
+    var s = Math.floor(left / 1000);
+    var d = Math.floor(s / 86400); s -= d * 86400;
+    var h = Math.floor(s / 3600);  s -= h * 3600;
+    var mi = Math.floor(s / 60);   var se = s - mi * 60;
+    return {
+      t: (d > 0 ? d + "天 " : "") + pad(h) + ":" + pad(mi) + ":" + pad(se),
+      over: false, soon: left < 6 * 3600e3
+    };
+  }
+
+  /* -------------------- 状态 -------------------- */
+  var ALL = [];          /* 全量（已解析） */
+  var VIEW = [];         /* 过滤后 */
+  var byDay = {};        /* dayKey → [rec] */
+  var cur = null;        /* {y, mo} 当前月 */
+  var selKey = null;     /* 选中日期 */
+  var mode = "month";
+  var fType = 0;         /* 0 = 全部 */
+  var fRegion = "";
+  var fStatus = "0";
+  var fText = "";
+  var loaded = false;
+  var picked = false;
+
+  var $ = function (id) { return document.getElementById(id); };
+
+  /* -------------------- 取数 -------------------- */
+  function load() {
+    var btn = $("refresh");
+    btn.disabled = true;
+    btn.classList.add("spin");
+    $("sync").textContent = "拉取中…";
+
+    var url = API + "?current=1&size=1000&_t=" + Date.now();
+
+    fetch(url, {
+      method: "GET",
+      /* Accept-Language 是服务端 @RequestHeader(required) —— 缺了会 500 Parameter error */
+      headers: { "Accept": "application/json, text/plain, */*", "Accept-Language": "zh-CN" },
+      credentials: "omit",
+      cache: "no-store"
+    })
+      .then(function (r) {
+        if (!r.ok) throw new Error("HTTP " + r.status);
+        return r.json();
+      })
+      .then(function (j) {
+        if (j.code !== 200) throw new Error(j.msg || ("接口返回 code=" + j.code));
+        var data = j.data || {};
+        parse(data.records || []);
+        var total = data.total;
+        var truncated = (total != null && total > (data.records || []).length);
+        $("sync").textContent = "更新于 " + new Date().toLocaleTimeString("zh-CN", { hour12: false }) +
+          (truncated ? "（已截断）" : "");
+        loaded = true;
+        btn.disabled = false;
+        btn.classList.remove("spin");
+        renderAll();
+      })
+      .catch(function (e) {
+        btn.disabled = false;
+        btn.classList.remove("spin");
+        $("sync").textContent = "载入失败";
+        fail(e);
+      });
+  }
+
+  function parse(records) {
+    ALL = [];
+    for (var i = 0; i < records.length; i++) {
+      var r = records[i];
+      var sell = parseBJ(r.sellDateTime);
+      var st = parseBJ(r.startTime);
+      var en = parseBJ(r.endTime);
+      ALL.push({
+        id: r.id,
+        title: r.title || "(无标题)",
+        type: r.type,
+        status: r.sellStatus,
+        sell: sell,
+        sellTsRaw: r.sellTimeStamp || null,
+        start: st,
+        end: en,
+        loc: r.location || "",
+        region: regionOf(r.title, r.location),
+        seat: r.chooseSeatFlag,
+        pre: r.preOrderFlag,
+        minPrice: r.minPrice,
+        symbol: r.symbol || r.symbolUnit || "",
+        img: r.detailInfoImg || r.ossUrl || r.carousel || r.ossUrlMini || r.wxMiniImg || "",
+        key: r.eventsKey || ""
+      });
+    }
+  }
+
+  /* -------------------- 过滤 -------------------- */
+  function statusOK(s) {
+    if (fStatus === "all") return true;
+    var list = fStatus.split(",");
+    for (var i = 0; i < list.length; i++) if (+list[i] === s) return true;
+    return false;
+  }
+  function apply() {
+    var q = fText.trim().toLowerCase();
+    VIEW = ALL.filter(function (r) {
+      if (!statusOK(r.status)) return false;
+      if (fType && r.type !== fType) return false;
+      if (fRegion && r.region !== fRegion) return false;
+      if (q) {
+        var hay = (r.title + " " + r.loc + " " + (TYPE[r.type] || "")).toLowerCase();
+        if (hay.indexOf(q) < 0) return false;
+      }
+      return true;
+    });
+    byDay = {};
+    VIEW.forEach(function (r) {
+      if (isTBD(r.sell)) { (byDay["TBD"] = byDay["TBD"] || []).push(r); return; }
+      (byDay[r.sell.key] = byDay[r.sell.key] || []).push(r);
+    });
+    Object.keys(byDay).forEach(function (k) {
+      byDay[k].sort(function (a, b) {
+        var av = a.sell ? a.sell.ts : 0, bv = b.sell ? b.sell.ts : 0;
+        return av - bv;
+      });
+    });
+  }
+
+  /* -------------------- 渲染 -------------------- */
+  function renderAll() {
+    apply();
+    /* 首次加载：跳到最近有待开售活动的月份 */
+    if (!picked) { picked = true; gotoFirst(); }
+    renderStats();
+    renderRegions();
+    renderMonth();
+    renderList();
+    renderSide();
+  }
+
+  function renderStats() {
+    var waiting = ALL.filter(function (r) { return r.status === 0; });
+    var soon = waiting.filter(function (r) { return r.sell && r.sell.ts > Date.now(); })
+      .sort(function (a, b) { return a.sell.ts - b.sell.ts; });
+    var regions = {};
+    waiting.forEach(function (r) { regions[r.region] = 1; });
+
+    var nextTxt = "—";
+    if (soon.length) {
+      var c = countdown(soon[0].sell.ts);
+      nextTxt = c.over ? "已开售" : c.t;
+    }
+    $("stats").innerHTML =
+      stat(waiting.length, "场", "待开售场次") +
+      stat(soon.length ? fmtYMD(soon[0].sell) + " " + soon[0].sell.hhmm : "—", "", "最近一场开售", true) +
+      stat(Object.keys(regions).length, "个", "覆盖地区") +
+      '<div class="ev-stat"><b id="statCd" style="font-size:19px">' + esc(nextTxt) +
+      "</b><u>距最近开售</u></div>";
+  }
+  function stat(v, unit, label, small) {
+    return '<div class="ev-stat"><b' + (small ? ' style="font-size:19px"' : "") + ">" +
+      esc(v) + (unit ? "<i>" + esc(unit) + "</i>" : "") + "</b><u>" + esc(label) + "</u></div>";
+  }
+
+  function renderRegions() {
+    var sel = $("regionSel");
+    var have = {}, total = 0;
+    ALL.forEach(function (r) {
+      if (!statusOK(r.status)) return;
+      have[r.region] = (have[r.region] || 0) + 1;
+      total++;
+    });
+    var keys = Object.keys(have).sort(function (a, b) { return have[b] - have[a]; });
+    var html = '<option value="">全部地区（' + total + '）</option>';
+    keys.forEach(function (k) {
+      html += '<option value="' + esc(k) + '"' + (fRegion === k ? " selected" : "") + ">" +
+        esc(k) + "（" + have[k] + "）</option>";
+    });
+    sel.innerHTML = html;
+
+    var chips = $("typeChips");
+    var want = [0].concat(Object.keys(TYPE).map(Number));
+    chips.innerHTML = want.map(function (t) {
+      var n = ALL.filter(function (r) {
+        return statusOK(r.status) && (!t || r.type === t);
+      }).length;
+      return '<button class="ev-chip' + (fType === t ? " on" : "") + '" data-t="' + t + '">' +
+        (t ? esc(TYPE[t]) : "全部") + " " + n + "</button>";
+    }).join("");
+  }
+
+  function renderMonth() {
+    var g = $("grid");
+    if (!cur) { g.innerHTML = ""; return; }
+    var y = cur.y, mo = cur.mo;
+    var first = new Date(Date.UTC(y, mo - 1, 1));
+    var lead = (first.getUTCDay() + 6) % 7;              /* 周一为一周起始 */
+    var days = new Date(Date.UTC(y, mo, 0)).getUTCDate();
+    var t = todayBJ();
+    var cells = [];
+
+    for (var i = 0; i < lead; i++) cells.push('<div class="ev-cell pad"></div>');
+    for (var d = 1; d <= days; d++) {
+      var k = dayKey(y, mo, d);
+      var list = byDay[k] || [];
+      var cls = "ev-cell";
+      if (list.length) cls += " has";
+      if (t.y === y && t.mo === mo && t.d === d) cls += " today";
+      if (selKey === k) cls += " sel";
+
+      var inner = '<span class="ev-dn">' + d + "</span>";
+      if (list.length) {
+        inner += '<div class="ev-minis">';
+        list.slice(0, 2).forEach(function (r) {
+          inner += '<div class="ev-mini" title="' + esc(r.sell.hhmm + " " + r.title) + '">' +
+            (r.img ? '<img src="' + esc(r.img) + '" alt="" loading="lazy" referrerpolicy="no-referrer">' : "") +
+            "<em>" + esc(r.sell.hhmm) + "</em><s>" + esc(r.title) + "</s></div>";
+        });
+        inner += "</div>";
+        if (list.length > 2) inner += '<div class="ev-more">还有 ' + (list.length - 2) + " 场</div>";
+      }
+      cells.push('<div class="' + cls + '" data-k="' + k + '">' + inner + "</div>");
+    }
+    /* 补齐尾部，保持网格整齐 */
+    while (cells.length % 7 !== 0) cells.push('<div class="ev-cell pad"></div>');
+    g.innerHTML = cells.join("");
+    updMLabel();
+    updCalTip();
+  }
+
+  /* 日历上只放"有确定开售时间"的场次；其余状态服务端不回填 sellDateTime，
+     放在这里说明一句，免得以为数据丢了。 */
+  function updCalTip() {
+    var tip = $("calTip");
+    if (!tip) return;
+    var tbd = (byDay["TBD"] || []).length;
+    if (!tbd) { tip.hidden = true; tip.innerHTML = ""; return; }
+    tip.hidden = false;
+    tip.innerHTML = "另有 <b>" + tbd + " 场</b>没有确定的开售时间（非「待开售」状态时服务端不回填 " +
+      "<code style='font-size:11px'>sellDateTime</code>），这些场次只在列表视图里出现。" +
+      '<a href="#" data-go="list">切到列表 →</a>';
+  }
+
+  /* 月份标题 + 该月开售场次 */
+  function updMLabel() {
+    if (!cur) { $("mLabel").innerHTML = "—"; return; }
+    var n = 0;
+    Object.keys(byDay).forEach(function (k) {
+      if (k === "TBD") return;
+      var p = k.split("-");
+      if (+p[0] === cur.y && +p[1] === cur.mo) n += byDay[k].length;
+    });
+    $("mLabel").innerHTML = "<b>" + cur.y + " 年 " + cur.mo + " 月</b>" +
+      "<small>" + (n ? n + " 场开售" : "无待开售") + "</small>";
+  }
+
+  function renderList() {
+    var box = $("viewList");
+    var upcoming = VIEW.filter(function (r) { return !isTBD(r.sell); })
+      .sort(function (a, b) { return a.sell.ts - b.sell.ts; });
+    var tbd = VIEW.filter(function (r) { return isTBD(r.sell); });
+
+    if (!upcoming.length && !tbd.length) {
+      box.innerHTML = emptyHTML("当前筛选下没有活动");
+      return;
+    }
+    var groups = {};
+    upcoming.forEach(function (r) {
+      var mk = r.sell.y + "-" + pad(r.sell.mo);
+      (groups[mk] = groups[mk] || []).push(r);
+    });
+    var html = "";
+    Object.keys(groups).sort().forEach(function (mk) {
+      var rs = groups[mk];
+      var dt = rs[0].sell;
+      html += '<div class="ev-grp"><div class="ev-grp-h"><b>' + dt.y + " 年 " + dt.mo + " 月</b><span>" +
+        rs.length + " 场</span></div>";
+      rs.forEach(function (r) { html += rowHTML(r); });
+      html += "</div>";
+    });
+    if (tbd.length) {
+      html += '<div class="ev-grp"><div class="ev-grp-h"><b>开售时间待定</b><span>' +
+        tbd.length + " 场</span></div>";
+      tbd.forEach(function (r) { html += rowHTML(r); });
+      html += "</div>";
+    }
+    box.innerHTML = html;
+  }
+
+  function rowHTML(r) {
+    var st = SELL[r.status] || { t: "?" };
+    var price = fmtPrice(r.minPrice, r.symbol);
+    return '<div class="ev-row" data-id="' + r.id + '">' +
+      (r.img ? '<img src="' + esc(r.img) + '" alt="" loading="lazy" referrerpolicy="no-referrer">' : "<img alt=''>") +
+      '<div class="ev-row-m"><b>' + esc(r.title) + "</b><span>" +
+      esc((TYPE[r.type] || "") + (r.loc ? " · " + r.loc : "")) +
+      (price ? " · " + esc(price) + " 起" : "") + "</span></div>" +
+      '<div class="ev-row-r"><b>' + (isTBD(r.sell) ? "待定" : esc(r.sell.hhmm)) + "</b><span>" +
+      esc(st.t) + (isTBD(r.sell) ? "" : " · " + esc(fmtYMD(r.sell))) + "</span></div></div>";
+  }
+
+  function emptyHTML(msg) {
+    return '<div class="ev-empty"><u>✦</u>' + esc(msg) + "</div>";
+  }
+
+  function renderSide() {
+    var box = $("side");
+    var list, head, sub;
+    if (selKey && selKey !== "TBD") {
+      list = byDay[selKey] || [];
+      var p = selKey.split("-");
+      var dt = new Date(Date.UTC(+p[0], +p[1] - 1, +p[2]));
+      head = "周" + WD[dt.getUTCDay()] + " · " + (+p[1]) + "月" + (+p[2]) + "日";
+      sub = list.length + " 场开售";
+    } else {
+      list = VIEW.filter(function (r) { return !isTBD(r.sell) && r.sell.ts > Date.now(); })
+        .sort(function (a, b) { return a.sell.ts - b.sell.ts; });
+      if (!list.length) list = VIEW.slice(0, 12);
+      head = "即将开售";
+      sub = list.length + " 场";
+    }
+
+    if (!list.length) {
+      box.innerHTML = '<div class="ev-side-h"><b>' + esc(head) + "</b></div>" +
+        '<div class="ev-note">这一天没有符合条件的活动。</div>';
+      return;
+    }
+    var html = '<div class="ev-side-h"><b>' + esc(head) + "</b><span>" + esc(sub) + "</span></div>";
+    html += list.slice(0, 20).map(cardHTML).join("");
+    box.innerHTML = html;
+  }
+
+  function cardHTML(r) {
+    var st = SELL[r.status] || { t: "?" };
+    var price = fmtPrice(r.minPrice, r.symbol);
+    var cd = r.sell && !isTBD(r.sell) ? countdown(r.sell.ts) : null;
+    var showCd = cd && !cd.over;
+
+    return '<article class="ev-card">' +
+      '<div class="ev-card-pic">' +
+      (r.img ? '<img src="' + esc(r.img) + '" alt="" loading="lazy" referrerpolicy="no-referrer">' : "") +
+      '<div class="ev-card-tags">' +
+      '<span class="ev-tag' + (st.c === "blue" ? " blue" : "") + '">' + esc(st.t) + "</span>" +
+      (TYPE[r.type] ? '<span class="ev-tag">' + esc(TYPE[r.type]) + "</span>" : "") +
+      (r.pre ? '<span class="ev-tag">预下单 ' + esc(PRE[r.pre] || r.pre) + "</span>" : "") +
+      "</div>" +
+      (showCd ? '<div class="ev-cd' + (cd.soon ? " soon" : "") + '" data-cd="' + r.sell.ts + '">距开售 ' +
+        esc(cd.t) + "</div>" : "") +
+      "</div>" +
+      '<div class="ev-card-b">' +
+      "<h3>" + esc(r.title) + "</h3>" +
+      (r.loc ? '<div class="ev-kv"><i>场地</i><b>' + esc(r.loc) + "</b></div>" : "") +
+      '<div class="ev-kv"><i>开售</i><b>' +
+      (isTBD(r.sell) ? "时间待定" : esc(fmtFull(r.sell))) + "</b></div>" +
+      '<div class="ev-kv"><i>演出</i><b>' + esc(fmtSpan(r.start, r.end)) + "</b></div>" +
+      (r.seat != null ? '<div class="ev-kv"><i>座位</i><b>' + esc(SEAT[r.seat] || ("模式 " + r.seat)) + "</b></div>" : "") +
+      (price ? '<div class="ev-kv"><i>票价</i><b>' + esc(price) + " 起</b></div>" : "") +
+      '<div class="ev-card-f">' +
+      '<a class="ev-go" href="https://www.fantopia.io/" target="_blank" rel="noopener">去 Fantopia</a>' +
+      '<button class="ev-copy" data-copy="' + esc(copyText(r)) + '">复制信息</button>' +
+      "</div></div></article>";
+  }
+
+  function copyText(r) {
+    return [
+      r.title,
+      r.loc ? "场地：" + r.loc : "",
+      isTBD(r.sell) ? "开售：时间待定" : "开售：" + fmtFull(r.sell),
+      "演出：" + fmtSpan(r.start, r.end),
+      TYPE[r.type] ? "类型：" + TYPE[r.type] : "",
+      r.seat != null ? "座位模式：" + (SEAT[r.seat] || r.seat) : "",
+      fmtPrice(r.minPrice, r.symbol) ? "票价：" + fmtPrice(r.minPrice, r.symbol) + " 起" : ""
+    ].filter(Boolean).join("\n");
+  }
+
+  /* -------------------- 交互 -------------------- */
+  function goMonth(delta) {
+    if (!cur) return;
+    var m = cur.mo + delta, y = cur.y;
+    if (m < 1) { m = 12; y--; }
+    if (m > 12) { m = 1; y++; }
+    cur = { y: y, mo: m };
+    selKey = null;
+    renderMonth();
+    renderSide();
+  }
+
+  function gotoToday() {
+    var t = todayBJ();
+    cur = { y: t.y, mo: t.mo };
+    selKey = dayKey(t.y, t.mo, t.d);
+    renderMonth();
+    renderSide();
+  }
+
+  function gotoFirst() {
+    var soon = VIEW.filter(function (r) { return !isTBD(r.sell); })
+      .sort(function (a, b) { return a.sell.ts - b.sell.ts; });
+    if (soon.length) cur = { y: soon[0].sell.y, mo: soon[0].sell.mo };
+    else { var t = todayBJ(); cur = { y: t.y, mo: t.mo }; }
+    selKey = null;
+  }
+
+  function onGridClick(e) {
+    var cell = e.target.closest(".ev-cell");
+    if (!cell || cell.classList.contains("pad")) return;
+    var k = cell.getAttribute("data-k");
+    selKey = (selKey === k) ? null : k;
+    renderMonth();
+    renderSide();
+    if (window.innerWidth <= 960 && selKey) {
+      $("side").scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  }
+
+  function onRowClick(e) {
+    var row = e.target.closest(".ev-row");
+    if (!row) return;
+    var id = row.getAttribute("data-id");
+    var r = null;
+    for (var i = 0; i < VIEW.length; i++) if (String(VIEW[i].id) === String(id)) { r = VIEW[i]; break; }
+    if (!r) return;
+    if (!isTBD(r.sell)) { cur = { y: r.sell.y, mo: r.sell.mo }; selKey = r.sell.key; }
+    setMode("month");
+    renderMonth();
+    renderSide();
+  }
+
+  function setMode(m) {
+    mode = m;
+    var btns = $("viewSeg").children;
+    for (var i = 0; i < btns.length; i++) btns[i].classList.toggle("on", btns[i].getAttribute("data-v") === m);
+    $("viewMonth").hidden = (m !== "month");
+    $("viewList").hidden = (m !== "list");
+    /* 月份导航只对月历有意义；列表是全部待开售的横向视图 */
+    $("barNav").style.display = (m === "month") ? "flex" : "none";
+  }
+
+  function onCopy(e) {
+    var b = e.target.closest(".ev-copy");
+    if (!b) return;
+    var t = b.getAttribute("data-copy") || "";
+    var done = function () {
+      var o = b.textContent;
+      b.textContent = "已复制";
+      setTimeout(function () { b.textContent = o; }, 1200);
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(t).then(done, function () { fallbackCopy(t, done); });
+    } else fallbackCopy(t, done);
+  }
+  function fallbackCopy(t, cb) {
+    var ta = document.createElement("textarea");
+    ta.value = t;
+    ta.style.cssText = "position:fixed;left:-9999px";
+    document.body.appendChild(ta);
+    ta.select();
+    try { document.execCommand("copy"); cb(); } catch (err) {}
+    document.body.removeChild(ta);
+  }
+
+  function tick() {
+    if (!loaded) return;
+    var nodes = document.querySelectorAll("[data-cd]");
+    for (var i = 0; i < nodes.length; i++) {
+      var c = countdown(+nodes[i].getAttribute("data-cd"));
+      nodes[i].textContent = c.over ? "已开售" : "距开售 " + c.t;
+      nodes[i].classList.toggle("soon", !!c.soon && !c.over);
+    }
+    /* 统计卡里的倒计时 */
+    var el = document.getElementById("statCd");
+    if (el) {
+      var soon = null, i;
+      for (i = 0; i < ALL.length; i++) {
+        if (ALL[i].status !== 0) continue;
+        var s = ALL[i].sell;
+        if (s && !isTBD(s) && s.ts > Date.now() && (soon === null || s.ts < soon)) soon = s.ts;
+      }
+      var cc = soon === null ? null : countdown(soon);
+      el.textContent = cc ? (cc.over ? "已开售" : cc.t) : "—";
+    }
+  }
+
+  function fail(e) {
+    var g = $("grid");
+    if (g) {
+      g.innerHTML = '<div class="ev-err" style="grid-column:1/-1">' +
+        "<b>拉取失败</b><p>" + esc(e && e.message ? e.message : String(e)) + "</p>" +
+        "<p style='margin-top:10px'>接口需要 <code>Accept-Language</code> 请求头，且依赖 fantopia.io 的 " +
+        "CORS 策略（当前为 <code>Access-Control-Allow-Origin: *</code>）。若在公司网络下，请检查是否被代理拦截。</p></div>";
+    }
+    var tip = $("calTip");
+    if (tip) { tip.hidden = true; tip.innerHTML = ""; }
+    var ul = $("viewList");
+    if (ul) ul.innerHTML = "";
+    $("side").innerHTML = "";
+  }
+
+  /* -------------------- 启动 -------------------- */
+  $("prevM").addEventListener("click", function () { goMonth(-1); });
+  $("nextM").addEventListener("click", function () { goMonth(1); });
+  $("todayBtn").addEventListener("click", gotoToday);
+  $("grid").addEventListener("click", onGridClick);
+  $("viewList").addEventListener("click", onRowClick);
+  $("side").addEventListener("click", onCopy);
+  $("refresh").addEventListener("click", load);
+  $("calTip").addEventListener("click", function (e) {
+    if (e.target.getAttribute("data-go") === "list") { e.preventDefault(); setMode("list"); }
+  });
+
+  $("viewSeg").addEventListener("click", function (e) {
+    var b = e.target.closest("button");
+    if (b) setMode(b.getAttribute("data-v"));
+  });
+  $("typeChips").addEventListener("click", function (e) {
+    var b = e.target.closest(".ev-chip");
+    if (!b) return;
+    fType = +b.getAttribute("data-t");
+    apply(); renderRegions(); renderMonth(); renderList(); renderSide();
+  });
+  $("regionSel").addEventListener("change", function () {
+    fRegion = this.value; apply(); renderMonth(); renderList(); renderSide();
+  });
+  $("statusSel").addEventListener("change", function () {
+    fStatus = this.value; apply(); renderRegions(); renderMonth(); renderList(); renderSide();
+  });
+  var qt = null;
+  $("q").addEventListener("input", function () {
+    var v = this.value;
+    clearTimeout(qt);
+    qt = setTimeout(function () {
+      fText = v; apply(); renderMonth(); renderList(); renderSide();
+    }, 180);
+  });
+  document.addEventListener("keydown", function (e) {
+    if (e.target.tagName === "INPUT" || e.target.tagName === "SELECT") return;
+    if (e.key === "ArrowLeft") goMonth(-1);
+    if (e.key === "ArrowRight") goMonth(1);
+    if (e.key === "/") { e.preventDefault(); $("q").focus(); }
+  });
+
+  /* 先渲染一次骨架月历，数据到了再填充 */
+  (function initSkeleton() {
+    var t = todayBJ();
+    cur = { y: t.y, mo: t.mo };
+    renderMonth();
+    $("side").innerHTML = '<div class="ev-sk" style="height:420px">' +
+      '<div class="bar" style="width:70%;margin-top:22px"></div><div class="bar" style="width:50%"></div>' +
+      '<div class="bar" style="width:80%"></div><div class="bar" style="width:60%"></div></div>';
+  })();
+
+  load();
+  setInterval(tick, 1000);
+})();
+</script>
+</body>
+</html>
