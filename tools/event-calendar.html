@@ -86,6 +86,20 @@ body{
 .ev-main{max-width:1180px;margin:0 auto;padding:40px 24px 40px}
 .ev-bar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:18px}
 .ev-bar-nav{display:flex;align-items:center;gap:10px}
+.ev-areapick{
+  display:flex;align-items:center;gap:7px;background:var(--paper);
+  border-radius:980px;padding:3px 4px 3px 15px;box-shadow:var(--sh-sm);
+  transition:box-shadow .18s var(--ease);
+}
+.ev-areapick span{
+  font-size:11.5px;font-weight:600;color:var(--gray-2);white-space:nowrap;
+}
+.ev-areapick select{
+  font:inherit;font-size:13.5px;font-weight:600;letter-spacing:-.01em;
+  color:var(--ink);background:transparent;border:none;outline:none;cursor:pointer;
+  padding:6px 4px 6px 0;max-width:158px;
+}
+.ev-areapick:focus-within{box-shadow:0 0 0 3.5px var(--blue-bg)}
 .ev-mnav{display:flex;align-items:center;gap:4px;background:var(--paper);border-radius:980px;padding:4px;box-shadow:var(--sh-sm)}
 .ev-mnav button{
   font:inherit;width:30px;height:30px;border:none;background:transparent;border-radius:50%;
@@ -317,7 +331,7 @@ body{
 <header class="ev-hero">
   <p class="ev-kicker">Fantopia · 开售日历</p>
   <h1>待开售演出</h1>
-  <p class="ev-sub">只收录「待开售」状态的场次，按开售时间归入日历。直连 Fantopia 公开接口实时拉取，不经过任何中间服务。</p>
+  <p class="ev-sub">只收录「待开售」状态的场次，按开售时间归入日历。接口按 <code>area</code> 请求头分区返回该地区上架的活动，可切换地区或合并全部地区查看。直连 Fantopia 公开接口实时拉取，不经过任何中间服务。</p>
   <div class="ev-stats" id="stats">
     <div class="ev-sk" style="flex:1 1 158px"><div class="bar" style="width:60%"></div><div class="bar" style="width:40%;height:22px"></div></div>
     <div class="ev-sk" style="flex:1 1 158px"><div class="bar" style="width:60%"></div><div class="bar" style="width:40%;height:22px"></div></div>
@@ -327,6 +341,10 @@ body{
 
 <main class="ev-main">
   <div class="ev-bar">
+    <label class="ev-areapick" title="接口按 area 请求头只返回该地区上架的活动">
+      <span>上架地区</span>
+      <select class="ev-sel" id="areaSel"></select>
+    </label>
     <span class="ev-bar-nav" id="barNav">
       <div class="ev-mnav">
         <button id="prevM" title="上一月">‹</button>
@@ -344,7 +362,7 @@ body{
   <div class="ev-filters">
     <input class="ev-search" id="q" type="search" placeholder="搜索演出、场地…" autocomplete="off">
     <div class="ev-chips" id="typeChips"></div>
-    <select class="ev-sel" id="regionSel"><option value="">全部地区</option></select>
+    <select class="ev-sel" id="regionSel"><option value="">全部举办地</option></select>
     <select class="ev-sel" id="statusSel">
       <option value="0" selected>仅待开售</option>
       <option value="0,1">待开售 + 热卖中</option>
@@ -367,6 +385,7 @@ body{
 
 <footer class="ev-foot">
   <p><b>数据来源</b> <code>fantopia.io/fanapiWeb/eventsInfo/getEventsInfoPageV2</code> —— 服务端可能有 3 分钟缓存，刷新拿到的未必是毫秒级最新。</p>
+  <p><b>上架地区</b> 接口按请求头 <code>area</code> 只返回该地区上架的活动，各地区的活动池并不互相包含（实测 <code>area=MY</code> 有 101 条在 <code>area=MO</code> 视角下不存在）。不传 <code>area</code> 时等同 <code>area=MO</code>。选「全部地区（合并）」会并发请求 10 个地区并按活动 id 去重，故耗时与流量都会明显增加。</p>
   <p><b>状态取值</b> <code>sellStatus</code> 实际枚举为 <code>0 待开始(待开售)</code> / <code>1 进行中</code> / <code>2 已售罄</code> / <code>3 已结束</code> / <code>4 缺货登记</code>；本页默认只取 <code>0</code>。</p>
   <p><b>时间口径</b> <code>sellDateTime</code> 为北京时间（服务端 <code>siteTimeZone = +08:00</code>）。开售时间显示 2099 年的场次，代表该活动暂无公开场次、开售时间未定。</p>
 </footer>
@@ -376,6 +395,25 @@ body{
   "use strict";
 
   var API = "https://www.fantopia.io/fanapiWeb/eventsInfo/getEventsInfoPageV2";
+
+  /* 上架地区：接口按请求头 area 返回该地区上架的活动。
+     注意：这不是「活动举办地」筛选 —— 各地区的活动池不同，
+     实测 area=MY 有 101 条在 MO 视角下根本不存在（如泰国的曼谷站）。
+     不传 area 时等同 area=MO（id 集合完全一致），故默认取 MO。 */
+  var AREAS = [
+    { c: "MO", n: "中国澳门" },
+    { c: "HK", n: "中国香港" },
+    { c: "CN", n: "中国大陆" },
+    { c: "MY", n: "马来西亚" },
+    { c: "TH", n: "泰国" },
+    { c: "SG", n: "新加坡" },
+    { c: "VN", n: "越南" },
+    { c: "PH", n: "菲律宾" },
+    { c: "ID", n: "印度尼西亚" },
+    { c: "AU", n: "澳大利亚" }
+  ];
+  var AREA_NAME = {};
+  AREAS.forEach(function (a) { AREA_NAME[a.c] = a.n; });
 
   /* 服务端 EventsTypeSellStatusEnum —— 注意：VO 上的注释是旧的，以枚举为准 */
   var SELL = {
@@ -477,81 +515,116 @@ body{
   var selKey = null;     /* 选中日期 */
   var mode = "month";
   var fType = 0;         /* 0 = 全部 */
-  var fRegion = "";
+  var fRegion = "";      /* 活动举办地筛选（从标题/场地提取） */
   var fStatus = "0";
   var fText = "";
+  var srcArea = "MO";    /* area 请求头：拉哪个地区上架的；"all" = 并行合并全部地区 */
   var loaded = false;
   var picked = false;
 
   var $ = function (id) { return document.getElementById(id); };
 
   /* -------------------- 取数 -------------------- */
+  /* 请求单个地区。area 是自定义头 → 会触发 CORS 预检，
+     服务端回 Access-Control-Allow-Headers: *，实测放行 */
+  function fetchArea(code) {
+    var url = API + "?current=1&size=1000&_t=" + Date.now();
+    return fetch(url, {
+      method: "GET",
+      headers: {
+        "Accept": "application/json, text/plain, */*",
+        /* Accept-Language 是服务端 @RequestHeader(required) —— 缺了会 500 Parameter error */
+        "Accept-Language": "zh-CN",
+        "area": code
+      },
+      credentials: "omit",
+      cache: "no-store"
+    }).then(function (r) {
+      if (!r.ok) throw new Error(AREA_NAME[code] + " HTTP " + r.status);
+      return r.json();
+    }).then(function (j) {
+      if (j.code !== 200) throw new Error(AREA_NAME[code] + " " + (j.msg || ("code=" + j.code)));
+      var data = j.data || {};
+      return { code: code, records: data.records || [], total: data.total };
+    });
+  }
+
   function load() {
     var btn = $("refresh");
     btn.disabled = true;
     btn.classList.add("spin");
-    $("sync").textContent = "拉取中…";
 
-    var url = API + "?current=1&size=1000&_t=" + Date.now();
+    var codes = (srcArea === "all")
+      ? AREAS.map(function (a) { return a.c; })
+      : [srcArea];
+    $("sync").textContent = codes.length > 1 ? ("并发拉取 " + codes.length + " 个地区…") : "拉取中…";
 
-    fetch(url, {
-      method: "GET",
-      /* Accept-Language 是服务端 @RequestHeader(required) —— 缺了会 500 Parameter error */
-      headers: { "Accept": "application/json, text/plain, */*", "Accept-Language": "zh-CN" },
-      credentials: "omit",
-      cache: "no-store"
-    })
-      .then(function (r) {
-        if (!r.ok) throw new Error("HTTP " + r.status);
-        return r.json();
-      })
-      .then(function (j) {
-        if (j.code !== 200) throw new Error(j.msg || ("接口返回 code=" + j.code));
-        var data = j.data || {};
-        parse(data.records || []);
-        var total = data.total;
-        var truncated = (total != null && total > (data.records || []).length);
-        $("sync").textContent = "更新于 " + new Date().toLocaleTimeString("zh-CN", { hour12: false }) +
-          (truncated ? "（已截断）" : "");
-        loaded = true;
-        btn.disabled = false;
-        btn.classList.remove("spin");
-        renderAll();
-      })
-      .catch(function (e) {
-        btn.disabled = false;
-        btn.classList.remove("spin");
-        $("sync").textContent = "载入失败";
-        fail(e);
+    Promise.all(codes.map(function (c) {
+      /* 单个地区失败不拖垮整体 */
+      return fetchArea(c).catch(function (e) { return { code: c, error: e, records: [], total: 0 }; });
+    })).then(function (groups) {
+      var ok = [], bad = [];
+      groups.forEach(function (g) { (g.error ? bad : ok).push(g); });
+
+      if (!ok.length) throw (bad[0] && bad[0].error) || new Error("全部地区拉取失败");
+
+      /* 合并去重：同 id 只留一条，记录它出现在哪些地区 */
+      var idx = {}, merged = [];
+      ok.forEach(function (g) {
+        g.records.forEach(function (r) {
+          var k = String(r.id);
+          if (idx[k]) { idx[k].areas.push(g.code); return; }
+          var rec = parseOne(r);
+          rec.areas = [g.code];
+          idx[k] = rec;
+          merged.push(rec);
+        });
       });
+      ALL = merged;
+
+      var truncated = false;
+      ok.forEach(function (g) { if (g.total != null && g.total > g.records.length) truncated = true; });
+
+      loaded = true;
+      btn.disabled = false;
+      btn.classList.remove("spin");
+
+      var t = new Date().toLocaleTimeString("zh-CN", { hour12: false });
+      var msg = "更新于 " + t;
+      if (codes.length > 1) msg += "（已合并 " + ok.length + "/" + codes.length + " 个地区）";
+      if (bad.length) msg += "，失败 " + bad.map(function (g) { return AREA_NAME[g.code]; }).join("/");
+      if (truncated) msg += "（已截断）";
+      $("sync").textContent = msg;
+
+      renderAll();
+    }).catch(function (e) {
+      btn.disabled = false;
+      btn.classList.remove("spin");
+      $("sync").textContent = "载入失败";
+      fail(e);
+    });
   }
 
-  function parse(records) {
-    ALL = [];
-    for (var i = 0; i < records.length; i++) {
-      var r = records[i];
-      var sell = parseBJ(r.sellDateTime);
-      var st = parseBJ(r.startTime);
-      var en = parseBJ(r.endTime);
-      ALL.push({
-        id: r.id,
-        title: r.title || "(无标题)",
-        type: r.type,
-        status: r.sellStatus,
-        sell: sell,
-        sellTsRaw: r.sellTimeStamp || null,
-        start: st,
-        end: en,
-        loc: r.location || "",
-        region: regionOf(r.title, r.location),
-        seat: r.chooseSeatFlag,
-        pre: r.preOrderFlag,
-        minPrice: r.minPrice,
-        symbol: r.symbol || r.symbolUnit || "",
-        img: r.detailInfoImg || r.ossUrl || r.carousel || r.ossUrlMini || r.wxMiniImg || "",
-        key: r.eventsKey || ""
-      });
-    }
+  function parseOne(r) {
+    return {
+      id: r.id,
+      title: r.title || "(无标题)",
+      type: r.type,
+      status: r.sellStatus,
+      sell: parseBJ(r.sellDateTime),
+      sellTsRaw: r.sellTimeStamp || null,
+      start: parseBJ(r.startTime),
+      end: parseBJ(r.endTime),
+      loc: r.location || "",
+      region: regionOf(r.title, r.location),
+      seat: r.chooseSeatFlag,
+      pre: r.preOrderFlag,
+      minPrice: r.minPrice,
+      symbol: r.symbol || r.symbolUnit || "",
+      img: r.detailInfoImg || r.ossUrl || r.carousel || r.ossUrlMini || r.wxMiniImg || "",
+      key: r.eventsKey || "",
+      areas: []
+    };
   }
 
   /* -------------------- 过滤 -------------------- */
@@ -622,6 +695,17 @@ body{
       esc(v) + (unit ? "<i>" + esc(unit) + "</i>" : "") + "</b><u>" + esc(label) + "</u></div>";
   }
 
+  /* 上架地区下拉（切换会重新请求接口，不是前端筛选） */
+  function renderAreaSel() {
+    var sel = $("areaSel");
+    var html = '<option value="all">全部地区（合并）</option>';
+    AREAS.forEach(function (a) {
+      html += '<option value="' + a.c + '">' + esc(a.n) + " " + a.c + "</option>";
+    });
+    sel.innerHTML = html;
+    sel.value = srcArea;
+  }
+
   function renderRegions() {
     var sel = $("regionSel");
     var have = {}, total = 0;
@@ -631,10 +715,10 @@ body{
       total++;
     });
     var keys = Object.keys(have).sort(function (a, b) { return have[b] - have[a]; });
-    var html = '<option value="">全部地区（' + total + '）</option>';
+    var html = '<option value="">全部举办地（' + total + ' 场）</option>';
     keys.forEach(function (k) {
       html += '<option value="' + esc(k) + '"' + (fRegion === k ? " selected" : "") + ">" +
-        esc(k) + "（" + have[k] + "）</option>";
+        esc(k) + "（" + have[k] + " 场）</option>";
     });
     sel.innerHTML = html;
 
@@ -815,6 +899,8 @@ body{
       '<div class="ev-kv"><i>演出</i><b>' + esc(fmtSpan(r.start, r.end)) + "</b></div>" +
       (r.seat != null ? '<div class="ev-kv"><i>座位</i><b>' + esc(SEAT[r.seat] || ("模式 " + r.seat)) + "</b></div>" : "") +
       (price ? '<div class="ev-kv"><i>票价</i><b>' + esc(price) + " 起</b></div>" : "") +
+      (r.areas && r.areas.length > 1 ? '<div class="ev-kv"><i>上架</i><b>' +
+        esc(r.areas.map(function (c) { return AREA_NAME[c] || c; }).join(" / ")) + "</b></div>" : "") +
       '<div class="ev-card-f">' +
       '<a class="ev-go" href="https://www.fantopia.io/" target="_blank" rel="noopener">去 Fantopia</a>' +
       '<button class="ev-copy" data-copy="' + esc(copyText(r)) + '">复制信息</button>' +
@@ -829,7 +915,9 @@ body{
       "演出：" + fmtSpan(r.start, r.end),
       TYPE[r.type] ? "类型：" + TYPE[r.type] : "",
       r.seat != null ? "座位模式：" + (SEAT[r.seat] || r.seat) : "",
-      fmtPrice(r.minPrice, r.symbol) ? "票价：" + fmtPrice(r.minPrice, r.symbol) + " 起" : ""
+      fmtPrice(r.minPrice, r.symbol) ? "票价：" + fmtPrice(r.minPrice, r.symbol) + " 起" : "",
+      (r.areas && r.areas.length > 1)
+        ? "上架地区：" + r.areas.map(function (c) { return AREA_NAME[c] || c; }).join(" / ") : ""
     ].filter(Boolean).join("\n");
   }
 
@@ -946,8 +1034,9 @@ body{
     if (g) {
       g.innerHTML = '<div class="ev-err" style="grid-column:1/-1">' +
         "<b>拉取失败</b><p>" + esc(e && e.message ? e.message : String(e)) + "</p>" +
-        "<p style='margin-top:10px'>接口需要 <code>Accept-Language</code> 请求头，且依赖 fantopia.io 的 " +
-        "CORS 策略（当前为 <code>Access-Control-Allow-Origin: *</code>）。若在公司网络下，请检查是否被代理拦截。</p></div>";
+        "<p style='margin-top:10px'>接口需要 <code>Accept-Language</code> 与 <code>area</code> 请求头，且依赖 fantopia.io 的 " +
+        "CORS 策略（当前为 <code>Access-Control-Allow-Origin: *</code>，<code>area</code> 属自定义头会触发预检，服务端已放行）。" +
+        "若在公司网络下，请检查是否被代理拦截。</p></div>";
     }
     var tip = $("calTip");
     if (tip) { tip.hidden = true; tip.innerHTML = ""; }
@@ -978,6 +1067,17 @@ body{
     fType = +b.getAttribute("data-t");
     apply(); renderRegions(); renderMonth(); renderList(); renderSide();
   });
+  /* 切换上架地区 = 换数据源，必须重新请求（不是前端筛选） */
+  $("areaSel").addEventListener("change", function () {
+    srcArea = this.value;
+    /* 换了活动池，原举办地筛选和选中日期都不再成立 */
+    fRegion = "";
+    fText = "";
+    $("q").value = "";
+    selKey = null;
+    picked = false;
+    load();
+  });
   $("regionSel").addEventListener("change", function () {
     fRegion = this.value; apply(); renderMonth(); renderList(); renderSide();
   });
@@ -1001,6 +1101,7 @@ body{
 
   /* 先渲染一次骨架月历，数据到了再填充 */
   (function initSkeleton() {
+    renderAreaSel();
     var t = todayBJ();
     cur = { y: t.y, mo: t.mo };
     renderMonth();

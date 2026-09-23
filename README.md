@@ -74,7 +74,7 @@ whaletool/
 | 随机抽签 | 支持无放回模式与滚动动画，适合决策 / 抽奖 | `tools/random-pick.html` |
 | 周报生成器 | 分类列表 + 状态标签 + 下周计划，贴合日常汇报格式 | `tools/weekly-report.html` |
 | 全屏时钟 | 全屏显示 + 倒计时 + 番茄钟，附 8 时区对照 | `tools/clock.html` |
-| 演出日历 | 直连 Fantopia 拉取待开售演出，按开售时间铺进月历，带倒计时 | `tools/event-calendar.html` |
+| 演出日历 | 直连 Fantopia 拉取待开售演出，按开售时间铺进月历，带倒计时；可按 `area` 请求头切地区或合并全部地区 | `tools/event-calendar.html` |
 
 ---
 
