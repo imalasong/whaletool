@@ -23,6 +23,7 @@
   --blue:#0071e3;
   --blue-h:#0077ed;
   --blue-bg:#eaf3ff;
+  --orange:#ff9500;
   --red:#e30000;
   --green:#00a862;
   --sh-sm:0 1px 3px rgba(0,0,0,.04), 0 4px 12px rgba(0,0,0,.05);
@@ -127,6 +128,10 @@ body{
 /* 维度切换：和「月历 / 列表」同形，但它是页面的主开关，所以站在左边、用纸白底 */
 .ev-dim{margin-left:0;background:var(--paper);box-shadow:var(--sh-sm)}
 .ev-dim button{padding:6px 15px}
+/* 每个维度按钮前一个色点，直接预告这一档日历的点色 */
+.ev-dim button::before{content:"";display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:7px;vertical-align:0}
+.ev-dim button[data-d="sell"]::before{background:var(--blue)}
+.ev-dim button[data-d="show"]::before{background:var(--orange)}
 
 .ev-filters{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:22px}
 .ev-search{
@@ -198,9 +203,12 @@ body{
 .ev-line{margin-top:auto;display:flex;align-items:center;gap:6px;min-width:0}
 .ev-dots{display:flex;align-items:center;gap:3px;flex:none}
 .ev-dots i{width:6px;height:6px;border-radius:50%;background:var(--blue);flex:none}
-.ev-dots i.pre{background:#e2942b}
+.ev-dots i.ring{background:transparent;box-shadow:inset 0 0 0 1.5px var(--blue)}
 .ev-dots i.mis{background:#c9c9d0}
 .ev-dots i.over{background:#dedee4}
+/* 演出日程换橙系：实心 = 还没开卖，空心 = 已在售，浅灰 = 演出已过 */
+.ev-cal[data-dim="show"] .ev-dots i{background:var(--orange)}
+.ev-cal[data-dim="show"] .ev-dots i.ring{box-shadow:inset 0 0 0 1.5px var(--orange)}
 .ev-dots u{
   text-decoration:none;margin-left:2px;font-size:10px;font-weight:600;
   color:var(--gray-2);font-variant-numeric:tabular-nums;
@@ -211,6 +219,7 @@ body{
 }
 .ev-when.dim{color:var(--gray-2);font-weight:500}
 .ev-cell.has:hover .ev-when{color:var(--blue)}
+.ev-cal[data-dim="show"] .ev-cell.has:hover .ev-when{color:var(--orange)}
 
 /* 图例：解释点色与红字 / 「班」的含义 */
 .ev-legend{
@@ -219,11 +228,17 @@ body{
 }
 .ev-legend u{text-decoration:none;display:inline-flex;align-items:center;gap:5px}
 .ev-legend i{width:7px;height:7px;border-radius:50%;background:var(--blue);flex:none}
-.ev-legend i.pre{background:#e2942b}
+.ev-legend i.ring{background:transparent;box-shadow:inset 0 0 0 1.5px var(--blue)}
+.ev-legend i.mis{background:#c9c9d0}
 .ev-legend i.over{background:#dedee4}
 .ev-legend i.hb{background:#c8402f}
 .ev-legend i.hw{width:15px;height:14px;border-radius:4px;background:#ececf0}
 .ev-legend em{margin-left:auto;font-style:normal;font-size:11px;color:var(--gray-2)}
+.ev-cal[data-dim="show"] .ev-legend i{background:var(--orange)}
+.ev-cal[data-dim="show"] .ev-legend i.ring{box-shadow:inset 0 0 0 1.5px var(--orange)}
+/* 图例分组：小标签 + 竖分隔线（「日程」口径 ｜ 「日期」口径） */
+.ev-legend .ev-lg{font-size:10px;font-weight:600;letter-spacing:.05em;color:var(--gray-2);margin-right:2px}
+.ev-legend .ev-lsep{width:1px;height:13px;background:var(--line);margin:0 10px;flex:none}
 
 /* 日历下方提示（如：有 N 场开售时间待定，不上日历） */
 .ev-tip{
@@ -357,10 +372,7 @@ body{
 .ev-cal.busy{opacity:.82;transition:opacity .3s var(--ease)}
 .ev-list.busy{opacity:.82;transition:opacity .3s var(--ease)}
 
-/* 演出视图的第二个状态色：还没开卖（要点是「要盯」而不是「会员购」） */
-.ev-dots i.warn{background:#e2942b}
-.ev-legend i.warn{background:#e2942b}
-/* 演出视图里「演出时间」是主角，字号提一档 */
+/* 演出日程里「演出时间」是主角，字号提一档 */
 .ev-kv.hi b{font-weight:600;color:var(--ink)}
 
 /* 骨架 */
@@ -402,8 +414,8 @@ body{
 </nav>
 
 <header class="ev-hero">
-  <p class="ev-kicker">Fantopia · 开售 / 演出双日历</p>
-  <h1 id="heroTitle">待开售演出</h1>
+  <p class="ev-kicker">Fantopia · 开售日程 / 演出日程</p>
+  <h1 id="heroTitle">开售日程</h1>
   <p class="ev-sub" id="heroSub">以<b>场次</b>为单位收录开售时间 —— 一个活动下的每个场次各有自己的开售时间，日历按场次铺。直连 Fantopia 公开接口实时拉取，不经过任何中间服务。</p>
   <div class="ev-stats" id="stats">
     <div class="ev-sk" style="flex:1 1 158px"><div class="bar" style="width:60%"></div><div class="bar" style="width:40%;height:22px"></div></div>
@@ -418,9 +430,9 @@ body{
       <span>上架地区</span>
       <select class="ev-sel" id="areaSel"></select>
     </label>
-    <div class="ev-seg ev-dim" id="dimSeg" title="开售时间：按每个场次的开售时间铺日历（抢票用）；演出时间：按演出当天铺日历（看演出用）">
-      <button data-d="sell" class="on">开售时间</button>
-      <button data-d="show">演出时间</button>
+    <div class="ev-seg ev-dim" id="dimSeg" title="开售日程：按每个场次的开售时间铺日历（抢票用）；演出日程：按每个场次的演出日期铺日历（看演出用）">
+      <button data-d="sell" class="on">开售日程</button>
+      <button data-d="show">演出日程</button>
     </div>
     <span class="ev-bar-nav" id="barNav">
       <div class="ev-mnav">
@@ -440,7 +452,7 @@ body{
     <input class="ev-search" id="q" type="search" placeholder="搜索演出、场地、场次备注…" autocomplete="off">
     <div class="ev-chips" id="typeChips"></div>
     <select class="ev-sel" id="regionSel"><option value="">全部举办地</option></select>
-    <select class="ev-sel" id="whenSel" title="按场次的开售时间过滤（演出视图下不适用，自动隐藏）">
+    <select class="ev-sel" id="whenSel" title="按场次的开售时间过滤（演出日程下不适用，自动隐藏）">
       <option value="wait" selected>仅待开售场次</option>
       <option value="all">含已开售场次</option>
     </select>
@@ -448,7 +460,7 @@ body{
 
   <div class="ev-body">
     <div id="colMain">
-      <section class="ev-cal" id="viewMonth">
+      <section class="ev-cal" id="viewMonth" data-dim="sell">
         <div class="ev-week"><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span><span>日</span></div>
         <div class="ev-grid" id="grid"></div>
         <div class="ev-legend" id="legend"></div>
@@ -1078,14 +1090,15 @@ body{
   /* 演出维度不按售票状态过滤：票卖完了，「那天有这场演出」这件事依然成立，照样要标出来 */
   function dimOK(r) { return dim === "show" ? true : whenOK(r); }
 
-  /* 月格上那一个点的颜色。两个维度各成体系，图例会跟着换 */
+  /* 月格上那一个点的颜色。开售 = 蓝系，演出 = 橙系；实心 / 空心 / 灰 表达状态。 */
   function dotClass(r) {
     if (dim === "show") {
-      if (r.ended) return "over";     /* 演出已过 */
-      return r.next ? "warn" : "";     /* 还没开卖 = 要盯；已在售 = 主色 */
+      if (r.ended) return "over";      /* 演出已过 → 浅灰 */
+      return r.next ? "" : "ring";      /* 还没开卖 → 橙实心；已在售 → 橙空心 */
     }
-    if (!isWait(r)) return "over";
-    return r.stype === 3 ? "pre" : r.stype === 1 ? "" : "mis";
+    if (!isWait(r)) return "over";      /* 已开售 → 浅灰 */
+    /* 公开发售(1) → 蓝实心；会员购(3) → 蓝空心；缺货登记(2) → 灰 */
+    return r.stype === 3 ? "ring" : r.stype === 1 ? "" : "mis";
   }
 
   /* 演出维度的数据源：把「同一活动 + 同一演出时间」的多个开售批次合成一场演出。
@@ -1269,15 +1282,18 @@ body{
     }).join("");
   }
 
-  /* 图例随维度变 —— 不然「琥珀点」在两个维度下含义不同，用户会读错 */
+  /* 图例随维度变。分两组：「日程」口径（开售/演出，点色随维度换）、「日期」口径（休息日/调休，恒定） */
   function renderLegend() {
     var el = $("legend");
     if (!el) return;
     var dots = dim === "show"
-      ? '<u><i class="warn"></i>待开售</u><u><i></i>已在售</u><u><i class="over"></i>演出已过</u>'
-      : '<u><i></i>待开售</u><u><i class="pre"></i>会员购</u>' +
+      ? '<u><i></i>未开卖</u><u><i class="ring"></i>已在售</u><u><i class="over"></i>演出已过</u>'
+      : '<u><i></i>待开售</u><u><i class="ring"></i>会员购</u>' +
         '<u><i class="mis"></i>缺货登记</u><u><i class="over"></i>已开售</u>';
-    el.innerHTML = dots +
+    el.innerHTML = '<span class="ev-lg">' + (dim === "show" ? "演出日程" : "开售日程") + "</span>" +
+      dots +
+      '<span class="ev-lsep"></span>' +
+      '<span class="ev-lg">日期</span>' +
       '<u><i class="hb"></i>休息日</u><u><i class="hw"></i>调休上班</u><em id="holiNote"></em>';
     updHoliNote();
   }
@@ -1901,10 +1917,11 @@ body{
     }
     /* 「仅待开售 / 含已开售」只对开售维度有意义；演出维度一律全铺 */
     $("whenSel").hidden = (d === "show");
-    $("heroTitle").textContent = d === "show" ? "演出日程" : "待开售演出";
+    $("viewMonth").setAttribute("data-dim", d);
+    $("heroTitle").textContent = d === "show" ? "演出日程" : "开售日程";
     $("heroSub").innerHTML = d === "show"
-      ? "以<b>演出</b>为单位把表演铺进月历 —— 同一场演出即使分批开卖也只算一场，" +
-        "点色区分「还没开卖 / 已在售 / 演出已过」。与「开售时间」视图同一份数据，切换不重新请求。"
+      ? "以<b>演出</b>为单位把表演铺进月历 —— 按每个场次的<b>演出日期</b>定位，同一场演出即使分批开卖也只算一场，" +
+        "点色区分「还没开卖 / 已在售 / 演出已过」。与「开售日程」同一份数据，切换不重新请求。"
       : "以<b>场次</b>为单位收录开售时间 —— 一个活动下的每个场次各有自己的开售时间，日历按场次铺。" +
         "直连 Fantopia 公开接口实时拉取，不经过任何中间服务。";
     /* 换了基准日，原来的选中日期和举办地筛选都不再成立 */
