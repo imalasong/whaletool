@@ -194,7 +194,7 @@ body{
 .ev-dn{
   align-self:flex-start;
   font-size:15.5px;font-weight:700;line-height:1.15;
-  color:var(--gray-2);font-variant-numeric:tabular-nums;letter-spacing:-.02em;
+  color:var(--ink-2);font-variant-numeric:tabular-nums;letter-spacing:-.02em;
 }
 .ev-cell.has .ev-dn{color:var(--ink)}
 /* 休息日红字（中国日历惯例）：法定节假日深一档，普通周末浅一档 */
@@ -212,12 +212,11 @@ body{
 .ev-cell.today:hover{background:var(--blue)}
 .ev-cell.today .ev-dn{color:#fff}
 .ev-cell.today .ev-fn{color:rgba(255,255,255,.92)}
-.ev-cell.today .ev-when{color:#fff}
-.ev-cell.today.has:hover .ev-when{color:#fff}
-.ev-cell.today .ev-dots u{color:rgba(255,255,255,.85)}
-.ev-cell.today .ev-dots i{background:#fff}
-.ev-cell.today .ev-dots i.ring{background:transparent;box-shadow:inset 0 0 0 1.5px #fff}
-.ev-cell.today .ev-dots i.mis,.ev-cell.today .ev-dots i.over{background:rgba(255,255,255,.45)}
+.ev-cell.today .ev-name i{background:#fff}
+.ev-cell.today .ev-name i.ring{background:transparent;box-shadow:inset 0 0 0 1.5px #fff}
+.ev-cell.today .ev-name i.mis,.ev-cell.today .ev-name i.over{background:rgba(255,255,255,.45)}
+.ev-cell.today .ev-name b{color:#fff}
+.ev-cell.today .ev-more{color:rgba(255,255,255,.85)}
 .ev-cell.today.sel{border-color:#fff}
 /* 右上角角标：法定假「休」/ 调休「班」（万年历式的角签） */
 .ev-badge{
@@ -226,27 +225,25 @@ body{
   padding:3px 5px 3px 6px;border-radius:3px 9px 3px 9px;
 }
 .ev-badge.work{color:var(--ink-2);background:#ececf0}
-/* 第二行：场次点阵（一场一点）+ 最近一场开售时间 */
-.ev-line{margin-top:auto;display:flex;align-items:center;gap:6px;min-width:0}
-.ev-dots{display:flex;align-items:center;gap:3px;flex:none}
-.ev-dots i{width:6px;height:6px;border-radius:50%;background:var(--blue);flex:none}
-.ev-dots i.ring{background:transparent;box-shadow:inset 0 0 0 1.5px var(--blue)}
-.ev-dots i.mis{background:#c9c9d0}
-.ev-dots i.over{background:#dedee4}
-/* 演出日程换橙系：实心 = 还没开卖，空心 = 已在售，浅灰 = 演出已过 */
-.ev-cal[data-dim="show"] .ev-dots i{background:var(--orange)}
-.ev-cal[data-dim="show"] .ev-dots i.ring{box-shadow:inset 0 0 0 1.5px var(--orange)}
-.ev-dots u{
-  text-decoration:none;margin-left:2px;font-size:10px;font-weight:600;
-  color:var(--gray-2);font-variant-numeric:tabular-nums;
+/* 活动名称列表：每行「色点 + 名称」，最多 5 个，超出 +N（万年历式的格内罗列） */
+.ev-names{margin-top:6px;display:flex;flex-direction:column;gap:3px;min-width:0}
+.ev-name{
+  display:flex;align-items:center;gap:5px;min-width:0;
+  font-size:10.5px;font-weight:500;color:var(--ink-2);line-height:1.25;letter-spacing:-.01em;
 }
-.ev-when{
-  margin-left:auto;flex:none;font-size:10.5px;font-weight:600;color:var(--ink-2);
+.ev-name i{width:6px;height:6px;border-radius:50%;background:var(--blue);flex:none}
+.ev-name i.ring{background:transparent;box-shadow:inset 0 0 0 1.5px var(--blue)}
+.ev-name i.mis{background:#c9c9d0}
+.ev-name i.over{background:#dedee4}
+.ev-name b{font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+/* 演出日程换橙系：实心 = 还没开卖，空心 = 已在售，浅灰 = 演出已过 */
+.ev-cal[data-dim="show"] .ev-name i{background:var(--orange)}
+.ev-cal[data-dim="show"] .ev-name i.ring{box-shadow:inset 0 0 0 1.5px var(--orange)}
+.ev-more{
+  margin-top:1px;font-size:10px;font-weight:600;color:var(--gray-2);
   font-variant-numeric:tabular-nums;letter-spacing:-.02em;
 }
-.ev-when.dim{color:var(--gray-2);font-weight:500}
-.ev-cell.has:hover .ev-when{color:var(--blue)}
-.ev-cal[data-dim="show"] .ev-cell.has:hover .ev-when{color:var(--orange)}
+.ev-cell.has:hover .ev-name b{color:var(--ink)}
 
 /* 图例：解释点色与红字 / 「班」的含义 */
 .ev-legend{
@@ -418,8 +415,8 @@ body{
   .ev-dn{font-size:13px}
   .ev-badge{top:4px;right:5px;font-size:8.5px;padding:2px 4px 2px 5px}
   .ev-mstrip button{padding:3px 6px}
-  .ev-when{display:none}
-  .ev-dots i{width:5px;height:5px}
+  .ev-name{font-size:9.5px;gap:4px}
+  .ev-name i{width:5px;height:5px}
   .ev-cal{padding:12px;border-radius:var(--r-lg)}
   .ev-legend{gap:5px 10px;font-size:11px}
   .ev-legend em{display:none}
@@ -1359,34 +1356,24 @@ body{
       if (dtag) tip.push(dtag);
 
       if (list.length) {
-        /* 月格的职责是「定位哪天有事」，不是罗列 —— 一场一点，点数即场次数
-           （超过 4 场用 +N 收口）。两个维度的点色含义不同，图例会跟着变。 */
-        var MAXD = 4;
-        inner += '<div class="ev-line"><span class="ev-dots">' +
-          list.slice(0, MAXD).map(function (r) {
+        /* 活动名称直接罗列：按活动去重，最多 5 个，超出 +N。色点表达状态。 */
+        var MAXN = 5;
+        var seen = {}, uniq = [];
+        list.forEach(function (r) {
+          if (seen[r.key]) return;
+          seen[r.key] = 1;
+          uniq.push(r);
+        });
+        inner += '<div class="ev-names">' +
+          uniq.slice(0, MAXN).map(function (r) {
             var dc = dotClass(r);
-            return dc ? '<i class="' + dc + '"></i>' : "<i></i>";
+            return '<span class="ev-name">' + (dc ? '<i class="' + dc + '"></i>' : "<i></i>") +
+              "<b>" + esc(shortName(r.title)) + "</b></span>";
           }).join("") +
-          (list.length > MAXD ? "<u>+" + (list.length - MAXD) + "</u>" : "") +
-          "</span>";
+          (uniq.length > MAXN ? '<span class="ev-more">+' + (uniq.length - MAXN) + " 更多</span>" : "") +
+          "</div>";
 
-        /* 右侧那行时间留给「最近一个还没到的时刻」：
-           开售维度 = 最近一场开售；演出维度 = 当天首场开演 */
-        var when = "", dimWhen = false;
-        if (dim === "show") {
-          when = list[0].show.hhmm;
-        } else {
-          var next = null, tbd = false;
-          list.forEach(function (r) {
-            if (isTBD(r.sell)) { tbd = true; return; }
-            if (!isWait(r)) return;
-            if (!next || r.sell.ts < next.sell.ts) next = r;
-          });
-          if (next) when = next.sell.hhmm + " 起";
-          else { when = tbd ? "待定" : "已开售"; dimWhen = true; }
-        }
-        inner += '<span class="ev-when' + (dimWhen ? " dim" : "") + '">' + esc(when) + "</span>";
-        inner += "</div>";
+        /* 开售 / 演出时间等细节已放进 title 提示，格内只罗列名称，保持干净。 */
 
         list.forEach(function (r) {
           if (dim === "show") {
