@@ -155,46 +155,72 @@ body{
 .ev-week{display:grid;grid-template-columns:repeat(7,1fr);gap:5px;margin-bottom:6px}
 .ev-week span{text-align:left;padding-left:9px;font-size:11.5px;font-weight:600;color:var(--gray);letter-spacing:0}
 .ev-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:5px}
+/* 日期格 = 「定位哪天有事」的入口，不承担罗列职责（详情在右侧面板）。
+   所以格内只放：日期数字 + 场次点阵 + 最近一场开售时间，全部等高。 */
 .ev-cell{
-  min-height:106px;border-radius:var(--r-md);padding:6px;
+  min-height:64px;border-radius:var(--r-md);padding:6px 7px;
   background:transparent;cursor:pointer;border:1.5px solid transparent;
   transition:background .18s var(--ease),box-shadow .18s var(--ease),
              border-color .18s var(--ease),transform .18s var(--ease);
   overflow:hidden;position:relative;
+  display:flex;flex-direction:column;
 }
 .ev-cell:hover{background:rgba(0,0,0,.035)}
 .ev-cell.pad{background:transparent;cursor:default;pointer-events:none}
 .ev-cell.has{background:var(--paper);border-color:transparent;box-shadow:0 1px 2px rgba(0,0,0,.05)}
 .ev-cell.has:hover{background:var(--paper);box-shadow:var(--sh-sm);transform:translateY(-1px)}
 .ev-cell.sel{border-color:var(--blue);box-shadow:0 0 0 3.5px var(--blue-bg)}
-.ev-cell.today .dn{background:var(--ink);color:#fff}
 .ev-dn{
+  align-self:flex-start;
   display:inline-flex;align-items:center;justify-content:center;
   width:22px;height:22px;border-radius:50%;font-size:11.5px;font-weight:600;
   color:var(--gray);font-variant-numeric:tabular-nums;
 }
 .ev-cell.has .ev-dn{color:var(--ink)}
-.ev-cell.today .ev-dn{color:#fff}
-.ev-minis{margin-top:4px;display:flex;flex-direction:column;gap:3px}
-.ev-mini{
-  display:flex;align-items:center;gap:4px;background:var(--blue-bg);
-  border-radius:6px;padding:3px 4px;min-width:0;
+/* 休息日红字（中国日历惯例）：法定节假日深一档，普通周末浅一档 */
+.ev-cell.wknd .ev-dn{color:#c5827c}
+.ev-cell.holi .ev-dn{color:#c8402f}
+/* 调休上班日本质是「工作日」—— 数字回到中性色，靠角标「班」区分 */
+.ev-cell.shif .ev-dn{color:var(--gray)}
+/* 今天：实心圆底反白，优先级高于以上全部 */
+.ev-cell.today .ev-dn{background:var(--ink);color:#fff}
+.ev-cell.today.holi .ev-dn,.ev-cell.today.wknd .ev-dn{background:#c8402f;color:#fff}
+/* 右上角角标：节日名 / 调休「班」 */
+.ev-badge{
+  position:absolute;top:7px;right:8px;font-size:10.5px;font-weight:600;
+  line-height:1;color:#c8402f;letter-spacing:-.02em;
 }
-.ev-mini img{width:14px;height:14px;border-radius:3px;object-fit:cover;flex:none;background:#dbe6f5}
-.ev-mini em{
-  font-style:normal;font-size:10px;font-weight:600;color:var(--blue);
-  font-variant-numeric:tabular-nums;flex:none;letter-spacing:-.02em;
+.ev-badge.work{color:var(--gray);background:#ececf0;border-radius:4px;padding:2px 4px;font-size:9.5px}
+/* 第二行：场次点阵（一场一点）+ 最近一场开售时间 */
+.ev-line{margin-top:auto;display:flex;align-items:center;gap:6px;min-width:0}
+.ev-dots{display:flex;align-items:center;gap:3px;flex:none}
+.ev-dots i{width:6px;height:6px;border-radius:50%;background:var(--blue);flex:none}
+.ev-dots i.pre{background:#e2942b}
+.ev-dots i.mis{background:#c9c9d0}
+.ev-dots i.over{background:#dedee4}
+.ev-dots u{
+  text-decoration:none;margin-left:2px;font-size:10px;font-weight:600;
+  color:var(--gray-2);font-variant-numeric:tabular-nums;
 }
-.ev-mini s{
-  text-decoration:none;font-size:10.5px;color:var(--ink-2);white-space:nowrap;
-  overflow:hidden;text-overflow:ellipsis;min-width:0;flex:1;
+.ev-when{
+  margin-left:auto;flex:none;font-size:10.5px;font-weight:600;color:var(--ink-2);
+  font-variant-numeric:tabular-nums;letter-spacing:-.02em;
 }
-/* 已开售的场次：降饱和，跟待开售区分开 */
-.ev-mini.over{background:#f1f1f4}
-.ev-mini.over em{color:var(--gray-2)}
-.ev-mini.over s{color:var(--gray-2)}
-.ev-mini.over img{opacity:.55}
-.ev-more{margin-top:3px;font-size:10px;color:var(--gray-2);padding-left:2px}
+.ev-when.dim{color:var(--gray-2);font-weight:500}
+.ev-cell.has:hover .ev-when{color:var(--blue)}
+
+/* 图例：解释点色与红字 / 「班」的含义 */
+.ev-legend{
+  display:flex;align-items:center;flex-wrap:wrap;gap:6px 14px;
+  margin-top:12px;font-size:11.5px;color:var(--gray);letter-spacing:0;
+}
+.ev-legend u{text-decoration:none;display:inline-flex;align-items:center;gap:5px}
+.ev-legend i{width:7px;height:7px;border-radius:50%;background:var(--blue);flex:none}
+.ev-legend i.pre{background:#e2942b}
+.ev-legend i.over{background:#dedee4}
+.ev-legend i.hb{background:#c8402f}
+.ev-legend i.hw{width:15px;height:14px;border-radius:4px;background:#ececf0}
+.ev-legend em{margin-left:auto;font-style:normal;font-size:11px;color:var(--gray-2)}
 
 /* 日历下方提示（如：有 N 场开售时间待定，不上日历） */
 .ev-tip{
@@ -326,10 +352,14 @@ body{
 @media (max-width:640px){
   .ev-hero{padding-top:40px}
   .ev-main{padding-left:16px;padding-right:16px}
-  .ev-cell{min-height:64px;padding:5px}
-  .ev-mini s{display:none}
-  .ev-mini em{font-size:9.5px}
+  .ev-cell{min-height:56px;padding:5px}
+  .ev-dn{width:19px;height:19px;font-size:10.5px}
+  .ev-badge{top:5px;right:5px;font-size:9.5px}
+  .ev-when{display:none}
+  .ev-dots i{width:5px;height:5px}
   .ev-cal{padding:12px;border-radius:var(--r-lg)}
+  .ev-legend{gap:5px 10px;font-size:11px}
+  .ev-legend em{display:none}
   .ev-seg{margin-left:0}
 }
 </style>
@@ -400,6 +430,14 @@ body{
       <section class="ev-cal" id="viewMonth">
         <div class="ev-week"><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span><span>日</span></div>
         <div class="ev-grid" id="grid"></div>
+        <div class="ev-legend" id="legend">
+          <u><i></i>待开售</u>
+          <u><i class="pre"></i>会员购</u>
+          <u><i class="over"></i>已开售</u>
+          <u><i class="hb"></i>休息日</u>
+          <u><i class="hw"></i>调休上班</u>
+          <em id="holiNote"></em>
+        </div>
         <div class="ev-tip" id="calTip" hidden></div>
       </section>
       <section class="ev-list" id="viewList" hidden></section>
@@ -452,6 +490,49 @@ body{
   var STYPE = { 1: "公开发售", 2: "缺货登记", 3: "会员购" };
   var SEAT  = { 0: "非关联座位", 1: "选座", 2: "关联座位" };
   var WD    = ["日", "一", "二", "三", "四", "五", "六"];
+
+  /* -------------------- 中国节假日（2026） --------------------
+     数据源：国务院办公厅《关于 2026 年部分节假日安排的通知》（2025-11-04）。
+     HOLI = 放假日 → 角标文字；SHIF = 调休上班日（周末补班）。
+     2027 年及以后国务院尚未公布，届时不标调休、只作提示。 */
+  var HOLI_YEAR = 2026;
+  var HOLI = {
+    "2026-01-01": "元旦", "2026-01-02": "元旦", "2026-01-03": "元旦",
+    "2026-02-15": "春节", "2026-02-16": "除夕", "2026-02-17": "春节",
+    "2026-02-18": "春节", "2026-02-19": "春节", "2026-02-20": "春节",
+    "2026-02-21": "春节", "2026-02-22": "春节", "2026-02-23": "春节",
+    "2026-04-04": "清明", "2026-04-05": "清明", "2026-04-06": "清明",
+    "2026-05-01": "劳动节", "2026-05-02": "劳动节", "2026-05-03": "劳动节",
+    "2026-05-04": "劳动节", "2026-05-05": "劳动节",
+    "2026-06-19": "端午", "2026-06-20": "端午", "2026-06-21": "端午",
+    "2026-09-25": "中秋", "2026-09-26": "中秋", "2026-09-27": "中秋",
+    "2026-10-01": "国庆", "2026-10-02": "国庆", "2026-10-03": "国庆",
+    "2026-10-04": "国庆", "2026-10-05": "国庆", "2026-10-06": "国庆",
+    "2026-10-07": "国庆"
+  };
+  var SHIF = {
+    "2026-01-04": 1, "2026-02-14": 1, "2026-02-28": 1,
+    "2026-05-09": 1, "2026-09-20": 1, "2026-10-10": 1
+  };
+
+  /* 日期格的四态：holi 法定节假日 / shif 调休上班 / wknd 普通周末 / 工作日。
+     法定节假日优先于周末（国庆里的周六仍是「假期」），调休优先于周末（要上班）。 */
+  function dayZone(k, dow) {
+    if (HOLI[k]) return "holi";
+    if (SHIF[k]) return "shif";
+    return (dow === 0 || dow === 6) ? "wknd" : "";
+  }
+  function dayBadge(k, zone) {
+    if (zone === "holi") return { t: HOLI[k], work: false };
+    if (zone === "shif") return { t: "班", work: true };
+    return null;
+  }
+  /* 给某天补一句说明：节假日 / 调休 / 周末（withWeekend 时） */
+  function dayTag(k, dow, withWeekend) {
+    if (HOLI[k]) return HOLI[k] + "假期";
+    if (SHIF[k]) return "调休上班";
+    return (withWeekend && (dow === 0 || dow === 6)) ? "周" + WD[dow] : "";
+  }
 
   /* -------------------- 工具 -------------------- */
   function esc(s) {
@@ -970,32 +1051,73 @@ body{
     for (var d = 1; d <= days; d++) {
       var k = dayKey(y, mo, d);
       var list = byDay[k] || [];
+      var dow = new Date(Date.UTC(y, mo - 1, d)).getUTCDay();
+      var zone = dayZone(k, dow);
       var cls = "ev-cell";
       if (list.length) cls += " has";
+      if (zone) cls += " " + zone;
       if (t.y === y && t.mo === mo && t.d === d) cls += " today";
       if (selKey === k) cls += " sel";
 
       var inner = '<span class="ev-dn">' + d + "</span>";
+      var bd = dayBadge(k, zone);
+      if (bd) inner += '<span class="ev-badge' + (bd.work ? " work" : "") + '">' + esc(bd.t) + "</span>";
+
+      var tip = [];
+      var dtag = dayTag(k, dow, true);
+      if (dtag) tip.push(dtag);
+
       if (list.length) {
-        inner += '<div class="ev-minis">';
-        list.slice(0, 2).forEach(function (r) {
-          inner += '<div class="ev-mini' + (isWait(r) ? "" : " over") + '" title="' +
-            esc(r.sell.hhmm + " 开售 · " + r.title +
-              (r.show ? " ｜ 演出 " + fmtYMD(r.show) + " " + r.show.hhmm : "") +
-              (STYPE[r.stype] ? " ｜ " + STYPE[r.stype] : "")) + '">' +
-            (r.img ? '<img src="' + esc(r.img) + '" alt="" loading="lazy" referrerpolicy="no-referrer">' : "") +
-            "<em>" + esc(r.sell.hhmm) + "</em><s>" + esc(shortName(r.title)) + "</s></div>";
+        /* 一天多场不再「只列两场 + 还有 N 场」：改成一场一点的点阵，
+           点数即场次数（超过 4 场用 +N 收口），点色表示发售方式。
+           具体哪几场由右侧面板和悬停提示给 —— 月格的职责是定位，不是罗列。 */
+        var MAXD = 4;
+        inner += '<div class="ev-line"><span class="ev-dots">' +
+          list.slice(0, MAXD).map(function (r) {
+            var dc = !isWait(r) ? "over" : (r.stype === 3 ? "pre" : r.stype === 1 ? "" : "mis");
+            return dc ? '<i class="' + dc + '"></i>' : "<i></i>";
+          }).join("") +
+          (list.length > MAXD ? "<u>+" + (list.length - MAXD) + "</u>" : "") +
+          "</span>";
+
+        /* 时间取「最近一个还没开售的场次」，全部开售了就写已开售 */
+        var next = null, tbd = false;
+        list.forEach(function (r) {
+          if (isTBD(r.sell)) { tbd = true; return; }
+          if (!isWait(r)) return;
+          if (!next || r.sell.ts < next.sell.ts) next = r;
         });
+        inner += next
+          ? '<span class="ev-when">' + esc(next.sell.hhmm) + " 起</span>"
+          : '<span class="ev-when dim">' + (tbd ? "待定" : "已开售") + "</span>";
         inner += "</div>";
-        if (list.length > 2) inner += '<div class="ev-more">还有 ' + (list.length - 2) + " 场</div>";
+
+        list.forEach(function (r) {
+          tip.push((isTBD(r.sell) ? "时间待定" : r.sell.hhmm) + " 开售 · " +
+            (STYPE[r.stype] || "开售") +
+            (r.show ? " · 演出 " + fmtYMD(r.show) + " " + r.show.hhmm : "") +
+            " · " + shortName(r.title));
+        });
       }
-      cells.push('<div class="' + cls + '" data-k="' + k + '">' + inner + "</div>");
+      cells.push('<div class="' + cls + '" data-k="' + k + '"' +
+        (tip.length ? ' title="' + esc(tip.join("\n")) + '"' : "") + ">" + inner + "</div>");
     }
     /* 补齐尾部，保持网格整齐 */
     while (cells.length % 7 !== 0) cells.push('<div class="ev-cell pad"></div>');
     g.innerHTML = cells.join("");
     updMLabel();
+    updHoliNote();
     updCalTip();
+  }
+
+  /* 节假日数据只到国务院已公布的年份：翻到之后的年份要说清楚，
+     否则「没有红字」会被误读成「那年没有假期」。 */
+  function updHoliNote() {
+    var el = $("holiNote");
+    if (!el || !cur) return;
+    el.textContent = cur.y > HOLI_YEAR
+      ? cur.y + " 年放假安排国务院尚未公布，暂不标注"
+      : "节假日：国务院 " + HOLI_YEAR + " 年安排";
   }
 
   /* 扫描范围有限：服务端一旦活动里有票可买就直接判「热卖中」返回，
@@ -1121,7 +1243,9 @@ body{
       groups = groupByEvent(list);
       var p = selKey.split("-");
       var dt = new Date(Date.UTC(+p[0], +p[1] - 1, +p[2]));
-      head = "周" + WD[dt.getUTCDay()] + " · " + (+p[1]) + "月" + (+p[2]) + "日";
+      var dtag = dayTag(selKey, dt.getUTCDay(), false);
+      head = "周" + WD[dt.getUTCDay()] + " · " + (+p[1]) + "月" + (+p[2]) + "日" +
+        (dtag ? " · " + dtag : "");
       /* 报数按活动去重，不然一个活动 4 场会让人以为有 4 个活动 */
       sub = groups.length + " 个活动 · 共 " + list.length + " 场";
     } else {
