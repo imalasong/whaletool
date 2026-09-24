@@ -124,6 +124,9 @@ body{
   transition:all .2s var(--ease);
 }
 .ev-seg button.on{background:var(--paper);color:var(--ink);box-shadow:0 1px 3px rgba(0,0,0,.1)}
+/* 维度切换：和「月历 / 列表」同形，但它是页面的主开关，所以站在左边、用纸白底 */
+.ev-dim{margin-left:0;background:var(--paper);box-shadow:var(--sh-sm)}
+.ev-dim button{padding:6px 15px}
 
 .ev-filters{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:22px}
 .ev-search{
@@ -340,6 +343,26 @@ body{
 .ev-err b{display:block;font-size:15px;font-weight:600;color:var(--red);margin-bottom:8px}
 .ev-err p{font-size:12.5px;color:var(--gray);line-height:1.7;word-break:break-all}
 
+/* ---------------- 载入进度 ---------------- */
+/* 细进度线：加载时替代「转圈的按钮」。放在顶栏下沿，不占布局、不打断阅读 */
+.ev-prog{position:absolute;left:0;right:0;bottom:-1px;height:2px;overflow:hidden;pointer-events:none}
+.ev-prog i{
+  display:block;height:100%;width:100%;background:var(--blue);
+  transform:scaleX(0);transform-origin:0 50%;opacity:0;
+  transition:transform .4s var(--ease),opacity .35s var(--ease);
+}
+.ev-prog.on i{opacity:1}
+.ev-prog.done i{opacity:0}
+/* 数据还没齐时整块降一档存在感，齐了回到正常 —— 不用遮罩，不打断已经看到的内容 */
+.ev-cal.busy{opacity:.82;transition:opacity .3s var(--ease)}
+.ev-list.busy{opacity:.82;transition:opacity .3s var(--ease)}
+
+/* 演出视图的第二个状态色：还没开卖（要点是「要盯」而不是「会员购」） */
+.ev-dots i.warn{background:#e2942b}
+.ev-legend i.warn{background:#e2942b}
+/* 演出视图里「演出时间」是主角，字号提一档 */
+.ev-kv.hi b{font-weight:600;color:var(--ink)}
+
 /* 骨架 */
 .ev-sk{background:var(--paper);border-radius:var(--r-lg);box-shadow:var(--sh-sm);overflow:hidden}
 .ev-sk .bar{
@@ -375,12 +398,13 @@ body{
       <button class="ev-ibtn" id="refresh">刷新</button>
     </div>
   </div>
+  <div class="ev-prog" id="prog"><i></i></div>
 </nav>
 
 <header class="ev-hero">
-  <p class="ev-kicker">Fantopia · 开售日历</p>
-  <h1>待开售演出</h1>
-  <p class="ev-sub">以<b>场次</b>为单位收录待开售的开售时间 —— 一个活动下的每个场次各有自己的开售时间，日历按场次铺。直连 Fantopia 公开接口实时拉取，不经过任何中间服务。</p>
+  <p class="ev-kicker">Fantopia · 开售 / 演出双日历</p>
+  <h1 id="heroTitle">待开售演出</h1>
+  <p class="ev-sub" id="heroSub">以<b>场次</b>为单位收录开售时间 —— 一个活动下的每个场次各有自己的开售时间，日历按场次铺。直连 Fantopia 公开接口实时拉取，不经过任何中间服务。</p>
   <div class="ev-stats" id="stats">
     <div class="ev-sk" style="flex:1 1 158px"><div class="bar" style="width:60%"></div><div class="bar" style="width:40%;height:22px"></div></div>
     <div class="ev-sk" style="flex:1 1 158px"><div class="bar" style="width:60%"></div><div class="bar" style="width:40%;height:22px"></div></div>
@@ -394,13 +418,10 @@ body{
       <span>上架地区</span>
       <select class="ev-sel" id="areaSel"></select>
     </label>
-    <label class="ev-areapick" title="查哪些活动的场次。活动一旦有票可买，服务端就判「热卖中」并停止往下判断场次，所以热卖中的活动里可能还藏着未开售的加场">
-      <span>场次范围</span>
-      <select class="ev-sel" id="scanSel">
-        <option value="waiting" selected>待开售活动</option>
-        <option value="all">全部未结束活动</option>
-      </select>
-    </label>
+    <div class="ev-seg ev-dim" id="dimSeg" title="开售时间：按每个场次的开售时间铺日历（抢票用）；演出时间：按演出当天铺日历（看演出用）">
+      <button data-d="sell" class="on">开售时间</button>
+      <button data-d="show">演出时间</button>
+    </div>
     <span class="ev-bar-nav" id="barNav">
       <div class="ev-mnav">
         <button id="prevM" title="上一月">‹</button>
@@ -419,7 +440,7 @@ body{
     <input class="ev-search" id="q" type="search" placeholder="搜索演出、场地、场次备注…" autocomplete="off">
     <div class="ev-chips" id="typeChips"></div>
     <select class="ev-sel" id="regionSel"><option value="">全部举办地</option></select>
-    <select class="ev-sel" id="whenSel" title="按场次的开售时间过滤">
+    <select class="ev-sel" id="whenSel" title="按场次的开售时间过滤（演出视图下不适用，自动隐藏）">
       <option value="wait" selected>仅待开售场次</option>
       <option value="all">含已开售场次</option>
     </select>
@@ -430,14 +451,7 @@ body{
       <section class="ev-cal" id="viewMonth">
         <div class="ev-week"><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span><span>日</span></div>
         <div class="ev-grid" id="grid"></div>
-        <div class="ev-legend" id="legend">
-          <u><i></i>待开售</u>
-          <u><i class="pre"></i>会员购</u>
-          <u><i class="over"></i>已开售</u>
-          <u><i class="hb"></i>休息日</u>
-          <u><i class="hw"></i>调休上班</u>
-          <em id="holiNote"></em>
-        </div>
+        <div class="ev-legend" id="legend"></div>
         <div class="ev-tip" id="calTip" hidden></div>
       </section>
       <section class="ev-list" id="viewList" hidden></section>
@@ -559,30 +573,42 @@ body{
     if (!m) return null;
     return mkDT(+m[1], +m[2], +m[3], +(m[4] || 0), +(m[5] || 0), +(m[6] || 0));
   }
-  /* 场次的演出时间。注意格式和别处不一样：
+  /* 场次的演出时间。格式很不统一，实测见过的写法：
      - seriesDate 形如 "2026-11-20"（有值时优先）
-     - title 形如 "2026/11/20 20:00"，也有 "2027/01/10 7PM" 这种 12 小时制 */
-  function parseShow(s) {
+     - title 形如 "2026/11/20 20:00"
+     - 12 小时制 "2027/01/10 7PM"、时分连写无冒号 "2026/11/08 830PM" / "730PM"
+     - 多日通票 "雙日通票 11/8 - 11/9"、"2 DAYS 18:00"、"VIP BOX 包厢" 完全没有年份
+     后一类解析不出，退回活动层的 startTime（活动首场）—— 总比丢掉强。
+     实测 285 个场次里 12 条属于这类。 */
+  function parseShow(s, fb) {
     var raw = (s.seriesDate && String(s.seriesDate).trim()) || String(s.title || "");
-    var m = /(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})/.exec(raw);
-    if (!m) return null;
+    var m = /(\d{4})[\/\-.](\d{1,2})[\/\-.](\d{1,2})/.exec(raw);
+    if (!m) return fb || null;
     var y = +m[1], mo = +m[2], d = +m[3], hh = 0, mi = 0;
     var rest = raw.slice(m.index + m[0].length);
     var hm = /(\d{1,2})\s*[:：]\s*(\d{2})/.exec(rest);
     if (hm) {
       hh = +hm[1]; mi = +hm[2];
     } else {
-      var ap = /(\d{1,2})\s*(AM|PM)/i.exec(rest);
-      if (ap) {
-        hh = +ap[1]; mi = 0;
-        if (/PM/i.test(ap[2]) && hh < 12) hh += 12;
-        if (/AM/i.test(ap[2]) && hh === 12) hh = 0;
+      var ap = /(\d{1,4})\s*(AM|PM)/i.exec(rest);
+      var v = ap ? ap[1] : null;
+      if (!v) {
+        /* 1930 这种连写（无 AM/PM） */
+        var h4 = /(?:^|[\s(（])(\d{3,4})(?!\d)/.exec(rest);
+        if (h4) v = h4[1];
+      }
+      if (v) {
+        if (v.length > 2) { hh = +v.slice(0, v.length - 2); mi = +v.slice(-2); }
+        else { hh = +v; mi = 0; }
+        if (ap && /PM/i.test(ap[2]) && hh < 12) hh += 12;
+        if (ap && /AM/i.test(ap[2]) && hh === 12) hh = 0;
       } else {
         var h3 = /(\d{1,2})/.exec(rest);
         if (h3) hh = +h3[1];
       }
     }
-    if (hh > 23) hh = 0;
+    if (!(hh >= 0 && hh <= 23)) { hh = 0; mi = 0; }
+    if (!(mi >= 0 && mi <= 59)) mi = 0;
     return mkDT(y, mo, d, hh, mi, 0);
   }
   /* 开售时间未定的哨兵值（服务端塞 2099-01-01） */
@@ -635,23 +661,88 @@ body{
 
   /* -------------------- 状态 -------------------- */
   var EVENTS = [];       /* 活动（按 area 拉到的原始列表，已解析） */
-  var ALL = [];          /* 全量场次（已展开，一条 = 一个场次） */
-  var VIEW = [];         /* 过滤后 */
-  var byDay = {};        /* dayKey → [sess] */
+  var ALL = [];          /* 全量场次（已展开，一条 = 一个「开售批次」） */
+  var SHOWS = [];        /* 全量演出（按「活动 + 演出时间」去重后的表演场） */
+  var VIEW = [];         /* 当前维度下过滤后的列表 */
+  var byDay = {};        /* dayKey → [当前维度的记录] */
   var cur = null;        /* {y, mo} 当前月 */
   var selKey = null;     /* 选中日期 */
   var mode = "month";
   var fType = 0;         /* 0 = 全部 */
   var fRegion = "";      /* 活动举办地筛选（从标题/场地提取） */
-  var fWhen = "wait";    /* wait = 只看待开售场次；selling = 含正在开售 */
+  var fWhen = "wait";    /* 开售维度：wait = 只看待开售场次；all = 含已开售 */
   var fText = "";
   var srcArea = "all";   /* area 请求头：拉哪个地区上架的；"all" = 并行合并全部地区（默认） */
-  var scan = "waiting";  /* 深扫范围：waiting = 只查待开售活动；all = 查全部未结束活动 */
+  var dim = "sell";      /* 维度：sell = 按开售时间铺；show = 按演出时间铺 */
   var sessCache = {};    /* eventsKey → 场次原始数组；换地区时清空 */
   var loaded = false;
   var picked = false;
+  var loading = false;   /* 正在取数（用于进度线与「数据未齐」状态） */
 
   var $ = function (id) { return document.getElementById(id); };
+
+  /* -------------------- 上次结果缓存 --------------------
+     刷新一次要等 3~6 秒（10 个地区 + 30 多个活动的场次），这段时间页面不该是空的。
+     所以把上次的结果落在 localStorage，进来先原样渲染，再在后台静默换成新的。
+     换地区会让缓存失效（活动池不同），超过 CACHE_TTL 也不再用，免得拿隔夜数据骗人。 */
+  var CACHE_KEY = "wt.evcal.v3";
+  var CACHE_TTL = 12 * 3600e3;
+
+  function readCache() {
+    try {
+      var raw = localStorage.getItem(CACHE_KEY);
+      if (!raw) return null;
+      var o = JSON.parse(raw);
+      if (!o || !o.t || !o.ALL || !o.ALL.length) return null;
+      if (Date.now() - o.t > CACHE_TTL) return null;
+      if (o.area !== srcArea) return null;
+      return o;
+    } catch (e) { return null; }
+  }
+  function writeCache() {
+    if (!loaded || !ALL.length) return;
+    try {
+      var s = JSON.stringify({ t: Date.now(), area: srcArea, EVENTS: EVENTS, ALL: ALL });
+      /* localStorage 一般 5MB，留足余量；超了宁可不缓存 */
+      if (s.length > 3.2e6) return;
+      localStorage.setItem(CACHE_KEY, s);
+    } catch (e) { /* 隐私模式 / 配额满：静默降级为「每次都拉」 */ }
+  }
+
+  /* -------------------- 载入态 -------------------- */
+  function sync(t) { $("sync").textContent = t; }
+
+  /* 顶栏下沿的细进度线：p ∈ [0,1] 有进度；p = -1 收线 */
+  function prog(p) {
+    var el = $("prog"), bar = el.firstChild;
+    if (p < 0) {
+      el.classList.remove("on");
+      /* 等淡出结束再归零，否则会看到进度条倒着扫回去 */
+      setTimeout(function () { bar.style.transform = "scaleX(0)"; }, 420);
+      return;
+    }
+    el.classList.add("on");
+    bar.style.transform = "scaleX(" + Math.max(0.02, Math.min(1, p)) + ")";
+  }
+
+  /* 数据还没齐时整块降一档存在感 —— 比盖一层遮罩温和，已经看到的内容还能继续读 */
+  function busy(on) {
+    $("viewMonth").classList.toggle("busy", on);
+    $("viewList").classList.toggle("busy", on);
+  }
+
+  /* 节流：流式补数据时不能每来一条就整块重渲染（一次 renderMonth 要重建 42 个格子） */
+  function throttle(fn, ms) {
+    var last = 0, timer = null;
+    var run = function () { last = Date.now(); timer = null; fn(); };
+    var wrapped = function () {
+      var left = ms - (Date.now() - last);
+      if (left <= 0) { if (timer) { clearTimeout(timer); timer = null; } run(); }
+      else if (!timer) timer = setTimeout(run, left);
+    };
+    wrapped.flush = function () { if (timer) { clearTimeout(timer); timer = null; } fn(); };
+    return wrapped;
+  }
 
   /* -------------------- 取数 -------------------- */
   /* 请求单个地区。area 是自定义头 → 会触发 CORS 预检，
@@ -727,7 +818,7 @@ body{
     });
   }
 
-  /* keepCache=true 时保留已拉到的场次（切扫描范围用它，只补拉新活动） */
+  /* keepCache=false 时丢弃已拉到的场次（换地区用）；true 则保留，只补新的 */
   function load(keepCache) {
     var btn = $("refresh");
     btn.disabled = true;
@@ -736,9 +827,12 @@ body{
     var codes = (srcArea === "all")
       ? AREAS.map(function (a) { return a.c; })
       : [srcArea];
-    $("sync").textContent = codes.length > 1 ? ("并发拉取 " + codes.length + " 个地区…") : "拉取中…";
-
     if (!keepCache) sessCache = {};
+
+    loading = true;
+    busy(true);
+    prog(0.08);
+    sync(codes.length > 1 ? ("并发拉取 " + codes.length + " 个地区…") : "拉取中…");
 
     Promise.all(codes.map(function (c) {
       /* 单个地区失败不拖垮整体 */
@@ -767,35 +861,46 @@ body{
         var truncated = false;
         ok.forEach(function (g) { if (g.total != null && g.total > g.records.length) truncated = true; });
 
-        /* 只深扫「有可能还有未开售场次」的活动：
-           - waiting：活动层状态 = 待开售（服务端判定「还有场次没到开售时间」）
-           - all    ：放宽到热卖中 / 已售罄，捞「已在卖但后面还有加场」的情况
-           已结束(3) 的活动不可能有未开售场次，直接跳过 —— 能省掉八成以上请求。 */
-        var targets = EVENTS.filter(function (e) {
-          if (!e.key) return false;
-          return scan === "all" ? (e.status !== 3) : (e.status === 0);
+        /* 查哪些活动的场次？
+           只要是「没结束」的活动就查 —— 不能拿活动层状态当闸门：
+           calcEventsStatus() 一见到活动里有票可买就直接判「热卖中」并 return，
+           根本不往下看场次，所以一个「热卖中」的活动完全可能藏着还没开售的加场。
+           已结束(3) 的活动不可能有未开售场次，跳过 —— 能省掉八成以上请求。 */
+        var targets = EVENTS.filter(function (e) { return e.key && e.status !== 3; });
+
+        /* 排序只为让首屏先落到最有用的那天：待开售的活动排最前。
+           顺序不影响最终结果，只影响等待时的观感。 */
+        targets.sort(function (a, b) {
+          var sa = a.status === 0 ? 0 : 1, sb = b.status === 0 ? 0 : 1;
+          if (sa !== sb) return sa - sb;
+          return (a.sell ? a.sell.ts : Infinity) - (b.sell ? b.sell.ts : Infinity);
         });
 
         if (!targets.length) {
           ALL = [];
-          renderAll();
+          renderAll(true);
           finish(btn, ok, bad, truncated, [], 0);
           return;
         }
 
         var keys = targets.map(function (e) { return e.key; });
-        /* 场次数据按 eventsKey 缓存：从「待开售活动」切到「全部未结束活动」
-           只需补拉新增的那些，切回来则是零请求。 */
         var need = keys.filter(function (k) { return !sessCache[k]; });
+        prog(0.45);
+
+        /* sessOf[k] 的三种取值，用来区分「还没拉到」和「拉到了但没数据」：
+             undefined = 还没拉（先不画，免得一会儿又得撤掉）
+             null      = 拉失败（退回活动层兜底）
+             [] / 数组 = 该活动的场次 */
         var sessOf = {};
         keys.forEach(function (k) { if (sessCache[k]) sessOf[k] = sessCache[k]; });
 
-        var expand = function (failed) {
-          /* 展开：一条 = 一个场次 */
+        /* 从当前已拿到的场次重建 ALL 并重绘。流式补数时会被反复调用 */
+        var refreshView = function (final) {
           ALL = [];
           targets.forEach(function (ev) {
             var list = sessOf[ev.key];
-            if (list == null) { addFallback(ALL, ev); return; }
+            if (list === undefined) return;
+            if (list === null) { addFallback(ALL, ev); return; }
             var live = [], k;
             for (k = 0; k < list.length; k++) {
               if (list[k].status != null && list[k].status !== 1) continue;   /* 0 = 场次无效 */
@@ -809,16 +914,22 @@ body{
             /* 该活动一个可用场次都没有（无公开场次 / 请求失败）→ 退回活动层兜底 */
             if (!live.length) addFallback(ALL, ev);
           });
-          renderAll();
-          finish(btn, ok, bad, truncated, failed, targets.length);
+          renderAll(final);
         };
 
-        if (!need.length) { expand([]); return; }
+        if (!need.length) { refreshView(true); finish(btn, ok, bad, truncated, [], targets.length); return; }
 
-        $("sync").textContent = "拉取 " + need.length + " 个活动的场次… 0/" + need.length;
+        /* 进度：地区占前 45%，场次从 45% 走到 100% */
+        var streamed = 0;
+        var paint = throttle(function () {
+          refreshView(false);
+          prog(0.45 + 0.55 * (streamed / need.length));
+        }, 260);
 
         pool(need, 6, fetchSessions, function (n, tot) {
-          if (n === tot || n % 4 === 0) $("sync").textContent = "拉取场次 " + n + "/" + tot;
+          streamed = n;
+          if (n === tot || n % 3 === 0) sync("拉取场次 " + n + "/" + tot + " …");
+          paint();
         }).then(function (res) {
           var failed = [];
           res.forEach(function (r, i) {
@@ -826,28 +937,42 @@ body{
             sessCache[need[i]] = r.ok;
             sessOf[need[i]] = r.ok;
           });
-          expand(failed);
+          paint.flush();
+          refreshView(true);
+          finish(btn, ok, bad, truncated, failed, targets.length);
         });
       })
       .catch(function (e) {
         btn.disabled = false;
         btn.classList.remove("spin");
-        $("sync").textContent = "载入失败";
+        loading = false;
+        busy(false);
+        prog(-1);
+        sync("载入失败");
         fail(e);
       });
   }
 
   function finish(btn, ok, bad, truncated, failed, nActs) {
     loaded = true;
+    loading = false;
     btn.disabled = false;
     btn.classList.remove("spin");
+    busy(false);
+    /* 走满再收线，别让进度条停在 87% 就消失 */
+    prog(1);
+    setTimeout(function () { prog(-1); }, 460);
+
     var msg = "更新于 " + new Date().toLocaleTimeString("zh-CN", { hour12: false });
     if (ok.length > 1) msg += "（已合并 " + ok.length + " 个地区）";
     if (bad.length) msg += "，地区失败 " + bad.map(function (g) { return AREA_NAME[g.code]; }).join("/");
     if (nActs) msg += " · 查了 " + nActs + " 个活动的场次";
     if (failed && failed.length) msg += "，场次失败 " + failed.length + " 个";
     if (truncated) msg += "（已截断）";
-    $("sync").textContent = msg;
+    sync(msg);
+
+    writeCache();
+    updCalTip();
   }
 
   function parseOne(r) {
@@ -877,6 +1002,11 @@ body{
     var sell = parseBJ(s.sellStartTime);
     if (!sell) return null;
     var tks = s.eventsTypes || [];
+    /* 演出时间：优先场次自己的字段；解析不出来（多日通票那种标题里没有年份的）
+       退回活动层的 startTime —— 总比丢掉强。showGuess 标记「这是猜的」。 */
+    var showRaw = (s.seriesDate && String(s.seriesDate).trim()) || String(s.title || "");
+    var show = parseShow(s, ev.start);
+    var showGuess = !!show && !/\d{4}[\/\-.]\d{1,2}[\/\-.]\d{1,2}/.test(showRaw);
     var lo = null;
     for (var i = 0; i < tks.length; i++) {
       var p = tks[i].price;
@@ -900,7 +1030,10 @@ body{
       /* —— 场次侧，开售时间以这里为准 —— */
       sell: sell,
       sellEnd: parseBJ(s.sellEndTime),
-      show: parseShow(s),
+      /* 演出时间优先取场次自己的；解析不出来（多日通票那种没有年份的标题）
+         退回活动层的 startTime，总比丢掉强 */
+      show: show,
+      showGuess: showGuess,
       showEnd: parseBJ(s.endDate),
       stype: s.sellType,
       remark: String(s.remark || "").trim(),
@@ -933,6 +1066,75 @@ body{
   function isWait(r) { return !!r.sell && r.sell.ts > Date.now(); }
   function whenOK(r) { return fWhen === "all" ? true : isWait(r); }
 
+  function dimPool() { return dim === "show" ? SHOWS : ALL; }
+  /* 演出维度不按售票状态过滤：票卖完了，「那天有这场演出」这件事依然成立，照样要标出来 */
+  function dimOK(r) { return dim === "show" ? true : whenOK(r); }
+
+  /* 月格上那一个点的颜色。两个维度各成体系，图例会跟着换 */
+  function dotClass(r) {
+    if (dim === "show") {
+      if (r.ended) return "over";     /* 演出已过 */
+      return r.next ? "warn" : "";     /* 还没开卖 = 要盯；已在售 = 主色 */
+    }
+    if (!isWait(r)) return "over";
+    return r.stype === 3 ? "pre" : r.stype === 1 ? "" : "mis";
+  }
+
+  /* 演出维度的数据源：把「同一活动 + 同一演出时间」的多个开售批次合成一场演出。
+     实例：YESUNG 11/15 18:00 这一场，既在 09-28 开会员购、又在 09-29 公开发售 ——
+     开售日历要算两条（那是两个开售动作），演出日历只能算一场（那是一次演出）。 */
+  function buildShows() {
+    var map = {}, order = [];
+    ALL.forEach(function (r) {
+      if (!r.show || isTBD(r.show)) return;
+      var k = String(r.key) + "@" + r.show.ts;
+      var g = map[k];
+      if (!g) {
+        g = map[k] = {
+          skey: k, key: r.key, title: r.title, type: r.type, status: r.status,
+          loc: r.loc, region: r.region, seat: r.seat, img: r.img, areas: r.areas,
+          show: r.show, showGuess: false, showEnd: null,
+          batches: [], tickets: 0, minPrice: null, symbol: r.symbol
+        };
+        order.push(g);
+      }
+      g.batches.push(r);
+      if (!g.showEnd) g.showEnd = r.showEnd;
+      if (r.showGuess) g.showGuess = true;
+      if (r.minPrice != null && (g.minPrice == null || r.minPrice < g.minPrice)) {
+        g.minPrice = r.minPrice; g.symbol = r.symbol;
+      }
+      if (r.tickets > g.tickets) g.tickets = r.tickets;
+    });
+    var t = Date.now();
+    order.forEach(function (g) {
+      g.batches.sort(function (a, b) {
+        return (a.sell ? a.sell.ts : Infinity) - (b.sell ? b.sell.ts : Infinity);
+      });
+      g.next = null;   /* 最近一个还没开卖的批次；没有则说明全部开卖过 */
+      g.sold = false;  /* 是否已有批次开卖 */
+      g.tbd = false;   /* 是否有批次开售时间待定 */
+      g.batches.forEach(function (r) {
+        if (isTBD(r.sell)) { g.tbd = true; return; }
+        if (r.sell.ts > t) { if (!g.next || r.sell.ts < g.next.sell.ts) g.next = r; }
+        else g.sold = true;
+      });
+      g.ended = g.show.ts <= t;
+    });
+    SHOWS = order;
+  }
+
+  /* 搜索用的文本。演出维度要把各批次的发售方式也算进去，否则用「会员购」搜不到演出 */
+  function hay(r) {
+    var s = r.title + " " + (r.loc || "") + " " + (TYPE[r.type] || "");
+    if (dim === "show") {
+      r.batches.forEach(function (b) { s += " " + (STYPE[b.stype] || "") + " " + (b.remark || ""); });
+    } else {
+      s += " " + (STYPE[r.stype] || "") + " " + (r.remark || "");
+    }
+    return s.toLowerCase();
+  }
+
   /* 日历格子窄，用去前缀的简称 */
   function shortName(t) {
     var s = String(t || "")
@@ -943,33 +1145,33 @@ body{
   }
 
   function apply() {
+    buildShows();
     var q = fText.trim().toLowerCase();
-    VIEW = ALL.filter(function (r) {
-      if (!whenOK(r)) return false;
+    VIEW = dimPool().filter(function (r) {
+      if (!dimOK(r)) return false;
       if (fType && r.type !== fType) return false;
       if (fRegion && r.region !== fRegion) return false;
-      if (q) {
-        var hay = (r.title + " " + r.loc + " " + (TYPE[r.type] || "") + " " +
-          (STYPE[r.stype] || "") + " " + r.remark).toLowerCase();
-        if (hay.indexOf(q) < 0) return false;
-      }
+      if (q && hay(r).indexOf(q) < 0) return false;
       return true;
     });
+    var dtOf = function (r) { return dim === "show" ? r.show : r.sell; };
     byDay = {};
     VIEW.forEach(function (r) {
-      if (isTBD(r.sell)) { (byDay["TBD"] = byDay["TBD"] || []).push(r); return; }
-      (byDay[r.sell.key] = byDay[r.sell.key] || []).push(r);
+      var dt = dtOf(r);
+      if (isTBD(dt)) { (byDay["TBD"] = byDay["TBD"] || []).push(r); return; }
+      (byDay[dt.key] = byDay[dt.key] || []).push(r);
     });
     Object.keys(byDay).forEach(function (k) {
-      byDay[k].sort(function (a, b) { return a.sell.ts - b.sell.ts; });
+      byDay[k].sort(function (a, b) { return dtOf(a).ts - dtOf(b).ts; });
     });
   }
 
   /* -------------------- 渲染 -------------------- */
-  function renderAll() {
+  function renderAll(final) {
     apply();
-    /* 首次加载：跳到最近有待开售活动的月份 */
-    if (!picked) { picked = true; gotoFirst(); }
+    /* 首次进来跳到最近一个「有事」的月份；只跳一次，之后不再抢用户的翻月操作。
+       流式补数时 final=false，但只要有数据就先跳，让首屏尽快落到用户关心的那天。 */
+    if (!picked && (final || VIEW.length)) { picked = true; gotoFirst(); }
     renderStats();
     renderRegions();
     renderMonth();
@@ -977,22 +1179,43 @@ body{
     renderSide();
   }
 
-  function renderStats() {
-    var wait = ALL.filter(isWait).sort(function (a, b) { return a.sell.ts - b.sell.ts; });
-    var acts = {}, regions = {};
-    wait.forEach(function (r) { acts[r.key] = 1; regions[r.region] = 1; });
-
-    var nextTxt = "—";
-    if (wait.length) {
-      var c = countdown(wait[0].sell.ts);
-      nextTxt = c.over ? "已开售" : c.t;
+  /* 「下一个还没到的时间点」——统计卡倒计时每秒刷新要用 */
+  function nextStamp() {
+    var soon = null, t = Date.now();
+    if (dim === "show") {
+      SHOWS.forEach(function (r) {
+        if (r.show.ts > t && (soon === null || r.show.ts < soon)) soon = r.show.ts;
+      });
+    } else {
+      ALL.forEach(function (r) {
+        if (isWait(r) && (soon === null || r.sell.ts < soon)) soon = r.sell.ts;
+      });
     }
+    return soon;
+  }
+
+  function renderStats() {
+    var items, acts = {}, nextTxt = "—";
+    if (dim === "show") {
+      var t = Date.now();
+      items = SHOWS.filter(function (r) { return r.show.ts > t; })
+        .sort(function (a, b) { return a.show.ts - b.show.ts; });
+    } else {
+      items = ALL.filter(isWait).sort(function (a, b) { return a.sell.ts - b.sell.ts; });
+    }
+    items.forEach(function (r) { acts[r.key] = 1; });
+    if (items.length) {
+      var ts = dim === "show" ? items[0].show.ts : items[0].sell.ts;
+      var c = countdown(ts);
+      nextTxt = c.over ? (dim === "show" ? "已开演" : "已开售") : c.t;
+    }
+    var first = items.length ? (dim === "show" ? items[0].show : items[0].sell) : null;
     $("stats").innerHTML =
-      stat(wait.length, "个", "待开售场次") +
+      stat(items.length, dim === "show" ? "场" : "个", dim === "show" ? "未开演" : "待开售场次") +
       stat(Object.keys(acts).length, "个", "涉及活动") +
-      stat(wait.length ? fmtYMD(wait[0].sell) + " " + wait[0].sell.hhmm : "—", "", "最近一场开售", true) +
+      stat(first ? fmtYMD(first) + " " + first.hhmm : "—", "", dim === "show" ? "最近一场演出" : "最近一场开售", true) +
       '<div class="ev-stat"><b id="statCd" style="font-size:19px">' + esc(nextTxt) +
-      "</b><u>距最近开售</u></div>";
+      "</b><u>" + (dim === "show" ? "距最近演出" : "距最近开售") + "</u></div>";
   }
   function stat(v, unit, label, small) {
     return '<div class="ev-stat"><b' + (small ? ' style="font-size:19px"' : "") + ">" +
@@ -1012,9 +1235,10 @@ body{
 
   function renderRegions() {
     var sel = $("regionSel");
+    var pool = dimPool();
     var have = {}, total = 0;
-    ALL.forEach(function (r) {
-      if (!whenOK(r)) return;
+    pool.forEach(function (r) {
+      if (!dimOK(r)) return;
       have[r.region] = (have[r.region] || 0) + 1;
       total++;
     });
@@ -1029,12 +1253,25 @@ body{
     var chips = $("typeChips");
     var want = [0].concat(Object.keys(TYPE).map(Number));
     chips.innerHTML = want.map(function (t) {
-      var n = ALL.filter(function (r) {
-        return whenOK(r) && (!t || r.type === t);
+      var n = pool.filter(function (r) {
+        return dimOK(r) && (!t || r.type === t);
       }).length;
       return '<button class="ev-chip' + (fType === t ? " on" : "") + '" data-t="' + t + '">' +
         (t ? esc(TYPE[t]) : "全部") + " " + n + "</button>";
     }).join("");
+  }
+
+  /* 图例随维度变 —— 不然「琥珀点」在两个维度下含义不同，用户会读错 */
+  function renderLegend() {
+    var el = $("legend");
+    if (!el) return;
+    var dots = dim === "show"
+      ? '<u><i class="warn"></i>待开售</u><u><i></i>已在售</u><u><i class="over"></i>演出已过</u>'
+      : '<u><i></i>待开售</u><u><i class="pre"></i>会员购</u>' +
+        '<u><i class="mis"></i>缺货登记</u><u><i class="over"></i>已开售</u>';
+    el.innerHTML = dots +
+      '<u><i class="hb"></i>休息日</u><u><i class="hw"></i>调休上班</u><em id="holiNote"></em>';
+    updHoliNote();
   }
 
   function renderMonth() {
@@ -1068,35 +1305,48 @@ body{
       if (dtag) tip.push(dtag);
 
       if (list.length) {
-        /* 一天多场不再「只列两场 + 还有 N 场」：改成一场一点的点阵，
-           点数即场次数（超过 4 场用 +N 收口），点色表示发售方式。
-           具体哪几场由右侧面板和悬停提示给 —— 月格的职责是定位，不是罗列。 */
+        /* 月格的职责是「定位哪天有事」，不是罗列 —— 一场一点，点数即场次数
+           （超过 4 场用 +N 收口）。两个维度的点色含义不同，图例会跟着变。 */
         var MAXD = 4;
         inner += '<div class="ev-line"><span class="ev-dots">' +
           list.slice(0, MAXD).map(function (r) {
-            var dc = !isWait(r) ? "over" : (r.stype === 3 ? "pre" : r.stype === 1 ? "" : "mis");
+            var dc = dotClass(r);
             return dc ? '<i class="' + dc + '"></i>' : "<i></i>";
           }).join("") +
           (list.length > MAXD ? "<u>+" + (list.length - MAXD) + "</u>" : "") +
           "</span>";
 
-        /* 时间取「最近一个还没开售的场次」，全部开售了就写已开售 */
-        var next = null, tbd = false;
-        list.forEach(function (r) {
-          if (isTBD(r.sell)) { tbd = true; return; }
-          if (!isWait(r)) return;
-          if (!next || r.sell.ts < next.sell.ts) next = r;
-        });
-        inner += next
-          ? '<span class="ev-when">' + esc(next.sell.hhmm) + " 起</span>"
-          : '<span class="ev-when dim">' + (tbd ? "待定" : "已开售") + "</span>";
+        /* 右侧那行时间留给「最近一个还没到的时刻」：
+           开售维度 = 最近一场开售；演出维度 = 当天首场开演 */
+        var when = "", dimWhen = false;
+        if (dim === "show") {
+          when = list[0].show.hhmm;
+        } else {
+          var next = null, tbd = false;
+          list.forEach(function (r) {
+            if (isTBD(r.sell)) { tbd = true; return; }
+            if (!isWait(r)) return;
+            if (!next || r.sell.ts < next.sell.ts) next = r;
+          });
+          if (next) when = next.sell.hhmm + " 起";
+          else { when = tbd ? "待定" : "已开售"; dimWhen = true; }
+        }
+        inner += '<span class="ev-when' + (dimWhen ? " dim" : "") + '">' + esc(when) + "</span>";
         inner += "</div>";
 
         list.forEach(function (r) {
-          tip.push((isTBD(r.sell) ? "时间待定" : r.sell.hhmm) + " 开售 · " +
-            (STYPE[r.stype] || "开售") +
-            (r.show ? " · 演出 " + fmtYMD(r.show) + " " + r.show.hhmm : "") +
-            " · " + shortName(r.title));
+          if (dim === "show") {
+            tip.push(r.show.hhmm + (r.showGuess ? "（推定）" : "") + " 开演 · " +
+              (r.ended ? "演出已过"
+                : r.next ? "票 " + fmtYMD(r.next.sell) + " " + r.next.sell.hhmm + " 开售"
+                  : "票已在售") +
+              " · " + (r.loc ? r.loc + " · " : "") + shortName(r.title));
+          } else {
+            tip.push((isTBD(r.sell) ? "时间待定" : r.sell.hhmm) + " 开售 · " +
+              (STYPE[r.stype] || "开售") +
+              (r.show ? " · 演出 " + fmtYMD(r.show) + " " + r.show.hhmm : "") +
+              " · " + shortName(r.title));
+          }
         });
       }
       cells.push('<div class="' + cls + '" data-k="' + k + '"' +
@@ -1123,23 +1373,26 @@ body{
   /* 扫描范围有限：服务端一旦活动里有票可买就直接判「热卖中」返回，
      不再往下看场次，所以热卖中的活动里也可能藏着未开售的加场。
      这里提示还剩多少活动没查，并给一键放大范围的入口。 */
+  /* 确实「什么都铺不上日历」的活动：既没有公开场次，活动层也没有开售时间。
+     这种要在日历下方点名，否则会被当成「页面漏了」 */
   function updCalTip() {
     var tip = $("calTip");
     if (!tip) return;
-    var skip = 0;
-    if (scan === "waiting") {
-      skip = EVENTS.filter(function (e) {
-        return e.key && (e.status === 1 || e.status === 2);
-      }).length;
+    var unresolved = 0;
+    if (loaded && EVENTS.length) {
+      var have = {};
+      ALL.forEach(function (r) { have[r.key] = 1; });
+      EVENTS.forEach(function (e) {
+        if (e.key && e.status !== 3 && !have[e.key]) unresolved++;
+      });
     }
-    if (!skip) { tip.hidden = true; tip.innerHTML = ""; return; }
+    if (!unresolved) { tip.hidden = true; tip.innerHTML = ""; return; }
     tip.hidden = false;
-    tip.innerHTML = "还有 <b>" + skip + " 个</b>「热卖中 / 已售罄」的活动没查场次 —— " +
-      "服务端只要活动里有票可买就判「热卖中」并停止往下判断，这些活动可能藏着后续加场。" +
-      '<a href="#" data-go="deep">深扫这些活动 →</a>';
+    tip.innerHTML = "另有 <b>" + unresolved + "</b> 个未结束的活动没有公开场次" +
+      "（还没开票 / 只在线下售卖），没有时间可以铺进日历。";
   }
 
-  /* 月份标题 + 该月开售场次 */
+  /* 月份标题 + 该月的场次数（维度不同，量词不同） */
   function updMLabel() {
     if (!cur) { $("mLabel").innerHTML = "—"; return; }
     var n = 0;
@@ -1149,30 +1402,34 @@ body{
       if (+p[0] === cur.y && +p[1] === cur.mo) n += byDay[k].length;
     });
     $("mLabel").innerHTML = "<b>" + cur.y + " 年 " + cur.mo + " 月</b>" +
-      "<small>" + (n ? n + " 个场次开售" : "无待开售") + "</small>";
+      "<small>" + (dim === "show"
+        ? (n ? n + " 场演出" : "无演出")
+        : (n ? n + " 个场次开售" : "无待开售")) + "</small>";
   }
 
   function renderList() {
     var box = $("viewList");
-    var upcoming = VIEW.filter(function (r) { return !isTBD(r.sell); })
-      .sort(function (a, b) { return a.sell.ts - b.sell.ts; });
-    var tbd = VIEW.filter(function (r) { return isTBD(r.sell); });
+    var dtOf = function (r) { return dim === "show" ? r.show : r.sell; };
+    var upcoming = VIEW.filter(function (r) { return !isTBD(dtOf(r)); })
+      .sort(function (a, b) { return dtOf(a).ts - dtOf(b).ts; });
+    var tbd = VIEW.filter(function (r) { return isTBD(dtOf(r)); });
 
     if (!upcoming.length && !tbd.length) {
-      box.innerHTML = emptyHTML("当前筛选下没有场次");
+      box.innerHTML = emptyHTML(dim === "show" ? "当前筛选下没有演出" : "当前筛选下没有场次");
       return;
     }
     var groups = {};
     upcoming.forEach(function (r) {
-      var mk = r.sell.y + "-" + pad(r.sell.mo);
+      var dt = dtOf(r);
+      var mk = dt.y + "-" + pad(dt.mo);
       (groups[mk] = groups[mk] || []).push(r);
     });
     var html = "";
     Object.keys(groups).sort().forEach(function (mk) {
       var rs = groups[mk];
-      var dt = rs[0].sell;
+      var dt = dtOf(rs[0]);
       html += '<div class="ev-grp"><div class="ev-grp-h"><b>' + dt.y + " 年 " + dt.mo + " 月</b><span>" +
-        rs.length + " 场</span></div>";
+        rs.length + (dim === "show" ? " 场演出" : " 场") + "</span></div>";
       rs.forEach(function (r) { html += rowHTML(r); });
       html += "</div>";
     });
@@ -1187,24 +1444,42 @@ body{
 
   function rowHTML(r) {
     var price = fmtPrice(r.minPrice, r.symbol);
-    var over = r.sell.ts <= Date.now();
-    var tags = [];
-    if (r.seq && r.total > 1) tags.push("第 " + r.seq + "/" + r.total + " 场");
-    if (STYPE[r.stype]) tags.push(STYPE[r.stype]);
-    var sub = [];
-    if (r.loc) sub.push(r.loc);
-    if (r.show) sub.push("演出 " + fmtYMD(r.show) + " " + r.show.hhmm);
-    if (price) sub.push(price + " 起");
+    var tags = [], sub = [], rightB, rightS;
 
-    return '<div class="ev-row" data-id="' + esc(r.sid) + '">' +
+    if (dim === "show") {
+      /* 演出维度：右边给演出时间，左边给「票怎么样了」 */
+      if (r.ended) tags.push("演出已过");
+      else if (r.next) tags.push("待开售 " + fmtYMD(r.next.sell) + " " + r.next.sell.hhmm);
+      else tags.push("已在售");
+      if (TYPE[r.type]) tags.push(TYPE[r.type]);
+      if (r.batches.length > 1) tags.push(r.batches.length + " 个开售批次");
+      if (r.showGuess) tags.push("时间推定");
+      if (r.loc) sub.push(r.loc);
+      if (price) sub.push(price + " 起");
+      rightB = esc(r.show.hhmm);
+      rightS = esc(fmtYMD(r.show));
+    } else {
+      var over = r.sell.ts <= Date.now();
+      if (r.seq && r.total > 1) tags.push("第 " + r.seq + "/" + r.total + " 场");
+      if (STYPE[r.stype]) tags.push(STYPE[r.stype]);
+      if (r.loc) sub.push(r.loc);
+      if (r.show) sub.push("演出 " + fmtYMD(r.show) + " " + r.show.hhmm);
+      if (price) sub.push(price + " 起");
+      rightB = isTBD(r.sell) ? "待定" : esc(r.sell.hhmm);
+      rightS = isTBD(r.sell) ? "时间待定" : (over ? "已开售 · " : "") + esc(fmtYMD(r.sell));
+    }
+
+    return '<div class="ev-row" data-id="' + esc(rowId(r)) + '">' +
       (r.img ? '<img src="' + esc(r.img) + '" alt="" loading="lazy" referrerpolicy="no-referrer">' : "<img alt=''>") +
       '<div class="ev-row-m"><b>' + esc(r.title) + "</b><span>" + esc(sub.join(" · ")) + "</span>" +
       (tags.length ? '<u class="ev-rtags">' +
         tags.map(function (t) { return "<i>" + esc(t) + "</i>"; }).join("") + "</u>" : "") +
       "</div>" +
-      '<div class="ev-row-r"><b>' + (isTBD(r.sell) ? "待定" : esc(r.sell.hhmm)) + "</b><span>" +
-      (isTBD(r.sell) ? "时间待定" : (over ? "已开售 · " : "") + esc(fmtYMD(r.sell))) + "</span></div></div>";
+      '<div class="ev-row-r"><b>' + rightB + "</b><span>" + rightS + "</span></div></div>";
   }
+
+  /* 列表行的标识：开售维度用场次 id，演出维度用「活动@演出时间」 */
+  function rowId(r) { return r.sid != null ? r.sid : r.skey; }
 
   function emptyHTML(msg) {
     return '<div class="ev-empty"><u>✦</u>' + esc(msg) + "</div>";
@@ -1247,18 +1522,19 @@ body{
       head = "周" + WD[dt.getUTCDay()] + " · " + (+p[1]) + "月" + (+p[2]) + "日" +
         (dtag ? " · " + dtag : "");
       /* 报数按活动去重，不然一个活动 4 场会让人以为有 4 个活动 */
-      sub = groups.length + " 个活动 · 共 " + list.length + " 场";
+      sub = groups.length + " 个活动 · 共 " + list.length + (dim === "show" ? " 场演出" : " 场");
     } else {
       /* 未选日期：不铺列表 —— 日历已经把全部场次铺开了，右侧再列一遍是冗余。
          只给一句引导，让用户知道点哪里。 */
-      box.innerHTML = '<div class="ev-side-h"><b>开售场次</b></div>' +
-        '<div class="ev-note">点左侧日历上带场次的日期，查看当天开售的场次。</div>';
+      box.innerHTML = '<div class="ev-side-h"><b>' + (dim === "show" ? "演出场次" : "开售场次") + "</b></div>" +
+        '<div class="ev-note">点左侧日历上带场次的日期，查看' +
+        (dim === "show" ? "当天有哪些演出。" : "当天开售的场次。") + "</div>";
       return;
     }
 
     if (!groups.length) {
       box.innerHTML = '<div class="ev-side-h"><b>' + esc(head) + "</b></div>" +
-        '<div class="ev-note">这一天没有符合条件的场次。</div>';
+        '<div class="ev-note">这一天没有' + (dim === "show" ? "演出。" : "符合条件的场次。") + "</div>";
       return;
     }
     var html = '<div class="ev-side-h"><b>' + esc(head) + "</b><span>" + esc(sub) + "</span></div>";
@@ -1280,8 +1556,9 @@ body{
     }).join("") + "</div>";
   }
 
-  /* g = { key, items:[场次] } —— 同一活动当天的全部开售场次 */
+  /* g = { key, items:[记录] } —— 同一活动当天的全部记录（开售维度是开售批次，演出维度是演出场） */
   function cardHTML(g) {
+    if (dim === "show") return showCardHTML(g);
     var items = g.items, first = items[0], multi = items.length > 1;
 
     /* 倒计时对准「最近一个还没开售的场次」；当天全开售了才显示「已开售」 */
@@ -1305,7 +1582,8 @@ body{
       if (first.seq && first.total > 1) tags.push({ t: "第 " + first.seq + "/" + first.total + " 场" });
     }
     if (TYPE[first.type]) tags.push({ t: TYPE[first.type] });
-    /* 活动层状态非「待开售」却仍有未开售场次 —— 深扫时才会遇到，标出来免得困惑 */
+    /* 活动状态不是「待开售」却仍有未开售场次 —— 服务端 calcEventsStatus 见到
+       「有票可买」就提前 return，所以这种组合是真实存在的，标出来免得困惑 */
     if (first.status !== 0 && SELL[first.status]) tags.push({ t: "活动" + SELL[first.status].t, warn: true });
 
     /* 同一天各场次的演出时间 / 场地 / 座位 / 备注可能不同，去重后并排 */
@@ -1365,7 +1643,87 @@ body{
       '<div class="ev-card-b">' + body + "</div></article>";
   }
 
+  /* 演出维度的卡片：主角是「这场演出」，售票安排挂在下面。
+     g.items 里的每一条是一场演出（可能带着多个开售批次）。 */
+  function showCardHTML(g) {
+    var items = g.items, first = items[0];
+    var next = null, sold = false, tbd = false, batches = [];
+    items.forEach(function (s) {
+      s.batches.forEach(function (r) { batches.push(r); });
+      if (s.next && (!next || s.next.sell.ts < next.sell.ts)) next = s.next;
+      if (s.sold) sold = true;
+      if (s.tbd) tbd = true;
+    });
+    batches.sort(function (a, b) {
+      return (a.sell ? a.sell.ts : Infinity) - (b.sell ? b.sell.ts : Infinity);
+    });
+
+    var cd = next ? countdown(next.sell.ts) : null;
+    var ended = items.every(function (s) { return s.ended; });
+    var shows = uniq(items.map(function (s) { return fmtFull(s.show) + (s.showGuess ? "（推定）" : ""); }));
+    var locs = uniq(items.map(function (s) { return s.loc || null; }));
+    var seats = uniq(items.map(function (s) { return s.seat; }))
+      .map(function (s) { return SEAT[s] || ("模式 " + s); });
+    var limits = uniq(batches.map(function (r) { return r.limit; }));
+    var remarks = uniq(batches.map(function (r) { return r.remark || null; }));
+    var tks = uniq(batches.map(function (r) { return r.tickets; }));
+    var best = null;
+    items.forEach(function (s) {
+      if (s.minPrice != null && (!best || s.minPrice < best.minPrice)) best = s;
+    });
+    var price = best ? fmtPrice(best.minPrice, best.symbol) : "";
+    var areas = first.areas || [];
+
+    var tags = [];
+    if (ended) tags.push({ t: "演出已过" });
+    else if (next) {
+      tags.push({ t: "待开售", on: true });
+      if (cd && cd.soon) tags.push({ t: "临开售", warn: true });
+    } else tags.push({ t: sold ? "已在售" : "时间待定" });
+    if (TYPE[first.type]) tags.push({ t: TYPE[first.type] });
+    if (batches.length > 1) tags.push({ t: batches.length + " 个开售批次", on: true });
+
+    var body = "<h3>" + esc(first.title) + "</h3>";
+    if (remarks.length) body += '<p class="ev-remark">' + esc(remarks.join(" · ")) + "</p>";
+    body += '<div class="ev-kv hi"><i>演出</i><b>' + esc(shows.join(" / ")) + "</b></div>";
+    if (locs.length) body += '<div class="ev-kv"><i>场地</i><b>' + esc(locs.join(" / ")) + "</b></div>";
+    body += '<div class="ev-kv"><i>售票</i><b>' + esc(
+      next ? "未开售 · " + fmtFull(next.sell) + " 开" + (next.sellEnd ? "，售止 " + fmtFull(next.sellEnd) : "")
+        : sold ? "已在售" : (tbd ? "时间待定" : "无公开售票")) + "</b></div>";
+    if (batches.length > 1) body += schedHTML(batches);
+    if (seats.length) body += '<div class="ev-kv"><i>座位</i><b>' + esc(seats.join(" / ")) + "</b></div>";
+    if (tks.length === 1 && tks[0]) {
+      body += '<div class="ev-kv"><i>票种</i><b>' + tks[0] + " 种" +
+        (price ? " · " + esc(price) + " 起" : "") + "</b></div>";
+    } else if (price) {
+      body += '<div class="ev-kv"><i>票价</i><b>' + esc(price) + " 起</b></div>";
+    }
+    if (limits.length) body += '<div class="ev-kv"><i>限购</i><b>' + esc(limits.join("/")) + " 张/人</b></div>";
+    if (areas.length > 1) body += '<div class="ev-kv"><i>上架</i><b>' +
+      esc(areas.map(function (c) { return AREA_NAME[c] || c; }).join(" / ")) + "</b></div>";
+
+    body += '<div class="ev-card-f">' +
+      '<a class="ev-go" href="' + esc(SITE + "?eventsKey=" + first.key) + '" target="_blank" rel="noopener">去 Fantopia 看演出</a>' +
+      '<button class="ev-copy" data-copy="' + esc(copyText(g)) + '">复制信息</button>' +
+      "</div>";
+
+    return '<article class="ev-card" data-key="' + esc(first.key) + '">' +
+      '<div class="ev-card-pic">' +
+      (first.img ? '<img src="' + esc(first.img) + '" alt="" loading="lazy" referrerpolicy="no-referrer">' : "") +
+      '<div class="ev-card-tags">' +
+      tags.map(function (x) {
+        return '<span class="ev-tag' + (x.on ? " blue" : "") + (x.warn ? " warn" : "") + '">' + esc(x.t) + "</span>";
+      }).join("") +
+      "</div>" +
+      (ended ? '<div class="ev-cd over">已开演</div>'
+        : next ? '<div class="ev-cd' + (cd.soon ? " soon" : "") + '" data-cd="' + next.sell.ts + '">距开售 ' + esc(cd.t) + "</div>"
+          : sold ? '<div class="ev-cd over">已在售</div>' : "") +
+      "</div>" +
+      '<div class="ev-card-b">' + body + "</div></article>";
+  }
+
   function copyText(g) {
+    if (dim === "show") return copyShowText(g);
     var items = g.items, first = items[0], multi = items.length > 1;
     var best = null;
     items.forEach(function (r) {
@@ -1411,6 +1769,49 @@ body{
     return lines.filter(Boolean).join("\n");
   }
 
+  /* 演出维度的复制文本：演出时间当头，开售批次列在下面 */
+  function copyShowText(g) {
+    var items = g.items, first = items[0];
+    var batches = [], next = null, best = null;
+    items.forEach(function (s) {
+      s.batches.forEach(function (r) { batches.push(r); });
+      if (s.next && (!next || s.next.sell.ts < next.sell.ts)) next = s.next;
+      if (s.minPrice != null && (!best || s.minPrice < best.minPrice)) best = s;
+    });
+    batches.sort(function (a, b) {
+      return (a.sell ? a.sell.ts : Infinity) - (b.sell ? b.sell.ts : Infinity);
+    });
+    var price = best ? fmtPrice(best.minPrice, best.symbol) : "";
+    var shows = uniq(items.map(function (s) { return fmtFull(s.show) + (s.showGuess ? "（推定）" : ""); }));
+    var locs = uniq(items.map(function (s) { return s.loc || null; }));
+    var stypes = uniq(batches.map(function (r) { return STYPE[r.stype] || null; }));
+    var limits = uniq(batches.map(function (r) { return r.limit; }));
+    var tks = uniq(batches.map(function (r) { return r.tickets; }));
+
+    var lines = [first.title];
+    if (shows.length) lines.push("演出：" + shows.join(" / "));
+    if (locs.length) lines.push("场地：" + locs.join(" / "));
+    lines.push(next ? "售票：还没开卖，最近 " + fmtFull(next.sell) + " 开售" : "售票：已在售 / 无公开售票");
+    if (batches.length > 1) {
+      lines.push("开售批次：");
+      batches.forEach(function (r) {
+        lines.push("  " + (isTBD(r.sell) ? "待定" : fmtFull(r.sell)) +
+          (STYPE[r.stype] ? " · " + STYPE[r.stype] : "") +
+          (r.sellEnd ? " · 售止 " + fmtFull(r.sellEnd) : ""));
+      });
+    }
+    if (stypes.length) lines.push("发售方式：" + stypes.join(" / "));
+    if (tks.length === 1 && tks[0]) lines.push("票种：共 " + tks[0] + " 种");
+    if (price) lines.push("最低价：" + price);
+    if (limits.length) lines.push("限购：" + limits.join("/") + " 张/人");
+    if (TYPE[first.type]) lines.push("活动类型：" + TYPE[first.type]);
+    if (first.areas && first.areas.length > 1) {
+      lines.push("上架地区：" + first.areas.map(function (c) { return AREA_NAME[c] || c; }).join(" / "));
+    }
+    lines.push("详情：" + SITE + "?eventsKey=" + first.key);
+    return lines.filter(Boolean).join("\n");
+  }
+
   /* -------------------- 交互 -------------------- */
   function goMonth(delta) {
     if (!cur) return;
@@ -1432,11 +1833,14 @@ body{
   }
 
   function gotoFirst() {
-    /* 优先跳到最近一个「还没开售」的场次所在月 */
-    var soon = VIEW.filter(isWait);
-    if (!soon.length) soon = VIEW.filter(function (r) { return !isTBD(r.sell); });
-    soon.sort(function (a, b) { return a.sell.ts - b.sell.ts; });
-    if (soon.length) cur = { y: soon[0].sell.y, mo: soon[0].sell.mo };
+    var dtOf = function (r) { return dim === "show" ? r.show : r.sell; };
+    /* 开售维度优先跳到「最近一个还没开售」的场次；演出维度跳到最近一场未开演 */
+    var soon = dim === "show"
+      ? VIEW.filter(function (r) { return r.show.ts > Date.now(); })
+      : VIEW.filter(isWait);
+    if (!soon.length) soon = VIEW.filter(function (r) { return !isTBD(dtOf(r)); });
+    soon.sort(function (a, b) { return dtOf(a).ts - dtOf(b).ts; });
+    if (soon.length) cur = { y: dtOf(soon[0]).y, mo: dtOf(soon[0]).mo };
     else { var t = todayBJ(); cur = { y: t.y, mo: t.mo }; }
     selKey = null;
   }
@@ -1458,9 +1862,12 @@ body{
     if (!row) return;
     var id = row.getAttribute("data-id");
     var r = null;
-    for (var i = 0; i < VIEW.length; i++) if (String(VIEW[i].sid) === String(id)) { r = VIEW[i]; break; }
+    for (var i = 0; i < VIEW.length; i++) {
+      if (String(rowId(VIEW[i])) === String(id)) { r = VIEW[i]; break; }
+    }
     if (!r) return;
-    if (r.sell && !isTBD(r.sell)) { cur = { y: r.sell.y, mo: r.sell.mo }; selKey = r.sell.key; }
+    var dt = dim === "show" ? r.show : r.sell;
+    if (dt && !isTBD(dt)) { cur = { y: dt.y, mo: dt.mo }; selKey = dt.key; }
     setMode("month");
     renderMonth();
     renderSide();
@@ -1474,6 +1881,32 @@ body{
     $("viewList").hidden = (m !== "list");
     /* 月份导航只对月历有意义；列表是全部待开售的横向视图 */
     $("barNav").style.display = (m === "month") ? "flex" : "none";
+  }
+
+  /* 切换维度：同一份数据换个基准日铺进日历。不重新请求 —— 数据是一样的 */
+  function setDim(d) {
+    if (dim === d) return;
+    dim = d;
+    var btns = $("dimSeg").children;
+    for (var i = 0; i < btns.length; i++) {
+      btns[i].classList.toggle("on", btns[i].getAttribute("data-d") === d);
+    }
+    /* 「仅待开售 / 含已开售」只对开售维度有意义；演出维度一律全铺 */
+    $("whenSel").hidden = (d === "show");
+    $("heroTitle").textContent = d === "show" ? "演出日程" : "待开售演出";
+    $("heroSub").innerHTML = d === "show"
+      ? "以<b>演出</b>为单位把表演铺进月历 —— 同一场演出即使分批开卖也只算一场，" +
+        "点色区分「还没开卖 / 已在售 / 演出已过」。与「开售时间」视图同一份数据，切换不重新请求。"
+      : "以<b>场次</b>为单位收录开售时间 —— 一个活动下的每个场次各有自己的开售时间，日历按场次铺。" +
+        "直连 Fantopia 公开接口实时拉取，不经过任何中间服务。";
+    /* 换了基准日，原来的选中日期和举办地筛选都不再成立 */
+    fRegion = "";
+    fText = "";
+    $("q").value = "";
+    selKey = null;
+    picked = false;
+    renderLegend();
+    renderAll(true);
   }
 
   function onCopy(e) {
@@ -1510,14 +1943,9 @@ body{
     /* 统计卡里的倒计时 */
     var el = document.getElementById("statCd");
     if (el) {
-      var soon = null, i;
-      for (i = 0; i < ALL.length; i++) {
-        if (!isWait(ALL[i])) continue;
-        var s = ALL[i].sell;
-        if (soon === null || s.ts < soon) soon = s.ts;
-      }
+      var soon = nextStamp();
       var cc = soon === null ? null : countdown(soon);
-      el.textContent = cc ? (cc.over ? "已开售" : cc.t) : "—";
+      el.textContent = cc ? (cc.over ? (dim === "show" ? "已开演" : "已开售") : cc.t) : "—";
     }
   }
 
@@ -1537,6 +1965,21 @@ body{
     $("side").innerHTML = "";
   }
 
+  /* 换数据源（地区）时先把内存清干净再重绘，避免不同地区的活动混在一起 */
+  function resetData(ev, all, sc) {
+    EVENTS = ev || [];
+    ALL = all || [];
+    SHOWS = [];
+    sessCache = sc || {};
+    apply();
+    renderStats();
+    renderRegions();
+    renderMonth();
+    renderList();
+    renderSide();
+    renderLegend();
+  }
+
   /* -------------------- 启动 -------------------- */
   $("prevM").addEventListener("click", function () { goMonth(-1); });
   $("nextM").addEventListener("click", function () { goMonth(1); });
@@ -1546,16 +1989,11 @@ body{
   $("side").addEventListener("click", onCopy);
   /* 刷新 = 重新取数，缓存一并作废 */
   $("refresh").addEventListener("click", function () { load(false); });
-  $("calTip").addEventListener("click", function (e) {
-    if (e.target.getAttribute("data-go") === "deep") {
-      e.preventDefault();
-      scan = "all";
-      $("scanSel").value = "all";
-      picked = false;
-      load(true);
-    }
-  });
 
+  $("dimSeg").addEventListener("click", function (e) {
+    var b = e.target.closest("button");
+    if (b) setDim(b.getAttribute("data-d"));
+  });
   $("viewSeg").addEventListener("click", function (e) {
     var b = e.target.closest("button");
     if (b) setMode(b.getAttribute("data-v"));
@@ -1566,7 +2004,8 @@ body{
     fType = +b.getAttribute("data-t");
     apply(); renderRegions(); renderMonth(); renderList(); renderSide();
   });
-  /* 切换上架地区 = 换数据源，必须重新请求（不是前端筛选） */
+  /* 切换上架地区 = 换数据源，必须重新请求（不是前端筛选）。
+     若该地区有上次的缓存，先原样上屏再后台刷新 —— 切回去也是秒开 */
   $("areaSel").addEventListener("change", function () {
     srcArea = this.value;
     /* 换了活动池，原举办地筛选和选中日期都不再成立 */
@@ -1575,6 +2014,8 @@ body{
     $("q").value = "";
     selKey = null;
     picked = false;
+    var hit = readCache();
+    resetData(hit ? hit.EVENTS : [], hit ? hit.ALL : [], null);
     load(false);
   });
   $("regionSel").addEventListener("change", function () {
@@ -1582,13 +2023,6 @@ body{
   });
   $("whenSel").addEventListener("change", function () {
     fWhen = this.value; apply(); renderRegions(); renderMonth(); renderList(); renderSide();
-  });
-  /* 换扫描范围 = 换请求规模，要重新拉；已拉到的场次保留，只补新的 */
-  $("scanSel").addEventListener("change", function () {
-    scan = this.value;
-    picked = false;
-    selKey = null;
-    load(true);
   });
   var qt = null;
   $("q").addEventListener("input", function () {
@@ -1605,18 +2039,42 @@ body{
     if (e.key === "/") { e.preventDefault(); $("q").focus(); }
   });
 
-  /* 先渲染一次骨架月历，数据到了再填充 */
-  (function initSkeleton() {
+  /* 启动：有 12 小时内的缓存就先把上次的结果原样上屏（几乎 0 毫秒可见），
+     再在后台静默换成新的 —— 刷新要等几秒这件事，用「先给旧的」绕过；
+     没有缓存（第一次访问）才走骨架屏 + 进度线。 */
+  (function init() {
     renderAreaSel();
+    renderLegend();
     var t = todayBJ();
     cur = { y: t.y, mo: t.mo };
-    renderMonth();
-    $("side").innerHTML = '<div class="ev-sk" style="height:420px">' +
-      '<div class="bar" style="width:70%;margin-top:22px"></div><div class="bar" style="width:50%"></div>' +
-      '<div class="bar" style="width:80%"></div><div class="bar" style="width:60%"></div></div>';
+
+    var hit = readCache();
+    if (hit) {
+      EVENTS = hit.EVENTS || [];
+      ALL = hit.ALL || [];
+      var ago = Math.max(0, Math.round((Date.now() - hit.t) / 60000));
+      sync("显示 " + (ago < 1 ? "刚刚" : ago + " 分钟前") + "的数据 · 正在更新…");
+      renderAll(false);      /* picked 仍为 false：首屏会跳到最近有事的那个月 */
+      prog(0.04);
+    } else {
+      renderMonth();
+      $("side").innerHTML = '<div class="ev-sk" style="height:420px">' +
+        '<div class="bar" style="width:70%;margin-top:22px"></div><div class="bar" style="width:50%"></div>' +
+        '<div class="bar" style="width:80%"></div><div class="bar" style="width:60%"></div></div>';
+    }
+    load(false);
   })();
 
-  load(false);
+  /* 只读调试出口：端到端断言用它拿内部数据，核对「数据 ↔ 界面」是否一致。
+     不影响渲染，也不写任何状态。 */
+  window.__evcal = function () {
+    return {
+      dim: dim, loaded: loaded, loading: loading, srcArea: srcArea, picked: picked, selKey: selKey,
+      EVENTS: EVENTS, ALL: ALL, SHOWS: SHOWS, VIEW: VIEW,
+      sessKeys: Object.keys(sessCache).length
+    };
+  };
+
   setInterval(tick, 1000);
 })();
 </script>
