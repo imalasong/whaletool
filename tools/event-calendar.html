@@ -32,7 +32,13 @@
   --r-md:12px; --r-lg:18px; --r-xl:24px;
   --ease:cubic-bezier(.4,0,.2,1);
 }
-html,body{background-color:#fbfbfd !important;background-image:none !important;}
+html,body{
+  background-color:#f5f5f7 !important;
+  background-image:
+    radial-gradient(1100px 520px at 16% -10%, rgba(0,113,227,.07), transparent 62%),
+    radial-gradient(980px 480px at 88% -8%, rgba(255,149,0,.06), transparent 60%) !important;
+  background-repeat:no-repeat;
+}
 body{
   font-family:-apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Segoe UI",
               "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
@@ -42,10 +48,10 @@ body{
 /* ---------------- 顶栏 ---------------- */
 .ev-nav{
   position:sticky; top:0; z-index:60;
-  background:rgba(251,251,253,.8);
+  background:rgba(245,245,247,.78);
   backdrop-filter:saturate(180%) blur(20px);
   -webkit-backdrop-filter:saturate(180%) blur(20px);
-  border-bottom:1px solid rgba(0,0,0,.07);
+  border-bottom:1px solid rgba(0,0,0,.06);
 }
 .ev-nav-in{max-width:1320px;margin:0 auto;padding:0 24px;height:52px;display:flex;align-items:center;gap:14px}
 .ev-back{font-size:13px;color:var(--gray);font-weight:500;transition:color .18s var(--ease)}
@@ -145,21 +151,17 @@ body{
   border-radius:980px;background:var(--paper);outline:none;cursor:pointer;color:var(--ink);
 }
 .ev-sel:focus{border-color:var(--blue);box-shadow:0 0 0 3.5px var(--blue-bg)}
-.ev-chips{display:flex;gap:6px;flex-wrap:wrap}
-.ev-chip{
-  font:inherit;font-size:12.5px;font-weight:500;border:1px solid var(--line-2);
-  background:var(--paper);padding:7px 14px;border-radius:980px;cursor:pointer;
-  color:var(--ink-2);transition:all .18s var(--ease);
+/* ---------------- 主体两栏：活动信息在左，日历在右 ---------------- */
+.ev-body{display:grid;grid-template-columns:318px minmax(0,1fr);gap:20px;align-items:start}
+/* 窄屏单列：日历在上、活动信息在下（点日期后滚到下方看详情） */
+@media (max-width:960px){
+  .ev-body{grid-template-columns:1fr}
+  #colMain{order:1}
+  .ev-side{order:2}
 }
-.ev-chip:hover{border-color:var(--line)}
-.ev-chip.on{background:var(--ink);border-color:var(--ink);color:#fff}
-
-/* ---------------- 主体两栏 ---------------- */
-.ev-body{display:grid;grid-template-columns:minmax(0,1fr) 318px;gap:20px;align-items:start}
-@media (max-width:960px){ .ev-body{grid-template-columns:1fr} }
 
 /* ---------------- 月历 ---------------- */
-.ev-cal{background:var(--paper-2);border-radius:var(--r-xl);padding:16px}
+.ev-cal{background:var(--paper);border-radius:var(--r-xl);padding:16px;box-shadow:var(--sh-sm)}
 /* 表格式日历：表头色带 + 细网格线（gap:1px 露出底色 = 网格线），万年历式结构 */
 .ev-week{
   display:grid;grid-template-columns:repeat(7,1fr);gap:1px;
@@ -488,7 +490,6 @@ body{
 
   <div class="ev-filters">
     <input class="ev-search" id="q" type="search" placeholder="搜索演出、场地、场次备注…" autocomplete="off">
-    <div class="ev-chips" id="typeChips"></div>
     <select class="ev-sel" id="regionSel"><option value="">全部举办地</option></select>
     <select class="ev-sel" id="whenSel" title="按场次的开售时间过滤（演出日程下不适用，自动隐藏）">
       <option value="wait" selected>仅待开售场次</option>
@@ -497,6 +498,7 @@ body{
   </div>
 
   <div class="ev-body">
+    <aside class="ev-side" id="side"></aside>
     <div id="colMain">
       <section class="ev-cal" id="viewMonth" data-dim="sell">
         <div class="ev-mstrip" id="mStrip"></div>
@@ -507,7 +509,6 @@ body{
       </section>
       <section class="ev-list" id="viewList" hidden></section>
     </div>
-    <aside class="ev-side" id="side"></aside>
   </div>
 </main>
 
@@ -520,8 +521,9 @@ body{
      活动列表里的 sellDateTime 是「该活动尚未开售场次里最晚的一个」，
      会漏掉更早开售的场次（如会员预售场），所以开售时间必须以场次为准。 */
   var API_SESS = "https://www.fantopia.io/fanapiWeb/eventsInfo/inside/getEventsDetailByKey";
-  /* 活动详情页 */
+  /* 活动详情页：选座活动走独立详情页（带座位图），其余走普通购票页 */
   var SITE = "https://www.fantopia.io/events-tickets";
+  var SITE_SEAT = "https://www.fantopia.io/events-ticket";
 
   /* 上架地区：接口按请求头 area 返回该地区上架的活动。
      注意：这不是「活动举办地」筛选 —— 各地区的活动池不同，
@@ -719,7 +721,6 @@ body{
   var cur = null;        /* {y, mo} 当前月 */
   var selKey = null;     /* 选中日期 */
   var mode = "month";
-  var fType = 0;         /* 0 = 全部 */
   var fRegion = "";      /* 活动举办地筛选（从标题/场地提取） */
   var fWhen = "wait";    /* 开售维度：wait = 只看待开售场次；all = 含已开售 */
   var fText = "";
@@ -1209,7 +1210,6 @@ body{
     var q = fText.trim().toLowerCase();
     VIEW = dimPool().filter(function (r) {
       if (!dimOK(r)) return false;
-      if (fType && r.type !== fType) return false;
       if (fRegion && r.region !== fRegion) return false;
       if (q && hay(r).indexOf(q) < 0) return false;
       return true;
@@ -1309,16 +1309,6 @@ body{
         esc(k) + "（" + have[k] + " 场）</option>";
     });
     sel.innerHTML = html;
-
-    var chips = $("typeChips");
-    var want = [0].concat(Object.keys(TYPE).map(Number));
-    chips.innerHTML = want.map(function (t) {
-      var n = pool.filter(function (r) {
-        return dimOK(r) && (!t || r.type === t);
-      }).length;
-      return '<button class="ev-chip' + (fType === t ? " on" : "") + '" data-t="' + t + '">' +
-        (t ? esc(TYPE[t]) : "全部") + " " + n + "</button>";
-    }).join("");
   }
 
   /* 图例随维度变。分两组：「日程」口径（开售/演出，点色随维度换）、「日期」口径（休息日/调休，恒定） */
@@ -1637,6 +1627,11 @@ body{
     }).join("") + "</div>";
   }
 
+  /* 活动详情页地址：选座活动（chooseSeatFlag=1）走独立详情页，其余走普通购票页 */
+  function detailURL(r) {
+    return (r.seat === 1 ? SITE_SEAT : SITE) + "?eventsKey=" + r.key;
+  }
+
   /* g = { key, items:[记录] } —— 同一活动当天的全部记录（开售维度是开售批次，演出维度是演出场） */
   function cardHTML(g) {
     if (dim === "show") return showCardHTML(g);
@@ -1705,7 +1700,7 @@ body{
       esc(areas.map(function (c) { return AREA_NAME[c] || c; }).join(" / ")) + "</b></div>";
 
     body += '<div class="ev-card-f">' +
-      '<a class="ev-go" href="' + esc(SITE + "?eventsKey=" + first.key) + '" target="_blank" rel="noopener">去 Fantopia 抢票</a>' +
+      '<a class="ev-go" href="' + esc(detailURL(first)) + '" target="_blank" rel="noopener">去 Fantopia 抢票</a>' +
       '<button class="ev-copy" data-copy="' + esc(copyText(g)) + '">复制信息</button>' +
       "</div>";
 
@@ -1784,7 +1779,7 @@ body{
       esc(areas.map(function (c) { return AREA_NAME[c] || c; }).join(" / ")) + "</b></div>";
 
     body += '<div class="ev-card-f">' +
-      '<a class="ev-go" href="' + esc(SITE + "?eventsKey=" + first.key) + '" target="_blank" rel="noopener">去 Fantopia 看演出</a>' +
+      '<a class="ev-go" href="' + esc(detailURL(first)) + '" target="_blank" rel="noopener">去 Fantopia 看演出</a>' +
       '<button class="ev-copy" data-copy="' + esc(copyText(g)) + '">复制信息</button>' +
       "</div>";
 
@@ -1846,7 +1841,7 @@ body{
     if (first.areas && first.areas.length > 1) {
       lines.push("上架地区：" + first.areas.map(function (c) { return AREA_NAME[c] || c; }).join(" / "));
     }
-    lines.push("详情：" + SITE + "?eventsKey=" + first.key);
+    lines.push("详情：" + detailURL(first));
     return lines.filter(Boolean).join("\n");
   }
 
@@ -1889,7 +1884,7 @@ body{
     if (first.areas && first.areas.length > 1) {
       lines.push("上架地区：" + first.areas.map(function (c) { return AREA_NAME[c] || c; }).join(" / "));
     }
-    lines.push("详情：" + SITE + "?eventsKey=" + first.key);
+    lines.push("详情：" + detailURL(first));
     return lines.filter(Boolean).join("\n");
   }
 
@@ -1986,7 +1981,8 @@ body{
     fText = "";
     $("q").value = "";
     selKey = null;
-    picked = false;
+    /* 切维度只换基准日，保留当前月份 —— 不跳回最近有事的月（用户可能正停在 11 月看演出） */
+    picked = true;
     renderLegend();
     renderAll(true);
   }
@@ -2101,12 +2097,6 @@ body{
   $("viewSeg").addEventListener("click", function (e) {
     var b = e.target.closest("button");
     if (b) setMode(b.getAttribute("data-v"));
-  });
-  $("typeChips").addEventListener("click", function (e) {
-    var b = e.target.closest(".ev-chip");
-    if (!b) return;
-    fType = +b.getAttribute("data-t");
-    apply(); renderRegions(); renderMonth(); renderList(); renderSide();
   });
   /* 切换上架地区 = 换数据源，必须重新请求（不是前端筛选）。
      若该地区有上次的缓存，先原样上屏再后台刷新 —— 切回去也是秒开 */
