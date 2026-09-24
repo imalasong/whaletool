@@ -678,6 +678,10 @@ body{
   var loaded = false;
   var picked = false;
   var loading = false;   /* 正在取数（用于进度线与「数据未齐」状态） */
+  /* 命中缓存时先上屏旧数据，此时必须把「你看到的是旧数据」这句话**留在状态栏**：
+     load() 一开始会把状态栏改成「并发拉取 N 个地区…」，如果直接覆盖，用户就分不清
+     屏上内容是刚拉的还是十分钟前的。所以缓存提示存这里，取数期间优先显示它。 */
+  var staleNote = "";
 
   var $ = function (id) { return document.getElementById(id); };
 
@@ -832,7 +836,7 @@ body{
     loading = true;
     busy(true);
     prog(0.08);
-    sync(codes.length > 1 ? ("并发拉取 " + codes.length + " 个地区…") : "拉取中…");
+    sync(staleNote || (codes.length > 1 ? ("并发拉取 " + codes.length + " 个地区…") : "拉取中…"));
 
     Promise.all(codes.map(function (c) {
       /* 单个地区失败不拖垮整体 */
@@ -917,6 +921,9 @@ body{
           renderAll(final);
         };
 
+        /* 地区已到 → 屏上马上就是新的活动池了，「显示旧数据」这句话到此为止 */
+        staleNote = "";
+
         if (!need.length) { refreshView(true); finish(btn, ok, bad, truncated, [], targets.length); return; }
 
         /* 进度：地区占前 45%，场次从 45% 走到 100% */
@@ -948,6 +955,7 @@ body{
         loading = false;
         busy(false);
         prog(-1);
+        staleNote = "";
         sync("载入失败");
         fail(e);
       });
@@ -1965,6 +1973,22 @@ body{
     $("side").innerHTML = "";
   }
 
+  /* 侧栏骨架屏：第一次访问、或切到一个没有缓存的地区时用。
+     宁可给「正在取数的骨架」，也不要给一个空白面板 —— 空白会被读成「这天没活动」。 */
+  function skSide() {
+    $("side").innerHTML = '<div class="ev-sk" style="height:420px">' +
+      '<div class="bar" style="width:70%;margin-top:22px"></div><div class="bar" style="width:50%"></div>' +
+      '<div class="bar" style="width:80%;margin-top:22px"></div><div class="bar" style="width:60%"></div></div>';
+  }
+
+  /* 命中缓存：先说明「屏上是几分钟前的数据」，再让它去后台更新。
+     返回 true 表示已经给了这句提示（load() 会保留它，不覆盖成「并发拉取…」）。 */
+  function staleSync(ms) {
+    var ago = Math.max(0, Math.round(ms / 60000));
+    staleNote = "显示 " + (ago < 1 ? "刚刚" : ago + " 分钟前") + "的数据 · 正在更新…";
+    sync(staleNote);
+  }
+
   /* 换数据源（地区）时先把内存清干净再重绘，避免不同地区的活动混在一起 */
   function resetData(ev, all, sc) {
     EVENTS = ev || [];
@@ -2016,6 +2040,9 @@ body{
     picked = false;
     var hit = readCache();
     resetData(hit ? hit.EVENTS : [], hit ? hit.ALL : [], null);
+    /* 有缓存 → 说明「屏上是旧数据」；没缓存 → 给骨架屏，别让面板空着 */
+    if (hit) staleSync(Date.now() - hit.t);
+    else { staleNote = ""; skSide(); }
     load(false);
   });
   $("regionSel").addEventListener("change", function () {
@@ -2052,15 +2079,13 @@ body{
     if (hit) {
       EVENTS = hit.EVENTS || [];
       ALL = hit.ALL || [];
-      var ago = Math.max(0, Math.round((Date.now() - hit.t) / 60000));
-      sync("显示 " + (ago < 1 ? "刚刚" : ago + " 分钟前") + "的数据 · 正在更新…");
+      staleSync(Date.now() - hit.t);
       renderAll(false);      /* picked 仍为 false：首屏会跳到最近有事的那个月 */
       prog(0.04);
     } else {
+      staleNote = "";
       renderMonth();
-      $("side").innerHTML = '<div class="ev-sk" style="height:420px">' +
-        '<div class="bar" style="width:70%;margin-top:22px"></div><div class="bar" style="width:50%"></div>' +
-        '<div class="bar" style="width:80%"></div><div class="bar" style="width:60%"></div></div>';
+      skSide();
     }
     load(false);
   })();
