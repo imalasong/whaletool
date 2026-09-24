@@ -124,7 +124,7 @@ body{
 .ev-pill:hover{background:#eaeaef}
 .ev-pill.on{background:var(--ink);color:#fff}
 
-.ev-seg{display:flex;background:var(--paper-2);border-radius:980px;padding:3px;margin-left:auto}
+.ev-seg{display:flex;background:var(--paper-2);border-radius:980px;padding:3px}
 .ev-seg button{
   font:inherit;font-size:12.5px;font-weight:500;border:none;background:transparent;
   padding:6px 16px;border-radius:980px;cursor:pointer;color:var(--ink-2);
@@ -132,12 +132,15 @@ body{
 }
 .ev-seg button.on{background:var(--paper);color:var(--ink);box-shadow:0 1px 3px rgba(0,0,0,.1)}
 /* 维度切换：和「月历 / 列表」同形，但它是页面的主开关，所以站在左边、用纸白底 */
-.ev-dim{margin-left:0;background:var(--paper);box-shadow:var(--sh-sm)}
+.ev-dim{background:var(--paper);box-shadow:var(--sh-sm)}
 .ev-dim button{padding:6px 15px}
 /* 每个维度按钮前一个色点，直接预告这一档日历的点色 */
 .ev-dim button::before{content:"";display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:7px;vertical-align:0}
 .ev-dim button[data-d="sell"]::before{background:var(--blue)}
 .ev-dim button[data-d="show"]::before{background:var(--orange)}
+/* 工具栏分组：地区|维度 在左，「视图+月份导航+今天」这一组浏览控件整体靠右 */
+.ev-browse{margin-left:auto;display:flex;align-items:center;gap:12px}
+.ev-lsep{width:1px;height:22px;background:var(--line);flex:none;margin:0 2px}
 
 .ev-filters{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:22px}
 .ev-search{
@@ -174,16 +177,28 @@ body{
 }
 .ev-week span:nth-child(6),.ev-week span:nth-child(7){color:#c8402f}  /* 周六/周日红字 */
 /* 月份快捷条（万年历式）：1~12 月一键直达，当前月高亮，有日程的月份带点 */
-.ev-mstrip{display:flex;gap:3px;margin-bottom:10px;overflow-x:auto;padding-bottom:2px;scrollbar-width:none}
-.ev-mstrip::-webkit-scrollbar{display:none}
-.ev-mstrip button{
-  font:inherit;flex:none;font-size:11px;font-weight:600;color:var(--gray-2);
-  background:transparent;border:none;border-radius:8px;padding:4px 7px;cursor:pointer;
-  transition:background .15s var(--ease),color .15s var(--ease);line-height:1.1;
+.ev-mstrip{
+  display:flex;align-items:center;gap:3px;margin-bottom:12px;
+  background:var(--paper-2);border:1px solid var(--line-2);border-radius:12px;
+  padding:5px 7px;overflow-x:auto;scrollbar-width:none;
 }
-.ev-mstrip button:hover{background:rgba(0,0,0,.05);color:var(--ink)}
+.ev-mstrip::-webkit-scrollbar{display:none}
+.ev-mstrip .ev-my{
+  flex:none;font-size:12px;font-weight:700;color:var(--ink-2);letter-spacing:-.01em;
+  padding:0 10px 0 5px;border-right:1px solid var(--line);white-space:nowrap;
+}
+.ev-mstrip button{
+  font:inherit;flex:none;font-size:12.5px;font-weight:600;color:var(--gray-2);
+  background:transparent;border:none;border-radius:8px;padding:6px 11px;cursor:pointer;
+  transition:background .15s var(--ease),color .15s var(--ease);line-height:1;position:relative;
+}
+.ev-mstrip button:hover{background:#fff;color:var(--ink)}
 .ev-mstrip button.on{background:var(--blue);color:#fff}
-.ev-mstrip button i{display:block;width:3px;height:3px;border-radius:50%;margin:2px auto 0;background:var(--blue);opacity:0}
+.ev-mstrip button.has{color:var(--ink)}
+.ev-mstrip button i{
+  position:absolute;bottom:2px;left:50%;transform:translateX(-50%);
+  width:4px;height:4px;border-radius:50%;background:var(--blue);opacity:0;
+}
 .ev-mstrip button.has i{opacity:1}
 .ev-mstrip button.on i{background:#fff}
 .ev-grid{
@@ -316,8 +331,20 @@ body{
 .ev-row-r span{display:block;font-size:11px;color:var(--gray-2);margin-top:3px}
 
 /* ---------------- 侧栏 ---------------- */
-.ev-side{position:sticky;top:72px;display:flex;flex-direction:column;gap:14px}
-@media (max-width:960px){ .ev-side{position:static} }
+.ev-side{
+  position:sticky;top:72px;display:flex;flex-direction:column;gap:14px;
+  max-height:calc(100vh - 88px);overflow-y:auto;overflow-x:hidden;
+  overscroll-behavior:contain;padding-right:4px;margin-right:-4px;
+  scrollbar-width:thin;scrollbar-color:rgba(0,0,0,.16) transparent;
+}
+.ev-side::-webkit-scrollbar{width:8px}
+.ev-side::-webkit-scrollbar-thumb{background:rgba(0,0,0,.16);border-radius:4px;border:2px solid transparent;background-clip:padding-box}
+.ev-side::-webkit-scrollbar-thumb:hover{background:rgba(0,0,0,.3);background-clip:padding-box}
+.ev-side::-webkit-scrollbar-track{background:transparent}
+/* 关键：flex 子项默认会被压缩到容器高以内（卡片被压扁、内容溢出），
+   必须钉住「子项保持内容高度」，限高才有「内部滚动」而不是「挤成一团」 */
+.ev-side>*{flex:none}
+@media (max-width:960px){ .ev-side{position:static;max-height:none;overflow:visible;padding-right:0;margin-right:0} }
 .ev-side-h{display:flex;align-items:baseline;gap:8px;padding:0 4px}
 .ev-side-h b{font-size:15px;font-weight:600;letter-spacing:-.02em}
 .ev-side-h span{font-size:12px;color:var(--gray-2);margin-left:auto}
@@ -470,21 +497,24 @@ body{
       <span>上架地区</span>
       <select class="ev-sel" id="areaSel"></select>
     </label>
+    <span class="ev-lsep"></span>
     <div class="ev-seg ev-dim" id="dimSeg" title="开售日程：按每个场次的开售时间铺日历（抢票用）；演出日程：按每个场次的演出日期铺日历（看演出用）">
       <button data-d="sell" class="on">开售日程</button>
       <button data-d="show">演出日程</button>
     </div>
-    <span class="ev-bar-nav" id="barNav">
-      <div class="ev-mnav">
-        <button id="prevM" title="上一月">‹</button>
-        <div class="ev-mlabel" id="mLabel">—</div>
-        <button id="nextM" title="下一月">›</button>
+    <div class="ev-browse">
+      <div class="ev-seg" id="viewSeg">
+        <button data-v="month" class="on">月历</button>
+        <button data-v="list">列表</button>
       </div>
-      <button class="ev-pill" id="todayBtn">今天</button>
-    </span>
-    <div class="ev-seg" id="viewSeg">
-      <button data-v="month" class="on">月历</button>
-      <button data-v="list">列表</button>
+      <span class="ev-bar-nav" id="barNav">
+        <div class="ev-mnav">
+          <button id="prevM" title="上一月">‹</button>
+          <div class="ev-mlabel" id="mLabel">—</div>
+          <button id="nextM" title="下一月">›</button>
+        </div>
+        <button class="ev-pill" id="todayBtn">今天</button>
+      </span>
     </div>
   </div>
 
@@ -1422,7 +1452,7 @@ body{
     Object.keys(byDay).forEach(function (k) {
       if (k.slice(0, 4) === String(y)) hasM[+k.slice(5, 7)] = 1;
     });
-    var html = "";
+    var html = '<span class="ev-my">' + y + " 年</span>";
     for (var m = 1; m <= 12; m++) {
       html += '<button data-m="' + m + '"' +
         (m === cur.mo ? ' class="on' + (hasM[m] ? " has" : "") + '"' : hasM[m] ? ' class="has"' : "") +
