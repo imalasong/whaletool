@@ -162,6 +162,19 @@ body{
 .ev-cal{background:var(--paper-2);border-radius:var(--r-xl);padding:16px}
 .ev-week{display:grid;grid-template-columns:repeat(7,1fr);gap:5px;margin-bottom:6px}
 .ev-week span{text-align:left;padding-left:9px;font-size:11.5px;font-weight:600;color:var(--gray);letter-spacing:0}
+/* 月份快捷条（万年历式）：1~12 月一键直达，当前月高亮，有日程的月份带点 */
+.ev-mstrip{display:flex;gap:3px;margin-bottom:10px;overflow-x:auto;padding-bottom:2px;scrollbar-width:none}
+.ev-mstrip::-webkit-scrollbar{display:none}
+.ev-mstrip button{
+  font:inherit;flex:none;font-size:11px;font-weight:600;color:var(--gray-2);
+  background:transparent;border:none;border-radius:8px;padding:4px 7px;cursor:pointer;
+  transition:background .15s var(--ease),color .15s var(--ease);line-height:1.1;
+}
+.ev-mstrip button:hover{background:rgba(0,0,0,.05);color:var(--ink)}
+.ev-mstrip button.on{background:var(--blue);color:#fff}
+.ev-mstrip button i{display:block;width:3px;height:3px;border-radius:50%;margin:2px auto 0;background:var(--blue);opacity:0}
+.ev-mstrip button.has i{opacity:1}
+.ev-mstrip button.on i{background:#fff}
 .ev-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:5px}
 /* 日期格 = 「定位哪天有事」的入口，不承担罗列职责（详情在右侧面板）。
    所以格内只放：日期数字 + 场次点阵 + 最近一场开售时间，全部等高。 */
@@ -180,25 +193,39 @@ body{
 .ev-cell.sel{border-color:var(--blue);box-shadow:0 0 0 3.5px var(--blue-bg)}
 .ev-dn{
   align-self:flex-start;
-  display:inline-flex;align-items:center;justify-content:center;
-  width:22px;height:22px;border-radius:50%;font-size:11.5px;font-weight:600;
-  color:var(--gray);font-variant-numeric:tabular-nums;
+  font-size:15.5px;font-weight:700;line-height:1.15;
+  color:var(--gray-2);font-variant-numeric:tabular-nums;letter-spacing:-.02em;
 }
 .ev-cell.has .ev-dn{color:var(--ink)}
 /* 休息日红字（中国日历惯例）：法定节假日深一档，普通周末浅一档 */
-.ev-cell.wknd .ev-dn{color:#c5827c}
+.ev-cell.wknd .ev-dn{color:#cd6f66}
 .ev-cell.holi .ev-dn{color:#c8402f}
 /* 调休上班日本质是「工作日」—— 数字回到中性色，靠角标「班」区分 */
-.ev-cell.shif .ev-dn{color:var(--gray)}
-/* 今天：实心圆底反白，优先级高于以上全部 */
-.ev-cell.today .ev-dn{background:var(--ink);color:#fff}
-.ev-cell.today.holi .ev-dn,.ev-cell.today.wknd .ev-dn{background:#c8402f;color:#fff}
-/* 右上角角标：节日名 / 调休「班」 */
-.ev-badge{
-  position:absolute;top:7px;right:8px;font-size:10.5px;font-weight:600;
-  line-height:1;color:#c8402f;letter-spacing:-.02em;
+.ev-cell.shif .ev-dn{color:var(--gray-2)}
+/* 数字下的节日名副行（万年历式：大数字 + 节日名） */
+.ev-fn{
+  align-self:flex-start;margin-top:1px;
+  font-size:10px;font-weight:600;line-height:1.2;color:#c8402f;letter-spacing:.03em;
 }
-.ev-badge.work{color:var(--gray);background:#ececf0;border-radius:4px;padding:2px 4px;font-size:9.5px}
+/* 今天：整格实底蓝（万年历的「今天」格），格内全部反白 */
+.ev-cell.today{background:var(--blue);box-shadow:var(--sh-sm)}
+.ev-cell.today:hover{background:var(--blue)}
+.ev-cell.today .ev-dn{color:#fff}
+.ev-cell.today .ev-fn{color:rgba(255,255,255,.92)}
+.ev-cell.today .ev-when{color:#fff}
+.ev-cell.today.has:hover .ev-when{color:#fff}
+.ev-cell.today .ev-dots u{color:rgba(255,255,255,.85)}
+.ev-cell.today .ev-dots i{background:#fff}
+.ev-cell.today .ev-dots i.ring{background:transparent;box-shadow:inset 0 0 0 1.5px #fff}
+.ev-cell.today .ev-dots i.mis,.ev-cell.today .ev-dots i.over{background:rgba(255,255,255,.45)}
+.ev-cell.today.sel{border-color:#fff}
+/* 右上角角标：法定假「休」/ 调休「班」（万年历式的角签） */
+.ev-badge{
+  position:absolute;top:6px;right:7px;font-size:9.5px;font-weight:700;
+  line-height:1;color:#fff;background:#c8402f;letter-spacing:.04em;
+  padding:3px 5px 3px 6px;border-radius:3px 9px 3px 9px;
+}
+.ev-badge.work{color:var(--ink-2);background:#ececf0}
 /* 第二行：场次点阵（一场一点）+ 最近一场开售时间 */
 .ev-line{margin-top:auto;display:flex;align-items:center;gap:6px;min-width:0}
 .ev-dots{display:flex;align-items:center;gap:3px;flex:none}
@@ -388,8 +415,9 @@ body{
   .ev-hero{padding-top:40px}
   .ev-main{padding-left:16px;padding-right:16px}
   .ev-cell{min-height:56px;padding:5px}
-  .ev-dn{width:19px;height:19px;font-size:10.5px}
-  .ev-badge{top:5px;right:5px;font-size:9.5px}
+  .ev-dn{font-size:13px}
+  .ev-badge{top:4px;right:5px;font-size:8.5px;padding:2px 4px 2px 5px}
+  .ev-mstrip button{padding:3px 6px}
   .ev-when{display:none}
   .ev-dots i{width:5px;height:5px}
   .ev-cal{padding:12px;border-radius:var(--r-lg)}
@@ -461,6 +489,7 @@ body{
   <div class="ev-body">
     <div id="colMain">
       <section class="ev-cal" id="viewMonth" data-dim="sell">
+        <div class="ev-mstrip" id="mStrip"></div>
         <div class="ev-week"><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span><span>日</span></div>
         <div class="ev-grid" id="grid"></div>
         <div class="ev-legend" id="legend"></div>
@@ -549,7 +578,7 @@ body{
     return (dow === 0 || dow === 6) ? "wknd" : "";
   }
   function dayBadge(k, zone) {
-    if (zone === "holi") return { t: HOLI[k], work: false };
+    if (zone === "holi") return { t: "休", work: false };   /* 节日名走数字下的副行 .ev-fn */
     if (zone === "shif") return { t: "班", work: true };
     return null;
   }
@@ -1322,6 +1351,7 @@ body{
 
       var inner = '<span class="ev-dn">' + d + "</span>";
       var bd = dayBadge(k, zone);
+      if (zone === "holi") inner += '<span class="ev-fn">' + esc(HOLI[k]) + "</span>";
       if (bd) inner += '<span class="ev-badge' + (bd.work ? " work" : "") + '">' + esc(bd.t) + "</span>";
 
       var tip = [];
@@ -1379,9 +1409,30 @@ body{
     /* 补齐尾部，保持网格整齐 */
     while (cells.length % 7 !== 0) cells.push('<div class="ev-cell pad"></div>');
     g.innerHTML = cells.join("");
+    renderStrip();
     updMLabel();
     updHoliNote();
     updCalTip();
+  }
+
+  /* 月份快捷条：1~12 月一键直达（万年历式）。当前月高亮；
+     「有日程的月份」下面带一个小点 —— 扫一眼就知道该跳去哪个月。
+     日程池按筛选联动（byDay），所以点色语义跟着当前维度走。 */
+  function renderStrip() {
+    var el = $("mStrip");
+    if (!el || !cur) return;
+    var y = cur.y;
+    var hasM = {};
+    Object.keys(byDay).forEach(function (k) {
+      if (k.slice(0, 4) === String(y)) hasM[+k.slice(5, 7)] = 1;
+    });
+    var html = "";
+    for (var m = 1; m <= 12; m++) {
+      html += '<button data-m="' + m + '"' +
+        (m === cur.mo ? ' class="on' + (hasM[m] ? " has" : "") + '"' : hasM[m] ? ' class="has"' : "") +
+        ">" + m + "月<i></i></button>";
+    }
+    el.innerHTML = html;
   }
 
   /* 节假日数据只到国务院已公布的年份：翻到之后的年份要说清楚，
@@ -2024,6 +2075,12 @@ body{
   /* -------------------- 启动 -------------------- */
   $("prevM").addEventListener("click", function () { goMonth(-1); });
   $("nextM").addEventListener("click", function () { goMonth(1); });
+  $("mStrip").addEventListener("click", function (e) {
+    var b = e.target.closest("button");
+    if (!b) return;
+    var m = +b.getAttribute("data-m");
+    if (cur && m !== cur.mo) goMonth(m - cur.mo);
+  });
   $("todayBtn").addEventListener("click", gotoToday);
   $("grid").addEventListener("click", onGridClick);
   $("viewList").addEventListener("click", onRowClick);
