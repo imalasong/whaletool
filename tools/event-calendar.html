@@ -3,7 +3,64 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>演出日历 · WhaleTool</title>
+<title>演出日历 · 演唱会/音乐节开售与演出日程表 | WhaleTool</title>
+<meta name="description" content="演出日历收录 Fantopia 演出活动的开售日程与演出日程：演唱会、音乐节、签售会按场次标注每日开售与演出时间，支持按地区筛选、节假日调休标记、待开售提醒，一眼看清哪天抢票、哪天开演。纯网页免安装，开箱即用。">
+<meta name="keywords" content="演出日历,演唱会,音乐节,开售时间,演出日程,抢票,签售会,Fantopia,票务日历">
+<meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1">
+<meta name="theme-color" content="#f5f5f7">
+<link rel="canonical" href="https://imalasong.github.io/whaletool/tools/event-calendar.html">
+
+<!-- Open Graph：微信 / 微博 / Facebook 等社交分享卡片 -->
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="WhaleTool">
+<meta property="og:title" content="演出日历 · 演唱会/音乐节开售与演出日程表">
+<meta property="og:description" content="按场次收录每场演出活动的开售时间与演出日期，日历式呈现，支持地区筛选与节假日标记。一眼看清哪天抢票、哪天开演。">
+<meta property="og:url" content="https://imalasong.github.io/whaletool/tools/event-calendar.html">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="https://imalasong.github.io/whaletool/assets/og-calendar.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="演出日历：演唱会、音乐节的开售与演出日程一览">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="演出日历 · 演唱会/音乐节开售与演出日程表">
+<meta name="twitter:description" content="按场次收录每场演出活动的开售时间与演出日期，日历式呈现，支持地区筛选与节假日标记。">
+<meta name="twitter:image" content="https://imalasong.github.io/whaletool/assets/og-calendar.png">
+
+<!-- 结构化数据：帮助搜索引擎理解页面 -->
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "WebApplication",
+  "name": "演出日历",
+  "alternateName": "WhaleTool 演出日历",
+  "url": "https://imalasong.github.io/whaletool/tools/event-calendar.html",
+  "description": "收录 Fantopia 演出活动的开售日程与演出日程：演唱会、音乐节、签售会按场次标注每日开售与演出时间，支持地区筛选、节假日调休标记与待开售提醒。",
+  "inLanguage": "zh-CN",
+  "applicationCategory": "UtilitiesApplication",
+  "operatingSystem": "Any",
+  "browserRequirements": "Requires JavaScript",
+  "isAccessibleForFree": true,
+  "offers": { "@type": "Offer", "price": "0", "priceCurrency": "CNY" },
+  "featureList": [
+    "开售日程月历（按场次开售时间）",
+    "演出日程月历（按场次演出日期）",
+    "按上架地区筛选",
+    "中国节假日与调休标记",
+    "列表视图与活动搜索"
+  ]
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [
+    { "@type": "ListItem", "position": 1, "name": "WhaleTool", "item": "https://imalasong.github.io/whaletool/" },
+    { "@type": "ListItem", "position": 2, "name": "演出日历", "item": "https://imalasong.github.io/whaletool/tools/event-calendar.html" }
+  ]
+}
+</script>
+
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎫</text></svg>">
 <link rel="stylesheet" href="../assets/style.css">
 <style>
@@ -469,6 +526,12 @@ body{
 </head>
 <body>
 
+<noscript>
+  <p style="max-width:1320px;margin:16px auto 0;padding:12px 24px;font-size:14px;color:#424245">
+    演出日历需要启用 JavaScript 才能加载 Fantopia 实时演出数据。本工具收录演唱会、音乐节、签售会等活动的开售日程与演出日程，按场次标注每日开售与演出时间。
+  </p>
+</noscript>
+
 <nav class="ev-nav">
   <div class="ev-nav-in">
     <a class="ev-back" href="../">← 工具合辑</a>
@@ -483,7 +546,7 @@ body{
 
 <header class="ev-hero">
   <p class="ev-kicker">Fantopia · 开售日程 / 演出日程</p>
-  <h1 id="heroTitle">开售日程</h1>
+  <h1 id="heroTitle">演出日历</h1>
   <p class="ev-sub" id="heroSub">以<b>场次</b>为单位收录开售时间 —— 一个活动下的每个场次各有自己的开售时间，日历按场次铺。直连 Fantopia 公开接口实时拉取，不经过任何中间服务。</p>
   <div class="ev-stats" id="stats">
     <div class="ev-sk" style="flex:1 1 158px"><div class="bar" style="width:60%"></div><div class="bar" style="width:40%;height:22px"></div></div>
