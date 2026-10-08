@@ -243,10 +243,10 @@ const TOOLS = [
   {
     id: "snowflake",
     name: "雪花算法 ID 生成",
-    desc: "Twitter Snowflake 64 位全局唯一 ID，自定义数据中心 / 机器节点 / 起始纪元，支持逆向解码。",
+    desc: "yitter 雪花漂移算法：自定义机器码与位长，ID 更短，支持时间回拨与逆向解码。",
     icon: "❄️",
     href: "tools/snowflake.html",
-    tags: ["雪花算法", "Snowflake", "分布式ID", "唯一ID", "订单号", "64位"],
+    tags: ["雪花算法", "雪花漂移", "Snowflake", "分布式ID", "唯一ID", "yitter", "WorkerId"],
     category: "dev",
     badge: "NEW",
     date: "2026-10-08",

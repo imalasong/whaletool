@@ -4,15 +4,15 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>雪花算法 ID 生成 · WhaleTool</title>
-<meta name="description" content="在线雪花算法（Snowflake）ID 生成器：自定义数据中心、机器节点与起始纪元，批量生成 64 位全局唯一 ID，支持十进制/十六进制输出与逆向解码，纯前端本地计算，不上传任何数据。">
-<meta name="keywords" content="雪花算法,Snowflake,分布式ID,唯一ID,ID生成器,64位ID,workerId,dataCenterId,自增ID">
+<meta name="description" content="基于 yitter/IdGenerator 雪花漂移算法的在线 ID 生成器：自定义机器码、机器码位长、序列数位长与基础时间，批量生成短数字型全局唯一 ID，支持时间回拨与逆向解码，纯前端本地计算，不上传任何数据。">
+<meta name="keywords" content="雪花算法,Snowflake,雪花漂移,yitter,分布式ID,唯一ID,ID生成器,WorkerId,机器码,序列数,自增ID,时间回拨">
 <meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1">
 <meta name="theme-color" content="#f4f7f9">
 <link rel="canonical" href="https://imalasong.github.io/whaletool/tools/snowflake.html">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="WhaleTool">
 <meta property="og:title" content="雪花算法 ID 生成 · WhaleTool">
-<meta property="og:description" content="自定义数据中心、机器节点与起始纪元，批量生成 64 位全局唯一 ID，支持逆向解码。纯前端本地计算。">
+<meta property="og:description" content="基于 yitter 雪花漂移算法：自定义机器码与位长，批量生成短数字型全局唯一 ID，支持时间回拨与逆向解码。纯前端本地计算。">
 <meta property="og:url" content="https://imalasong.github.io/whaletool/tools/snowflake.html">
 <meta property="og:locale" content="zh_CN">
 <meta property="og:image" content="https://imalasong.github.io/whaletool/assets/og-whaletool.png">
@@ -20,7 +20,7 @@
 <meta property="og:image:height" content="630">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="雪花算法 ID 生成 · WhaleTool">
-<meta name="twitter:description" content="自定义数据中心、机器节点与起始纪元，批量生成 64 位全局唯一 ID。">
+<meta name="twitter:description" content="基于 yitter 雪花漂移算法，批量生成短数字型全局唯一 ID。">
 <meta name="twitter:image" content="https://imalasong.github.io/whaletool/assets/og-whaletool.png">
 <script type="application/ld+json">
 {
@@ -29,13 +29,13 @@
   "name": "雪花算法 ID 生成",
   "alternateName": "Snowflake ID 生成器",
   "url": "https://imalasong.github.io/whaletool/tools/snowflake.html",
-  "description": "在线雪花算法 ID 生成器，自定义数据中心、机器节点与起始纪元，批量生成 64 位全局唯一 ID 并支持逆向解码。",
+  "description": "基于 yitter/IdGenerator 雪花漂移算法的在线 ID 生成器，自定义机器码、机器码位长、序列数位长与基础时间，批量生成短数字型全局唯一 ID 并支持逆向解码。",
   "inLanguage": "zh-CN",
   "applicationCategory": "DeveloperApplication",
   "operatingSystem": "Any",
   "isAccessibleForFree": true,
   "offers": { "@type": "Offer", "price": "0", "priceCurrency": "CNY" },
-  "featureList": ["批量生成 64 位雪花 ID", "自定义数据中心与机器节点", "自定义起始纪元", "十进制/十六进制输出", "逆向解码时间戳与机器位"]
+  "featureList": ["雪花漂移算法", "批量生成短数字型 ID", "自定义机器码与位长", "时间回拨处理", "序列号用尽自动漂移", "逆向解码时间戳与机器码"]
 }
 </script>
 <script type="application/ld+json">
@@ -57,20 +57,21 @@
 
 <div class="tool-head">
   <h1>❄️ 雪花算法 ID 生成</h1>
-  <p>Twitter Snowflake 的 64 位全局唯一 ID：符号位 1 + 时间戳 41 + 机器位 10 + 序列号 12。纯本地生成，不依赖网络、天然单调递增。</p>
+  <p>基于 <a href="https://github.com/yitter/IdGenerator" target="_blank" rel="noopener">yitter/IdGenerator</a> 的「雪花漂移」算法：<b>时间差 + 机器码 + 序列数</b>，ID 更短、支持时间回拨、序列号用尽自动漂移。纯本地生成，随时间单调递增。</p>
 </div>
 
 <div class="wrap">
   <div class="panel">
     <div class="panel-title"><span>生成配置</span></div>
     <div class="row tight">
-      <label class="lb">数据中心 ID <input class="wt" id="dcId" type="number" value="1" min="0" max="31" style="width:70px" title="5 位，0~31"></label>
-      <label class="lb" style="margin-left:8px">机器节点 ID <input class="wt" id="workerId" type="number" value="1" min="0" max="31" style="width:70px" title="5 位，0~31"></label>
-      <label class="lb" style="margin-left:8px">起始纪元
+      <label class="lb">机器码 WorkerId <input class="wt" id="workerId" type="number" value="1" min="0" max="63" style="width:78px" title="机器/应用唯一编号，必须全局唯一"></label>
+      <label class="lb" style="margin-left:8px">机器码位长 <input class="wt" id="workerBit" type="number" value="6" min="1" max="19" style="width:60px" title="决定机器码最大值，默认 6（0~63），取值范围 1~19"></label>
+      <label class="lb" style="margin-left:8px">序列数位长 <input class="wt" id="seqBit" type="number" value="6" min="3" max="21" style="width:60px" title="决定每毫秒序号个数，默认 6，取值范围 3~21；机器码位长 + 序列数位长 ≤ 22"></label>
+      <label class="lb" style="margin-left:8px">基础时间
         <select class="wt" id="epochSel" style="width:auto">
-          <option value="1704067200000" selected>2024-01-01</option>
-          <option value="1577836800000">2020-01-01</option>
-          <option value="1288834974657">Twitter 经典 (2010-11-04)</option>
+          <option value="1577836800000" selected>2020-01-01（默认）</option>
+          <option value="1704067200000">2024-01-01</option>
+          <option value="1288834974657">2010-11-04（Twitter）</option>
           <option value="0">1970-01-01</option>
         </select>
       </label>
@@ -80,9 +81,7 @@
       <label class="lb" style="margin-left:8px"><input type="checkbox" id="showHex" checked> 同时显示十六进制</label>
       <button class="btn btn-primary" id="btnGen">生成</button>
     </div>
-    <div class="note" style="margin-top:12px">
-      机器位 10 bit 拆成数据中心（5 bit）+ 机器节点（5 bit），最多支持 32×32 台机器；序列号 12 bit，单机每毫秒最多 4096 个，超过会顺延到下一毫秒。
-    </div>
+    <div class="note" id="constraint" style="margin-top:12px">机器码范围 0~63 · 每毫秒最多 64 个序号（0~4 为保留位）</div>
   </div>
 
   <div class="panel">
@@ -99,6 +98,7 @@
       <input class="wt" id="decodeInput" placeholder="粘贴一个雪花 ID（十进制）" style="flex:1;min-width:220px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace">
       <button class="btn btn-primary" id="btnDecode">解析</button>
     </div>
+    <div class="note" style="margin-top:8px">按当前「机器码位长 / 序列数位长 / 基础时间」反向拆分，需与生成时的配置一致。</div>
     <div class="out" id="decodeResult" style="margin-top:12px"></div>
   </div>
 
@@ -107,15 +107,13 @@
     <table class="wt">
       <thead><tr><th>字段</th><th class="num">位宽</th><th class="num">范围</th><th>说明</th></tr></thead>
       <tbody>
-        <tr><td>符号位</td><td class="num">1</td><td class="num">恒 0</td><td>保证是正数</td></tr>
-        <tr><td>时间戳</td><td class="num">41</td><td class="num">≈69 年</td><td>相对起始纪元的毫秒数</td></tr>
-        <tr><td>数据中心 ID</td><td class="num">5</td><td class="num">0~31</td><td>机房 / 集群编号</td></tr>
-        <tr><td>机器节点 ID</td><td class="num">5</td><td class="num">0~31</td><td>单机编号</td></tr>
-        <tr><td>序列号</td><td class="num">12</td><td class="num">0~4095</td><td>同一毫秒内的自增序号</td></tr>
+        <tr><td>时间差</td><td class="num">高位（可变）</td><td class="num">—</td><td>生成时刻 − 基础时间（毫秒）</td></tr>
+        <tr><td>机器码 WorkerId</td><td class="num">6（默认）</td><td class="num">0~63</td><td>机器 / 应用唯一编号</td></tr>
+        <tr><td>序列数</td><td class="num">6（默认）</td><td class="num">5~63</td><td>每毫秒内序号，0~4 为保留位（时间回拨 / 手工新值）</td></tr>
       </tbody>
     </table>
     <div class="note" style="margin-top:14px">
-      整体趋势递增（同一机器内严格递增），适合做主键、订单号、消息 ID。注意：41 位时间戳从起始纪元起约 69 年后会溢出，选纪元时留足余量。
+      雪花漂移算法相对 Twitter 经典雪花：ID 更短（默认约 15 位，50 年内不超过 JS 安全整数）、速度更快；<b>时间回拨</b>时用保留位 1~4 自动生成唯一 ID，<b>序列号用尽</b>时自动漂移到下一毫秒（不忙等）。默认配置下约 71000 年不重复。基础时间一旦确定，运行后只建议「更旧」不「更新」，避免 ID 重叠。
     </div>
   </div>
 </div>
@@ -125,46 +123,183 @@
 <script>
 (function () {
   "use strict";
-  var $dc = document.getElementById("dcId"), $worker = document.getElementById("workerId"),
-      $epochSel = document.getElementById("epochSel"), $count = document.getElementById("count"),
-      $showHex = document.getElementById("showHex"), $result = document.getElementById("result"),
-      $genInfo = document.getElementById("genInfo"), $decodeInput = document.getElementById("decodeInput"),
-      $decodeResult = document.getElementById("decodeResult");
+  var $worker = document.getElementById("workerId"),
+      $wBit = document.getElementById("workerBit"),
+      $sBit = document.getElementById("seqBit"),
+      $epochSel = document.getElementById("epochSel"),
+      $count = document.getElementById("count"),
+      $showHex = document.getElementById("showHex"),
+      $result = document.getElementById("result"),
+      $genInfo = document.getElementById("genInfo"),
+      $decodeInput = document.getElementById("decodeInput"),
+      $decodeResult = document.getElementById("decodeResult"),
+      $constraint = document.getElementById("constraint");
 
-  // 序列号状态：保持同一毫秒内递增，跨毫秒归零
-  var state = { lastTs: -1n, seq: 0 };
+  var genId = null;          // 长驻实例，跨批次保留序列号状态（避免同毫秒重复）
+  var fingerprint = "";      // 配置指纹，变化时重建实例
 
-  function nowMs() { return BigInt(Date.now()); }
-
-  function makeId(dc, worker, epoch) {
-    var ts = nowMs() - epoch;
-    if (ts < 0n) ts = 0n;
-    if (ts === state.lastTs) {
-      state.seq++;
-      if (state.seq > 4095) {           // 序列号用尽 → 顺延到下一毫秒
-        while (nowMs() - epoch === state.lastTs) { /* 忙等 1ms */ }
-        ts = nowMs() - epoch;
-        state.seq = 0;
-      }
-    } else {
-      state.seq = 0;
-    }
-    state.lastTs = ts;
-    return (ts << 22n) | (BigInt(dc) << 17n) | (BigInt(worker) << 12n) | BigInt(state.seq);
+  function clampInt(v, lo, hi, dflt) {
+    var n = Math.floor(+v);
+    if (isNaN(n)) n = dflt;
+    return Math.max(lo, Math.min(hi, n));
   }
 
-  function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, Math.floor(+v || 0))); }
+  /* ============ 雪花漂移算法（yitter/IdGenerator JavaScript 版的忠实移植） ============ */
+  function GenId(opt) {
+    // 默认值，与 yitter 保持一致
+    if (opt.BaseTime == null || opt.BaseTime < 0) opt.BaseTime = 1577836800000; // 2020-01-01
+    if (opt.WorkerIdBitLength == null || opt.WorkerIdBitLength < 0) opt.WorkerIdBitLength = 6;
+    if (opt.SeqBitLength == null || opt.SeqBitLength < 0) opt.SeqBitLength = 6;
+    var maxSeq = (1 << opt.SeqBitLength) - 1;
+    if (opt.MaxSeqNumber == null || opt.MaxSeqNumber <= 0) opt.MaxSeqNumber = maxSeq;
+    if (opt.MinSeqNumber == null || opt.MinSeqNumber < 0) opt.MinSeqNumber = 5;
+    if (opt.TopOverCostCount == null || opt.TopOverCostCount < 0) opt.TopOverCostCount = 2000;
 
+    this.BaseTime = BigInt(opt.BaseTime);
+    this.WorkerId = BigInt(opt.WorkerId);
+    this.WorkerIdBitLength = BigInt(opt.WorkerIdBitLength);
+    this.SeqBitLength = BigInt(opt.SeqBitLength);
+    this.MaxSeqNumber = BigInt(opt.MaxSeqNumber);
+    this.MinSeqNumber = BigInt(opt.MinSeqNumber);
+    this.TopOverCostCount = BigInt(opt.TopOverCostCount);
+
+    this._TimestampShift = this.WorkerIdBitLength + this.SeqBitLength;
+    this._CurrentSeqNumber = this.MinSeqNumber;
+
+    this._LastTimeTick = 0n;
+    this._TurnBackTimeTick = 0n;
+    this._TurnBackIndex = 0;
+    this._IsOverCost = false;
+    this._OverCostCountInOneTerm = 0n;
+  }
+
+  GenId.prototype.GetCurrentTimeTick = function () {
+    return BigInt(Date.now()) - this.BaseTime;
+  };
+  GenId.prototype.GetNextTimeTick = function () {
+    var t = this.GetCurrentTimeTick();
+    while (t <= this._LastTimeTick) t = this.GetCurrentTimeTick();
+    return t;
+  };
+  GenId.prototype.CalcId = function (tick) {
+    var r = (tick << this._TimestampShift) +
+            (this.WorkerId << this.SeqBitLength) +
+            this._CurrentSeqNumber;
+    this._CurrentSeqNumber++;
+    return r;
+  };
+  GenId.prototype.CalcTurnBackId = function (tick) {
+    var r = (tick << this._TimestampShift) +
+            (this.WorkerId << this.SeqBitLength) +
+            BigInt(this._TurnBackIndex);
+    this._TurnBackTimeTick--;
+    return r;
+  };
+  GenId.prototype.NextOverCostId = function () {
+    var cur = this.GetCurrentTimeTick();
+    if (cur > this._LastTimeTick) {
+      this._LastTimeTick = cur;
+      this._CurrentSeqNumber = this.MinSeqNumber;
+      this._IsOverCost = false;
+      this._OverCostCountInOneTerm = 0n;
+      return this.CalcId(this._LastTimeTick);
+    }
+    if (this._OverCostCountInOneTerm >= this.TopOverCostCount) {
+      this._LastTimeTick = this.GetNextTimeTick();
+      this._CurrentSeqNumber = this.MinSeqNumber;
+      this._IsOverCost = false;
+      this._OverCostCountInOneTerm = 0n;
+      return this.CalcId(this._LastTimeTick);
+    }
+    if (this._CurrentSeqNumber > this.MaxSeqNumber) {
+      this._LastTimeTick++;
+      this._CurrentSeqNumber = this.MinSeqNumber;
+      this._IsOverCost = true;
+      this._OverCostCountInOneTerm++;
+      return this.CalcId(this._LastTimeTick);
+    }
+    return this.CalcId(this._LastTimeTick);
+  };
+  GenId.prototype.NextNormalId = function () {
+    var cur = this.GetCurrentTimeTick();
+    // 时间回拨：用过去时序的保留位生成唯一 ID
+    if (cur < this._LastTimeTick) {
+      if (this._TurnBackTimeTick < 1n) {
+        this._TurnBackTimeTick = this._LastTimeTick - 1n;
+        this._TurnBackIndex++;
+        if (this._TurnBackIndex > 4) this._TurnBackIndex = 1;
+      }
+      return this.CalcTurnBackId(this._TurnBackTimeTick);
+    }
+    // 时间追平时，回拨计数清零
+    if (this._TurnBackTimeTick > 0n) this._TurnBackTimeTick = 0n;
+    if (cur > this._LastTimeTick) {
+      this._LastTimeTick = cur;
+      this._CurrentSeqNumber = this.MinSeqNumber;
+      return this.CalcId(this._LastTimeTick);
+    }
+    // 序列号用尽 → 漂移到下一毫秒
+    if (this._CurrentSeqNumber > this.MaxSeqNumber) {
+      this._LastTimeTick++;
+      this._CurrentSeqNumber = this.MinSeqNumber;
+      this._IsOverCost = true;
+      this._OverCostCountInOneTerm = 1n;
+      return this.CalcId(this._LastTimeTick);
+    }
+    return this.CalcId(this._LastTimeTick);
+  };
+  GenId.prototype.NextBigId = function () {
+    return this._IsOverCost ? this.NextOverCostId() : this.NextNormalId();
+  };
+
+  /* ============ 配置读取 + 约束校验 ============ */
+  function readConfig() {
+    var wBit = clampInt($wBit.value, 1, 19, 6);
+    var sBit = clampInt($sBit.value, 3, 21, 6);
+    if (wBit + sBit > 22) sBit = 22 - wBit;          // 机器码位长 + 序列数位长 ≤ 22
+    var maxWorker = Math.pow(2, wBit) - 1;
+    var worker = clampInt($worker.value, 0, maxWorker, 1);
+    return { worker: worker, wBit: wBit, sBit: sBit, baseTime: Number($epochSel.value || "0") };
+  }
+
+  function getGenId() {
+    var c = readConfig();
+    var fp = c.worker + "|" + c.wBit + "|" + c.sBit + "|" + c.baseTime;
+    if (!genId || fp !== fingerprint) {
+      genId = new GenId({
+        WorkerId: c.worker,
+        WorkerIdBitLength: c.wBit,
+        SeqBitLength: c.sBit,
+        BaseTime: c.baseTime
+      });
+      fingerprint = fp;
+    }
+    return genId;
+  }
+
+  function updateConstraint() {
+    var c = readConfig();
+    var maxWorker = Math.pow(2, c.wBit) - 1;
+    var total = Math.pow(2, c.sBit);
+    $worker.max = maxWorker;
+    $constraint.textContent =
+      "机器码范围 0~" + maxWorker +
+      " · 每毫秒最多 " + total + " 个序号（0~4 为保留位，可用 " + (total - 5) + " 个）" +
+      " · 位长之和 " + (c.wBit + c.sBit) + " ≤ 22";
+  }
+
+  /* ============ 视图 ============ */
   function esc(s) {
     return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
   }
 
   function gen() {
-    var dc = clamp($dc.value, 0, 31), worker = clamp($worker.value, 0, 31),
-        n = clamp($count.value, 1, 200), epoch = BigInt($epochSel.value || "0");
+    updateConstraint();
+    var g = getGenId();
+    var n = clampInt($count.value, 1, 200, 5);
     var html = "", decs = [];
     for (var i = 0; i < n; i++) {
-      var id = makeId(dc, worker, epoch);
+      var id = g.NextBigId();
       var dec = id.toString();
       decs.push(dec);
       var hex = id.toString(16).toUpperCase();
@@ -179,18 +314,22 @@
 
   function decode() {
     var raw = ($decodeInput.value || "").trim();
-    if (!/^\d{10,20}$/.test(raw)) { $decodeResult.textContent = "❌ 请输入有效的雪花 ID（10~20 位十进制整数）。"; return; }
+    if (!/^\d{5,24}$/.test(raw)) { $decodeResult.textContent = "❌ 请输入有效的雪花 ID（5~24 位十进制整数）。"; return; }
     var id = BigInt(raw);
-    var epoch = BigInt($epochSel.value || "0");
-    var ts = (id >> 22n) + epoch;
-    var dc = Number((id >> 17n) & 0x1Fn), worker = Number((id >> 12n) & 0x1Fn), seq = Number(id & 0xFFFn);
+    var c = readConfig();
+    var wBit = BigInt(c.wBit), sBit = BigInt(c.sBit);
+    var shift = wBit + sBit;
+    var tick = id >> shift;
+    var worker = Number((id >> sBit) & ((1n << wBit) - 1n));
+    var seq = Number(id & ((1n << sBit) - 1n));
+    var ts = tick + BigInt(c.baseTime);
     var t = new Date(Number(ts));
+    var seqNote = seq === 0 ? "（手工新值保留位）" : (seq >= 1 && seq <= 4 ? "（时间回拨预留位）" : "");
     $decodeResult.innerHTML =
       '<div class="sf-dc"><b>时间戳</b><span>' + t.toLocaleString("zh-CN", { hour12: false }) +
-      '（epoch + ' + Number(ts - epoch).toLocaleString() + ' ms）</span></div>' +
-      '<div class="sf-dc"><b>数据中心 ID</b><span>' + dc + '</span></div>' +
-      '<div class="sf-dc"><b>机器节点 ID</b><span>' + worker + '</span></div>' +
-      '<div class="sf-dc"><b>序列号</b><span>' + seq + '</span></div>';
+      '（基础时间 + ' + tick.toLocaleString() + ' ms）</span></div>' +
+      '<div class="sf-dc"><b>机器码 WorkerId</b><span>' + worker + '</span></div>' +
+      '<div class="sf-dc"><b>序列数</b><span>' + seq + " " + seqNote + '</span></div>';
   }
 
   function copyText(text, btn) {
@@ -230,7 +369,10 @@
 
   document.getElementById("btnGen").addEventListener("click", gen);
   document.getElementById("btnDecode").addEventListener("click", decode);
-  $epochSel.addEventListener("change", function () { state.lastTs = -1n; state.seq = 0; gen(); });
+  // 配置变化时：刷新约束提示并重建实例重新生成
+  [$worker, $wBit, $sBit, $epochSel].forEach(function (el) {
+    el.addEventListener("change", function () { fingerprint = ""; gen(); });
+  });
   $showHex.addEventListener("change", gen);
 
   // 结果卡片局部样式（复用面板体系，仅补雪花特有的等宽展示）
@@ -243,7 +385,7 @@
     ".sf-copy:hover{color:var(--primary)}" +
     ".sf-hex{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12px;color:var(--muted)}" +
     ".sf-dc{display:flex;gap:16px;padding:6px 0;border-bottom:1px solid var(--border-soft);font-size:14px}" +
-    ".sf-dc b{width:110px;flex:none;color:var(--muted);font-weight:600}" +
+    ".sf-dc b{width:140px;flex:none;color:var(--muted);font-weight:600}" +
     ".sf-dc span{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}";
   document.head.appendChild(css);
 
