@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>雪花算法 ID 生成 · WhaleTool</title>
+<meta name="description" content="在线雪花算法（Snowflake）ID 生成器：自定义数据中心、机器节点与起始纪元，批量生成 64 位全局唯一 ID，支持十进制/十六进制输出与逆向解码，纯前端本地计算，不上传任何数据。">
+<meta name="keywords" content="雪花算法,Snowflake,分布式ID,唯一ID,ID生成器,64位ID,workerId,dataCenterId,自增ID">
+<meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1">
+<meta name="theme-color" content="#f4f7f9">
+<link rel="canonical" href="https://imalasong.github.io/whaletool/tools/snowflake.html">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="WhaleTool">
+<meta property="og:title" content="雪花算法 ID 生成 · WhaleTool">
+<meta property="og:description" content="自定义数据中心、机器节点与起始纪元，批量生成 64 位全局唯一 ID，支持逆向解码。纯前端本地计算。">
+<meta property="og:url" content="https://imalasong.github.io/whaletool/tools/snowflake.html">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="https://imalasong.github.io/whaletool/assets/og-whaletool.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="雪花算法 ID 生成 · WhaleTool">
+<meta name="twitter:description" content="自定义数据中心、机器节点与起始纪元，批量生成 64 位全局唯一 ID。">
+<meta name="twitter:image" content="https://imalasong.github.io/whaletool/assets/og-whaletool.png">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "WebApplication",
+  "name": "雪花算法 ID 生成",
+  "alternateName": "Snowflake ID 生成器",
+  "url": "https://imalasong.github.io/whaletool/tools/snowflake.html",
+  "description": "在线雪花算法 ID 生成器，自定义数据中心、机器节点与起始纪元，批量生成 64 位全局唯一 ID 并支持逆向解码。",
+  "inLanguage": "zh-CN",
+  "applicationCategory": "DeveloperApplication",
+  "operatingSystem": "Any",
+  "isAccessibleForFree": true,
+  "offers": { "@type": "Offer", "price": "0", "priceCurrency": "CNY" },
+  "featureList": ["批量生成 64 位雪花 ID", "自定义数据中心与机器节点", "自定义起始纪元", "十进制/十六进制输出", "逆向解码时间戳与机器位"]
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [
+    { "@type": "ListItem", "position": 1, "name": "WhaleTool", "item": "https://imalasong.github.io/whaletool/" },
+    { "@type": "ListItem", "position": 2, "name": "雪花算法 ID 生成", "item": "https://imalasong.github.io/whaletool/tools/snowflake.html" }
+  ]
+}
+</script>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>❄️</text></svg>">
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+
+<div class="wt-back"><a href="../">← 工具合辑</a></div>
+
+<div class="tool-head">
+  <h1>❄️ 雪花算法 ID 生成</h1>
+  <p>Twitter Snowflake 的 64 位全局唯一 ID：符号位 1 + 时间戳 41 + 机器位 10 + 序列号 12。纯本地生成，不依赖网络、天然单调递增。</p>
+</div>
+
+<div class="wrap">
+  <div class="panel">
+    <div class="panel-title"><span>生成配置</span></div>
+    <div class="row tight">
+      <label class="lb">数据中心 ID <input class="wt" id="dcId" type="number" value="1" min="0" max="31" style="width:70px" title="5 位，0~31"></label>
+      <label class="lb" style="margin-left:8px">机器节点 ID <input class="wt" id="workerId" type="number" value="1" min="0" max="31" style="width:70px" title="5 位，0~31"></label>
+      <label class="lb" style="margin-left:8px">起始纪元
+        <select class="wt" id="epochSel" style="width:auto">
+          <option value="1704067200000" selected>2024-01-01</option>
+          <option value="1577836800000">2020-01-01</option>
+          <option value="1288834974657">Twitter 经典 (2010-11-04)</option>
+          <option value="0">1970-01-01</option>
+        </select>
+      </label>
+    </div>
+    <div class="row" style="margin-top:14px">
+      <label class="lb">数量 <input class="wt" id="count" type="number" value="5" min="1" max="200" style="width:80px"></label>
+      <label class="lb" style="margin-left:8px"><input type="checkbox" id="showHex" checked> 同时显示十六进制</label>
+      <button class="btn btn-primary" id="btnGen">生成</button>
+    </div>
+    <div class="note" style="margin-top:12px">
+      机器位 10 bit 拆成数据中心（5 bit）+ 机器节点（5 bit），最多支持 32×32 台机器；序列号 12 bit，单机每毫秒最多 4096 个，超过会顺延到下一毫秒。
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-title"><span>结果</span><span class="spacer"></span>
+      <span class="hint" id="genInfo">—</span>
+      <button class="btn btn-ghost btn-sm" id="btnCopyAll">全部复制</button>
+      <button class="btn btn-ghost btn-sm" id="btnDownload">下载 .txt</button></div>
+    <div class="out" id="result" style="max-height:480px"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-title"><span>逆向解码</span></div>
+    <div class="row">
+      <input class="wt" id="decodeInput" placeholder="粘贴一个雪花 ID（十进制）" style="flex:1;min-width:220px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace">
+      <button class="btn btn-primary" id="btnDecode">解析</button>
+    </div>
+    <div class="out" id="decodeResult" style="margin-top:12px"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-title"><span>结构说明</span></div>
+    <table class="wt">
+      <thead><tr><th>字段</th><th class="num">位宽</th><th class="num">范围</th><th>说明</th></tr></thead>
+      <tbody>
+        <tr><td>符号位</td><td class="num">1</td><td class="num">恒 0</td><td>保证是正数</td></tr>
+        <tr><td>时间戳</td><td class="num">41</td><td class="num">≈69 年</td><td>相对起始纪元的毫秒数</td></tr>
+        <tr><td>数据中心 ID</td><td class="num">5</td><td class="num">0~31</td><td>机房 / 集群编号</td></tr>
+        <tr><td>机器节点 ID</td><td class="num">5</td><td class="num">0~31</td><td>单机编号</td></tr>
+        <tr><td>序列号</td><td class="num">12</td><td class="num">0~4095</td><td>同一毫秒内的自增序号</td></tr>
+      </tbody>
+    </table>
+    <div class="note" style="margin-top:14px">
+      整体趋势递增（同一机器内严格递增），适合做主键、订单号、消息 ID。注意：41 位时间戳从起始纪元起约 69 年后会溢出，选纪元时留足余量。
+    </div>
+  </div>
+</div>
+
+<div class="tool-foot">全部在浏览器本地计算，不上传 · <a href="../">返回工具合辑</a></div>
+
+<script>
+(function () {
+  "use strict";
+  var $dc = document.getElementById("dcId"), $worker = document.getElementById("workerId"),
+      $epochSel = document.getElementById("epochSel"), $count = document.getElementById("count"),
+      $showHex = document.getElementById("showHex"), $result = document.getElementById("result"),
+      $genInfo = document.getElementById("genInfo"), $decodeInput = document.getElementById("decodeInput"),
+      $decodeResult = document.getElementById("decodeResult");
+
+  // 序列号状态：保持同一毫秒内递增，跨毫秒归零
+  var state = { lastTs: -1n, seq: 0 };
+
+  function nowMs() { return BigInt(Date.now()); }
+
+  function makeId(dc, worker, epoch) {
+    var ts = nowMs() - epoch;
+    if (ts < 0n) ts = 0n;
+    if (ts === state.lastTs) {
+      state.seq++;
+      if (state.seq > 4095) {           // 序列号用尽 → 顺延到下一毫秒
+        while (nowMs() - epoch === state.lastTs) { /* 忙等 1ms */ }
+        ts = nowMs() - epoch;
+        state.seq = 0;
+      }
+    } else {
+      state.seq = 0;
+    }
+    state.lastTs = ts;
+    return (ts << 22n) | (BigInt(dc) << 17n) | (BigInt(worker) << 12n) | BigInt(state.seq);
+  }
+
+  function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, Math.floor(+v || 0))); }
+
+  function esc(s) {
+    return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  }
+
+  function gen() {
+    var dc = clamp($dc.value, 0, 31), worker = clamp($worker.value, 0, 31),
+        n = clamp($count.value, 1, 200), epoch = BigInt($epochSel.value || "0");
+    var html = "", decs = [];
+    for (var i = 0; i < n; i++) {
+      var id = makeId(dc, worker, epoch);
+      var dec = id.toString();
+      decs.push(dec);
+      var hex = id.toString(16).toUpperCase();
+      html += '<div class="sf-row">' +
+        '<button class="sf-copy" data-v="' + esc(dec) + '" title="复制">' + esc(dec) + '</button>' +
+        ($showHex.checked ? '<span class="sf-hex">0x' + esc(hex) + '</span>' : "") +
+        '</div>';
+    }
+    $result.innerHTML = html;
+    $genInfo.textContent = n + " 条 · " + decs[0].length + " 位十进制";
+  }
+
+  function decode() {
+    var raw = ($decodeInput.value || "").trim();
+    if (!/^\d{10,20}$/.test(raw)) { $decodeResult.textContent = "❌ 请输入有效的雪花 ID（10~20 位十进制整数）。"; return; }
+    var id = BigInt(raw);
+    var epoch = BigInt($epochSel.value || "0");
+    var ts = (id >> 22n) + epoch;
+    var dc = Number((id >> 17n) & 0x1Fn), worker = Number((id >> 12n) & 0x1Fn), seq = Number(id & 0xFFFn);
+    var t = new Date(Number(ts));
+    $decodeResult.innerHTML =
+      '<div class="sf-dc"><b>时间戳</b><span>' + t.toLocaleString("zh-CN", { hour12: false }) +
+      '（epoch + ' + Number(ts - epoch).toLocaleString() + ' ms）</span></div>' +
+      '<div class="sf-dc"><b>数据中心 ID</b><span>' + dc + '</span></div>' +
+      '<div class="sf-dc"><b>机器节点 ID</b><span>' + worker + '</span></div>' +
+      '<div class="sf-dc"><b>序列号</b><span>' + seq + '</span></div>';
+  }
+
+  function copyText(text, btn) {
+    var done = function () { if (btn) { var o = btn.textContent; btn.textContent = "已复制 ✓"; setTimeout(function () { btn.textContent = o; }, 1200); } };
+    if (navigator.clipboard && location.protocol !== "file:") {
+      navigator.clipboard.writeText(text).then(done, function () { fb(text, done); });
+    } else { fb(text, done); }
+    function fb(v, cb) {
+      var ta = document.createElement("textarea");
+      ta.value = v; ta.style.position = "fixed"; ta.style.opacity = "0";
+      document.body.appendChild(ta); ta.select();
+      try { document.execCommand("copy"); cb(); } catch (e) {}
+      document.body.removeChild(ta);
+    }
+  }
+
+  $result.addEventListener("click", function (e) {
+    var b = e.target.closest ? e.target.closest(".sf-copy") : null;
+    if (b) copyText(b.dataset.v, b);
+  });
+
+  document.getElementById("btnCopyAll").addEventListener("click", function () {
+    var txt = [].map.call($result.querySelectorAll(".sf-copy"), function (b) { return b.dataset.v; }).join("\n");
+    if (txt) copyText(txt, this);
+  });
+
+  document.getElementById("btnDownload").addEventListener("click", function () {
+    var txt = [].map.call($result.querySelectorAll(".sf-copy"), function (b) { return b.dataset.v; }).join("\n");
+    if (!txt) return;
+    var blob = new Blob([txt], { type: "text/plain" });
+    var a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "snowflake-" + Date.now() + ".txt";
+    a.click();
+    setTimeout(function () { URL.revokeObjectURL(a.href); }, 3000);
+  });
+
+  document.getElementById("btnGen").addEventListener("click", gen);
+  document.getElementById("btnDecode").addEventListener("click", decode);
+  $epochSel.addEventListener("change", function () { state.lastTs = -1n; state.seq = 0; gen(); });
+  $showHex.addEventListener("change", gen);
+
+  // 结果卡片局部样式（复用面板体系，仅补雪花特有的等宽展示）
+  var css = document.createElement("style");
+  css.textContent =
+    ".sf-row{display:flex;align-items:center;gap:12px;padding:9px 12px;border-radius:10px}" +
+    ".sf-row:hover{background:rgba(0,0,0,.035)}" +
+    ".sf-copy{font:inherit;border:none;background:transparent;cursor:pointer;color:var(--primary-ink);" +
+    "font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:14px;text-align:left;padding:0}" +
+    ".sf-copy:hover{color:var(--primary)}" +
+    ".sf-hex{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12px;color:var(--muted)}" +
+    ".sf-dc{display:flex;gap:16px;padding:6px 0;border-bottom:1px solid var(--border-soft);font-size:14px}" +
+    ".sf-dc b{width:110px;flex:none;color:var(--muted);font-weight:600}" +
+    ".sf-dc span{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}";
+  document.head.appendChild(css);
+
+  gen();
+})();
+</script>
+</body>
+</html>

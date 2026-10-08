@@ -231,14 +231,38 @@ const TOOLS = [
   },
   {
     id: "uuid",
-    name: "UUID / 密码生成",
-    desc: "批量生成 UUID v4、随机密码、随机 ID，密码强度可选，一键复制或导出。",
+    name: "UUID 生成",
+    desc: "批量生成 UUID v4、短 ID、十六进制、URL 友好 ID，全部用浏览器加密随机源，一键复制或导出。",
     icon: "🎲",
     href: "tools/uuid.html",
-    tags: ["UUID", "密码", "随机", "v4", "批量"],
+    tags: ["UUID", "随机", "v4", "短ID", "批量", "nanoid"],
     category: "dev",
     date: "2026-09-20",
     pop: 7
+  },
+  {
+    id: "snowflake",
+    name: "雪花算法 ID 生成",
+    desc: "Twitter Snowflake 64 位全局唯一 ID，自定义数据中心 / 机器节点 / 起始纪元，支持逆向解码。",
+    icon: "❄️",
+    href: "tools/snowflake.html",
+    tags: ["雪花算法", "Snowflake", "分布式ID", "唯一ID", "订单号", "64位"],
+    category: "dev",
+    badge: "NEW",
+    date: "2026-10-08",
+    pop: 8
+  },
+  {
+    id: "password",
+    name: "密码生成器",
+    desc: "自定义长度与字符集，排除易混淆字符，实时显示熵值与破解时间，批量生成强密码。",
+    icon: "🔑",
+    href: "tools/password.html",
+    tags: ["密码", "强密码", "随机密码", "安全", "熵值", "批量"],
+    category: "dev",
+    badge: "NEW",
+    date: "2026-10-08",
+    pop: 8
   },
   {
     id: "unit-convert",
