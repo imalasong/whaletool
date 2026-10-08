@@ -391,5 +391,14 @@ s.parentNode.insertBefore(hm, s);
   setInterval(renderZones, 10000);
 })();
 </script>
+<script>
+/* 百度统计事件埋点（自动生成） */
+(function () {
+  if (!window._hmt) return;
+  function track(a) { _hmt.push(['_trackEvent', "全屏时钟", a, location.pathname]); }
+  var el = document.getElementById("btnStart");
+  if (el) el.addEventListener('click', function () { track("倒计时"); });
+})();
+</script>
 </body>
 </html>

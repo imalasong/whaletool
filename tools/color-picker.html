@@ -353,5 +353,16 @@ s.parentNode.insertBefore(hm, s);
   setColor(15, 118, 110);
 })();
 </script>
+<script>
+/* 百度统计事件埋点（自动生成） */
+(function () {
+  if (!window._hmt) return;
+  function track(a) { _hmt.push(['_trackEvent', "图片取色器", a, location.pathname]); }
+  var f = document.getElementById('file');
+  if (f) f.addEventListener('change', function () { if (this.files && this.files.length) track("载入图片"); });
+  var d = document.getElementById('drop');
+  if (d) d.addEventListener('drop', function () { track("载入图片"); });
+})();
+</script>
 </body>
 </html>

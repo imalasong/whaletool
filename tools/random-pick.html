@@ -268,5 +268,14 @@ s.parentNode.insertBefore(hm, s);
   render();
 })();
 </script>
+<script>
+/* 百度统计事件埋点（自动生成） */
+(function () {
+  if (!window._hmt) return;
+  function track(a) { _hmt.push(['_trackEvent', "随机抽签", a, location.pathname]); }
+  var el = document.getElementById("btnDraw");
+  if (el) el.addEventListener('click', function () { track("抽签"); });
+})();
+</script>
 </body>
 </html>

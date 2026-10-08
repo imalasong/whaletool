@@ -225,5 +225,16 @@ s.parentNode.insertBefore(hm, s);
   $usecase.textContent = "选一张图片后，这里会给出四种常见用法的代码片段。";
 })();
 </script>
+<script>
+/* 百度统计事件埋点（自动生成） */
+(function () {
+  if (!window._hmt) return;
+  function track(a) { _hmt.push(['_trackEvent', "图片转 Base64", a, location.pathname]); }
+  var f = document.getElementById('file');
+  if (f) f.addEventListener('change', function () { if (this.files && this.files.length) track("转换图片"); });
+  var d = document.getElementById('drop');
+  if (d) d.addEventListener('drop', function () { track("转换图片"); });
+})();
+</script>
 </body>
 </html>

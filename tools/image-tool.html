@@ -264,5 +264,14 @@ s.parentNode.insertBefore(hm, s);
 
   render();
 </script>
+<script>
+/* 百度统计事件埋点（自动生成） */
+(function () {
+  if (!window._hmt) return;
+  function track(a) { _hmt.push(['_trackEvent', "批量图片展示", a, location.pathname]); }
+  var el = document.getElementById("gen");
+  if (el) el.addEventListener('click', function () { track("生成画廊"); });
+})();
+</script>
 </body>
 </html>

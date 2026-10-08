@@ -282,5 +282,22 @@ s.parentNode.insertBefore(hm, s);
   buildCats(); buildUnits(); render();
 })();
 </script>
+<script>
+/* 百度统计事件埋点（自动生成） */
+(function () {
+  if (!window._hmt) return;
+  function track(a) { _hmt.push(['_trackEvent', "单位换算", a, location.pathname]); }
+  var els = document.querySelectorAll("#value");
+  var last = 0;
+  for (var i = 0; i < els.length; i++) {
+    els[i].addEventListener('input', function () {
+      var now = Date.now();
+      if (now - last < 3000) return;
+      last = now;
+      track("换算");
+    });
+  }
+})();
+</script>
 </body>
 </html>

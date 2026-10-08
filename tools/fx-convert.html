@@ -315,5 +315,14 @@ s.parentNode.insertBefore(hm, s);
   calc();
 })();
 </script>
+<script>
+/* 百度统计事件埋点（自动生成） */
+(function () {
+  if (!window._hmt) return;
+  function track(a) { _hmt.push(['_trackEvent', "汇率换算", a, location.pathname]); }
+  var el = document.getElementById("btnCalc");
+  if (el) el.addEventListener('click', function () { track("换算"); });
+})();
+</script>
 </body>
 </html>

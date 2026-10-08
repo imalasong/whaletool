@@ -2278,5 +2278,14 @@ s.parentNode.insertBefore(hm, s);
   setInterval(tick, 1000);
 })();
 </script>
+<script>
+/* 百度统计事件埋点（自动生成） */
+(function () {
+  if (!window._hmt) return;
+  function track(a) { _hmt.push(['_trackEvent', "演出日历", a, location.pathname]); }
+  var el = document.getElementById("refresh");
+  if (el) el.addEventListener('click', function () { track("刷新"); });
+})();
+</script>
 </body>
 </html>
