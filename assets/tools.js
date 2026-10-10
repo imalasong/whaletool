@@ -411,5 +411,17 @@ const TOOLS = [
     badge: "NEW",
     date: "2026-10-10",
     pop: 9
+  },
+  {
+    id: "army-formation",
+    name: "楚河·军阵 II · 千军入局",
+    desc: "策略战棋游戏，楚汉对垒、千军布阵，人机对战离线可玩。",
+    icon: "⚔️",
+    href: "tools/army-formation.html",
+    tags: ["游戏", "策略", "战棋", "军阵", "人机", "离线"],
+    category: "game",
+    badge: "NEW",
+    date: "2026-10-10",
+    pop: 9
   }
 ];
