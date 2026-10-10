@@ -18,7 +18,19 @@
 
   if ($repo && REPO_URL) $repo.href = REPO_URL;
 
-  let activeCat = "all";
+  function readCat() {
+    const key = new URLSearchParams(location.search).get("cat");
+    return key && CATEGORIES.some(c => c.key === key) ? key : "all";
+  }
+
+  function writeCat(key) {
+    const url = new URL(location.href);
+    if (!key || key === "all") url.searchParams.delete("cat");
+    else url.searchParams.set("cat", key);
+    history.replaceState(null, "", url.pathname + url.search + url.hash);
+  }
+
+  let activeCat = readCat();
   let keyword   = "";
   let sortBy    = "default";
 
@@ -36,6 +48,7 @@
       btn.innerHTML = `${c.icon} ${c.label}<span class="n">${n}</span>`;
       btn.addEventListener("click", () => {
         activeCat = c.key;
+        writeCat(activeCat);
         renderFilters();
         renderGrid();
       });
