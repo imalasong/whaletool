@@ -20,7 +20,8 @@ const CATEGORIES = [
   { key: "text",    label: "文本",     icon: "✎" },
   { key: "dev",     label: "开发",     icon: "⌘" },
   { key: "finance", label: "金融",     icon: "📈" },
-  { key: "other",   label: "日常",     icon: "◈" }
+  { key: "other",   label: "日常",     icon: "◈" },
+  { key: "game",    label: "游戏",     icon: "🎮" }
 ];
 
 const TOOLS = [
@@ -384,5 +385,31 @@ const TOOLS = [
     badge: "NEW",
     date: "2026-09-23",
     pop: 8
+  },
+
+  /* ---------------- 游戏 ---------------- */
+  {
+    id: "pikachu-riding",
+    name: "皮卡丘·电光骑行",
+    desc: "三维海岛骑行游戏，环岛探险、捕捉宝可梦、限时挑战，离线可玩。",
+    icon: "⚡",
+    href: "tools/pikachu-riding.html",
+    tags: ["游戏", "皮卡丘", "骑行", "宝可梦", "三维", "离线"],
+    category: "game",
+    badge: "NEW",
+    date: "2026-10-10",
+    pop: 9
+  },
+  {
+    id: "eleven-kingdoms",
+    name: "十一王国·诸侯争锋",
+    desc: "实时策略游戏，选君主、建城池、逐格征服，18 张战场、离线可玩。",
+    icon: "🏰",
+    href: "tools/eleven-kingdoms.html",
+    tags: ["游戏", "策略", "王国", "征服", "实时", "离线"],
+    category: "game",
+    badge: "NEW",
+    date: "2026-10-10",
+    pop: 9
   }
 ];
