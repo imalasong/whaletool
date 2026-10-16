@@ -195,16 +195,16 @@ body::after{content:'';position:fixed;inset:0;pointer-events:none;
 
 <!-- ============ 尘土 ============ -->
 <g id="dust" fill="#EADFC6">
-  <circle cx="418" cy="662" r="7" opacity="0">
-    <animate attributeName="r" values="5;24" dur=".9s" repeatCount="indefinite"/>
+  <circle cx="470" cy="664" r="6" opacity="0">
+    <animate attributeName="r" values="4;16" dur=".9s" repeatCount="indefinite"/>
     <animate attributeName="opacity" values=".6;0" dur=".9s" repeatCount="indefinite"/>
   </circle>
-  <circle cx="392" cy="668" r="5" opacity="0">
-    <animate attributeName="r" values="4;20" dur=".9s" begin="-.3s" repeatCount="indefinite"/>
+  <circle cx="448" cy="668" r="4" opacity="0">
+    <animate attributeName="r" values="3;13" dur=".9s" begin="-.3s" repeatCount="indefinite"/>
     <animate attributeName="opacity" values=".5;0" dur=".9s" begin="-.3s" repeatCount="indefinite"/>
   </circle>
-  <circle cx="370" cy="656" r="4" opacity="0">
-    <animate attributeName="r" values="3;16" dur=".9s" begin="-.6s" repeatCount="indefinite"/>
+  <circle cx="428" cy="660" r="3" opacity="0">
+    <animate attributeName="r" values="2;11" dur=".9s" begin="-.6s" repeatCount="indefinite"/>
     <animate attributeName="opacity" values=".4;0" dur=".9s" begin="-.6s" repeatCount="indefinite"/>
   </circle>
 </g>
@@ -212,7 +212,7 @@ body::after{content:'';position:fixed;inset:0;pointer-events:none;
 <g id="actors" pointer-events="none"></g>
 
 <!-- ============ 影子 ============ -->
-<ellipse id="shadow" cx="602" cy="676" rx="236" ry="15" fill="#7BA98A" opacity=".22"/>
+<ellipse id="shadow" cx="601" cy="674" rx="132" ry="11" fill="#7BA98A" opacity=".22"/>
 
 <!-- ============ 佩奇 + 单车 ============ -->
 <g id="rider">
@@ -440,11 +440,17 @@ body::after{content:'';position:fixed;inset:0;pointer-events:none;
   var FONT = 'Microsoft YaHei, PingFang SC, sans-serif';
   var GOAL = 300;
   var METER = 24;
-  var BASE_SPEED = 300;
-  var MAX_SPEED = 460;
-  var HIT_X = 710;
-  var GRAVITY = 2700;
-  var JUMP_V = -1000;
+  var BASE_SPEED = 440;
+  var MAX_SPEED = 560;
+  var BIKE_SCALE = 0.56;
+  var AX = 601;
+  var AY = 672;
+  var REAR_X = 525;
+  var FRONT_X = 677;
+  var WHEEL_R = 43;
+  var CLEAR_Y = -40;
+  var GRAVITY = 1200;
+  var JUMP_V = -820;
   var FCOLORS = ['#FF9DBE', '#FFFFFF', '#FFB74D', '#D7B4FF'];
   var BCOLORS = ['#F4563F', '#FFD265', '#7EC8F0', '#B6E38A'];
 
@@ -644,12 +650,12 @@ body::after{content:'';position:fixed;inset:0;pointer-events:none;
   }
   function syncRider() {
     var shx = shake > 0 ? Math.sin(t * 48) * 12 : 0;
-    var tilt = y * 0.028;
+    var tilt = y * 0.012;
     if (state === 'fall') tilt += Math.min(14, fallT * 20);
-    rider.setAttribute('transform', 'translate(' + shx.toFixed(1) + ',' + y.toFixed(1) + ') rotate(' + tilt.toFixed(2) + ' 620 500)');
+    rider.setAttribute('transform', 'translate(' + (AX + shx).toFixed(1) + ',' + (AY + y).toFixed(1) + ') rotate(' + tilt.toFixed(2) + ') scale(' + BIKE_SCALE + ') translate(' + (-AX) + ',' + (-AY) + ')');
     var lift = Math.max(0, -y);
-    var sc = Math.max(0.42, 1 - lift / 250);
-    shadow.setAttribute('rx', (228 * sc).toFixed(1));
+    var sc = Math.max(0.45, 1 - lift / 420);
+    shadow.setAttribute('rx', (132 * sc).toFixed(1));
     shadow.setAttribute('opacity', (0.22 * sc).toFixed(3));
     var moving = (state === 'ready' || state === 'play' || state === 'finish') && onGround && (state === 'ready' || speed > 40);
     dust.setAttribute('opacity', moving ? '1' : '0');
@@ -672,7 +678,7 @@ body::after{content:'';position:fixed;inset:0;pointer-events:none;
         y = 0;
         vy = 0;
         onGround = true;
-        if (state === 'play' || state === 'finish') burst(650, 668, '#EADFC6', 4);
+        if (state === 'play' || state === 'finish') burst(600, 668, '#EADFC6', 4);
       }
     }
   }
@@ -706,8 +712,8 @@ body::after{content:'';position:fixed;inset:0;pointer-events:none;
   }
   function drawPuddle(label, wide) {
     var g = el('g');
-    var rx = wide ? 116 : 88;
-    var ry = wide ? 22 : 16;
+    var rx = wide ? 58 : 42;
+    var ry = wide ? 14 : 12;
     el('ellipse', {cx: 0, cy: 5, rx: rx + 10, ry: ry + 6, fill: '#6AA8C8', opacity: 0.35}, g);
     el('ellipse', {cx: 0, cy: 0, rx: rx, ry: ry, fill: '#9FD4EA', stroke: '#6AA8C8', 'stroke-width': 4}, g);
     el('ellipse', {cx: wide ? -30 : -22, cy: -4, rx: wide ? 34 : 24, ry: 6, fill: '#FFFFFF', opacity: 0.6}, g);
@@ -716,10 +722,10 @@ body::after{content:'';position:fixed;inset:0;pointer-events:none;
   }
   function drawRock(label) {
     var g = el('g');
-    el('ellipse', {cx: 0, cy: 22, rx: 40, ry: 10, fill: '#E4D3B4', opacity: 0.95}, g);
-    el('path', {d: 'M -36 14 C -44 -8 -20 -34 0 -30 C 22 -38 46 -8 36 16 C 20 26 -16 26 -36 14 Z', fill: '#8A847C', stroke: '#5C574F', 'stroke-width': 4, 'stroke-linejoin': 'round'}, g);
-    el('path', {d: 'M -14 -4 C -2 -16 10 -12 14 -2', fill: 'none', stroke: '#D0CBC4', 'stroke-width': 4, 'stroke-linecap': 'round'}, g);
-    addLabel(g, label, -52);
+    el('ellipse', {cx: 0, cy: 14, rx: 26, ry: 7, fill: '#E4D3B4', opacity: 0.95}, g);
+    el('path', {d: 'M -24 10 C -30 -6 -12 -24 0 -20 C 16 -26 32 -4 24 12 C 12 16 -10 16 -24 10 Z', fill: '#8A847C', stroke: '#5C574F', 'stroke-width': 4, 'stroke-linejoin': 'round'}, g);
+    el('path', {d: 'M -10 -2 C -2 -12 8 -8 10 0', fill: 'none', stroke: '#D0CBC4', 'stroke-width': 3, 'stroke-linecap': 'round'}, g);
+    addLabel(g, label, -40);
     return g;
   }
   function drawGeorge() {
@@ -774,7 +780,7 @@ body::after{content:'';position:fixed;inset:0;pointer-events:none;
     actors.appendChild(node);
     var o = {
       type: type, x: x, node: node, color: color,
-      hw: type === 'puddle' ? (wide ? 86 : 64) : type === 'rock' ? 42 : 58,
+      hw: type === 'puddle' ? (wide ? 50 : 36) : type === 'rock' ? 24 : 46,
       sy: type === 'balloon' ? 500 : type === 'flower' ? 582 : type === 'puddle' ? 678 : type === 'rock' ? 646 : 688,
       hit: false, closed: false, cleared: false, got: false,
       phase: Math.random() * 6.28,
@@ -827,7 +833,7 @@ body::after{content:'';position:fixed;inset:0;pointer-events:none;
     var maxHit = GOAL * METER - 400;
     for (var i = 0; i < seq.length; i++) {
       var x = x0 + seq[i][1];
-      if ((x - runStart) - HIT_X > maxHit) continue;
+      if ((x - runStart) - FRONT_X > maxHit) continue;
       spawn(seq[i][0], x);
     }
   }
@@ -847,11 +853,11 @@ body::after{content:'';position:fixed;inset:0;pointer-events:none;
     shake = 0.3;
     stain = Math.min(1, stain + 0.4);
     mud.setAttribute('opacity', String(stain));
-    speed = Math.max(200, speed * 0.72);
+    speed = Math.max(400, speed * 0.82);
     vy = -400;
     onGround = false;
-    burst(706, 658, '#8A6844', 10);
-    burst(734, 642, '#9FD4EA', 6);
+    burst(640, 658, '#8A6844', 10);
+    burst(680, 650, '#9FD4EA', 6);
     tone(150, 0.18, 'sine', 0.045);
     try { if (navigator.vibrate) navigator.vibrate(28); } catch (err) {}
     if (hearts <= 0) {
@@ -875,7 +881,7 @@ body::after{content:'';position:fixed;inset:0;pointer-events:none;
       var o = objects[i];
       var sx = o.x - worldX;
       if (o.type === 'george') {
-        o.node.setAttribute('transform', 'translate(' + sx.toFixed(1) + ',668) scale(1.45)');
+        o.node.setAttribute('transform', 'translate(' + sx.toFixed(1) + ',670) scale(1.15)');
         continue;
       }
       if (o.got) {
@@ -885,21 +891,20 @@ body::after{content:'';position:fixed;inset:0;pointer-events:none;
       var bob = o.type === 'balloon' ? Math.sin(t * 2.3 + o.phase) * 8 : (o.type === 'flower' ? Math.sin(t * 1.7 + o.phase) * 2 : 0);
       o.node.setAttribute('transform', 'translate(' + sx.toFixed(1) + ',' + (o.sy + bob).toFixed(1) + ')');
       var prev = sx + move;
+      var spanL = REAR_X - WHEEL_R - o.hw;
+      var spanR = FRONT_X + WHEEL_R + o.hw;
+      var overBike = sx < spanR && prev > spanL;
       if (o.type === 'flower' || o.type === 'balloon') {
-        if (sx < HIT_X + o.hw && prev > HIT_X - o.hw) collect(o, sx);
+        if (overBike) collect(o, sx);
       } else if (!o.closed && (o.type === 'puddle' || o.type === 'rock') && (state === 'play' || state === 'finish')) {
-        var reach = o.hw + 30;
-        var overInner = sx < HIT_X + o.hw && prev > HIT_X - o.hw;
-        var overWide = sx < HIT_X + reach && prev > HIT_X - reach;
-        var rising = vy < -80 || y < -18;
-        if (overWide && rising) o.cleared = true;
-        if (overInner && inv > 0) { o.closed = true; o.hit = true; }
-        else if (overInner && !o.cleared && !rising) {
+        var high = y < CLEAR_Y;
+        if (overBike && inv > 0) { o.closed = true; o.hit = true; }
+        else if (overBike && !high) {
           o.closed = true;
           o.hit = true;
           hurt();
         }
-        if (!o.closed && sx < HIT_X - reach) {
+        if (!o.closed && sx < spanL) {
           o.closed = true;
           if (!o.hit) speed = Math.min(MAX_SPEED, speed + 32);
         }
@@ -922,7 +927,7 @@ body::after{content:'';position:fixed;inset:0;pointer-events:none;
   }
   function updateFinish() {
     if (!george) return;
-    var stopAt = 960;
+    var stopAt = 880;
     var dist = (george.x - worldX) - stopAt;
     if (dist < 700) {
       var cap = Math.max(0, dist * 0.9);
