@@ -423,5 +423,17 @@ const TOOLS = [
     badge: "NEW",
     date: "2026-10-10",
     pop: 9
+  },
+  {
+    id: "peppa-bike",
+    name: "佩奇骑单车",
+    desc: "佩奇骑车去找乔治。跳过水坑和石头，把花和气球收进车筐。",
+    icon: "🚲",
+    href: "tools/peppa-bike.html",
+    tags: ["游戏", "佩奇", "骑车", "跳跃", "儿童", "离线"],
+    category: "game",
+    badge: "NEW",
+    date: "2026-10-16",
+    pop: 8
   }
 ];
