@@ -23,10 +23,11 @@ whaletool/
 
 ## 已上线工具（28 个）
 
-### 🖼️ 图片（4）
+### 🖼️ 图片（5）
 
 | 工具 | 说明 | 目录 |
 | --- | --- | --- |
+| 图片大小检测 | 粘贴多张图片 URL，读出宽高、比例和文件体积 | `tools/image-size.html` |
 | 批量图片展示 | 粘贴一堆图片 URL，一键生成画廊，支持灯箱 / 键盘翻页 | `tools/image-tool.html` |
 | 图片压缩 | JPEG/WebP 可调质量；PNG 自带优化编码器（逐行最优滤波 + 调色板量化），压完更大时自动保留原文件 | `tools/image-compress.html` |
 | 图片转 Base64 | 生成 Data URL，附 CSS / HTML / JS / Markdown 四种用法 | `tools/img2base64.html` |

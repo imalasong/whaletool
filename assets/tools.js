@@ -72,6 +72,18 @@ const TOOLS = [
     date: "2026-09-20",
     pop: 6
   },
+  {
+    id: "image-size",
+    name: "图片大小检测",
+    desc: "粘贴多张图片 URL，一次读出宽高、比例和文件体积。逗号、换行、空格都能分隔。",
+    icon: "📐",
+    href: "tools/image-size.html",
+    tags: ["图片", "尺寸", "体积", "URL", "宽高", "批量"],
+    category: "image",
+    badge: "NEW",
+    date: "2026-10-19",
+    pop: 8
+  },
 
   /* ---------------- 文本 ---------------- */
   {

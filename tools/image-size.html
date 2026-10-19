@@ -1,0 +1,513 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>图片大小检测 · WhaleTool</title>
+<meta name="description" content="粘贴多张图片 URL，一次读出宽高、比例和文件体积。逗号、换行、空格都能分隔。">
+<meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1">
+<meta name="theme-color" content="#f4f7f9">
+<link rel="canonical" href="https://imalasong.github.io/whaletool/tools/image-size.html">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="WhaleTool">
+<meta property="og:title" content="图片大小检测 · WhaleTool">
+<meta property="og:description" content="粘贴多张图片 URL，一次读出宽高、比例和文件体积。">
+<meta property="og:url" content="https://imalasong.github.io/whaletool/tools/image-size.html">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="https://imalasong.github.io/whaletool/assets/og-whaletool.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="图片大小检测 · WhaleTool">
+<meta name="twitter:description" content="粘贴多张图片 URL，一次读出宽高、比例和文件体积。">
+<meta name="twitter:image" content="https://imalasong.github.io/whaletool/assets/og-whaletool.png">
+<script type="application/ld+json">
+{"@context": "https://schema.org", "@type": "WebApplication", "name": "图片大小检测", "url": "https://imalasong.github.io/whaletool/tools/image-size.html", "description": "粘贴多张图片 URL，一次读出宽高、比例和文件体积。", "inLanguage": "zh-CN", "applicationCategory": "UtilitiesApplication", "operatingSystem": "Any", "isAccessibleForFree": true, "offers": {"@type": "Offer", "price": "0", "priceCurrency": "CNY"}}
+</script>
+<script type="application/ld+json">
+{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "WhaleTool", "item": "https://imalasong.github.io/whaletool/"}, {"@type": "ListItem", "position": 2, "name": "图片大小检测", "item": "https://imalasong.github.io/whaletool/tools/image-size.html"}]}
+</script>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐳</text></svg>">
+<link rel="stylesheet" href="../assets/style.css">
+<style>
+  .size-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .size-table th, .size-table td {
+    text-align: left; padding: 10px 12px; vertical-align: middle;
+    border-bottom: 1px solid var(--border-soft);
+  }
+  .size-table th {
+    font-size: 11.5px; color: var(--muted); font-weight: 600;
+    letter-spacing: .3px; white-space: nowrap;
+  }
+  .size-table td.num, .size-table th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  .size-table tr:last-child td { border-bottom: none; }
+  .thumb {
+    width: 72px; height: 54px; object-fit: cover; border-radius: 8px;
+    background: #eef3f6; display: block; border: 1px solid var(--border-soft);
+  }
+  .thumb.bad { object-fit: none; }
+  .name {
+    max-width: 280px; font-weight: 600; color: var(--text);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .url {
+    max-width: 280px; margin-top: 2px; font-size: 11.5px; color: var(--faint);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    font-family: ui-monospace, Consolas, monospace;
+  }
+  .dim { font-weight: 700; color: var(--text); font-variant-numeric: tabular-nums; }
+  .sub { display: block; margin-top: 2px; font-size: 11.5px; color: var(--muted); font-weight: 500; }
+  .scroll { overflow-x: auto; }
+  .empty { text-align: center; color: var(--faint); font-size: 13.5px; padding: 36px 12px; }
+  select.wt.slim { width: auto; min-width: 148px; padding-top: 7px; padding-bottom: 7px; font-size: 12.5px; }
+</style>
+<script>
+var _hmt = _hmt || [];
+(function() {
+var hm = document.createElement("script");
+hm.src = "https://hm.baidu.com/hm.js?5d617f623101d17a0d91a43eec834966";
+var s = document.getElementsByTagName("script")[0];
+s.parentNode.insertBefore(hm, s);
+})();
+</script>
+</head>
+<body>
+
+<div class="wt-back"><a href="../">← 工具合辑</a></div>
+
+<div class="tool-head">
+  <h1>📐 图片大小检测</h1>
+  <p>把图片地址贴进来就行，一次可以很多张。逗号、换行、空格都能分开。每张图会给出像素尺寸、比例，以及能读到的文件体积。</p>
+</div>
+
+<div class="wrap">
+  <div class="panel">
+    <label class="lb" for="urls">图片 URL</label>
+    <textarea class="wt mono" id="urls" placeholder="每行一张，或者用逗号 / 空格隔开&#10;https://example.com/a.jpg&#10;https://example.com/b.png, https://example.com/c.webp"></textarea>
+    <div class="row" style="margin-top:14px">
+      <button class="btn btn-primary" id="run" type="button">检测大小</button>
+      <button class="btn btn-ghost" id="demo" type="button">填入示例</button>
+      <button class="btn btn-ghost" id="clear" type="button">清空</button>
+      <button class="btn btn-ghost" id="copy" type="button">复制结果</button>
+      <span class="spacer"></span>
+      <span class="muted" id="count" style="font-size:13px">已识别 0 张</span>
+    </div>
+  </div>
+
+  <div class="stat-row" style="margin-bottom:18px">
+    <div class="stat"><div class="k">图片</div><div class="v sm" id="sTotal">0</div></div>
+    <div class="stat"><div class="k">成功</div><div class="v sm" id="sOk">0</div></div>
+    <div class="stat"><div class="k">失败</div><div class="v sm" id="sFail">0</div></div>
+    <div class="stat"><div class="k">体积合计</div><div class="v sm" id="sBytes">—</div></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-title">
+      <span>检测结果</span>
+      <span class="hint" id="progress"></span>
+      <span class="spacer"></span>
+      <select class="wt slim" id="sort" aria-label="排序">
+        <option value="input">按输入顺序</option>
+        <option value="bytes">按体积从大到小</option>
+        <option value="area">按像素面积从大到小</option>
+      </select>
+    </div>
+    <div class="scroll" id="box">
+      <div class="empty" id="empty">还没有结果。把 URL 贴到上面，点「检测大小」。</div>
+    </div>
+    <p class="note" style="margin-top:14px">宽高只要图片能在浏览器里打开就能读到。文件体积需要图片服务器允许跨域读取；不允许时只显示尺寸，体积标成「跨域不可读」。</p>
+  </div>
+</div>
+
+<div class="tool-foot">检测在浏览器里完成，图片不会上传到 WhaleTool · <a href="../">返回工具合辑</a></div>
+
+<script>
+(function () {
+  "use strict";
+
+  var DEMO = [
+    "https://static.fantopia.io/ticketimg/a7dcdc8d-5557-4c17-910a-ca81fbbb06af.png",
+    "https://static.fantopia.io/ticketimg/22bb99c7-1122-46b1-a0a2-8f1706829dc5.png",
+    "https://static.fantopia.io/app-upload004a70b6-cdb0-42e4-80ee-9435781a7eb5.jpg"
+  ];
+
+  var $urls = document.getElementById("urls");
+  var $count = document.getElementById("count");
+  var $box = document.getElementById("box");
+  var $empty = document.getElementById("empty");
+  var $run = document.getElementById("run");
+  var $progress = document.getElementById("progress");
+  var $sort = document.getElementById("sort");
+  var $sTotal = document.getElementById("sTotal");
+  var $sOk = document.getElementById("sOk");
+  var $sFail = document.getElementById("sFail");
+  var $sBytes = document.getElementById("sBytes");
+
+  var rows = [];
+  var objectUrls = [];
+  var runId = 0;
+
+  function parse(raw) {
+    var ignored = 0;
+    var parts = String(raw || "").split(/[\n,;，、]+|\s+/).map(function (s) { return s.trim(); }).filter(Boolean);
+    var urls = [];
+    var seen = {};
+    parts.forEach(function (p) {
+      var u = p.replace(/^["'`]+|["'`]+$/g, "");
+      var md = u.match(/!\[[^\]]*]\((https?:\/\/[^)\s]+)\)/i);
+      if (md) u = md[1];
+      u = u.replace(/[)）.。]+$/g, "");
+      if (!/^https?:\/\//i.test(u)) { ignored++; return; }
+      if (seen[u]) return;
+      seen[u] = true;
+      urls.push(u);
+    });
+    return { urls: urls, ignored: ignored };
+  }
+
+  function refreshCount() {
+    var parsed = parse($urls.value);
+    var text = "已识别 " + parsed.urls.length + " 张";
+    if (parsed.ignored) text += " · 忽略 " + parsed.ignored + " 段非链接";
+    $count.textContent = text;
+  }
+
+  function fmtSize(n) {
+    if (n == null || isNaN(n)) return "—";
+    if (n < 1024) return n + " B";
+    if (n < 1048576) return (n / 1024).toFixed(n < 10240 ? 1 : 0) + " KB";
+    return (n / 1048576).toFixed(2) + " MB";
+  }
+
+  function gcd(a, b) { return b ? gcd(b, a % b) : a; }
+
+  function ratioText(w, h) {
+    var g = gcd(w, h) || 1;
+    var rw = w / g, rh = h / g;
+    if (rw > 32 || rh > 32) return (w / h).toFixed(2) + " : 1";
+    return rw + " : " + rh;
+  }
+
+  function orient(w, h) {
+    if (w === h) return "方图";
+    return w > h ? "横图" : "竖图";
+  }
+
+  function fileName(url) {
+    try {
+      var name = decodeURIComponent(new URL(url).pathname.split("/").filter(Boolean).pop() || "");
+      return name || "未命名";
+    } catch (e) {
+      return "未命名";
+    }
+  }
+
+  function typeLabel(mime, url) {
+    var sub = (mime || "").split(";")[0].trim().toLowerCase();
+    if (sub.indexOf("image/") === 0) {
+      return sub.slice(6).replace("jpeg", "jpg").replace("svg+xml", "svg").toUpperCase();
+    }
+    var m = String(url).split("?")[0].match(/\.([a-z0-9]{2,5})$/i);
+    return m ? m[1].toUpperCase() : "—";
+  }
+
+  function revokeAll() {
+    objectUrls.forEach(function (u) { URL.revokeObjectURL(u); });
+    objectUrls = [];
+  }
+
+  function loadRemote(url) {
+    return new Promise(function (resolve) {
+      var img = new Image();
+      var timer = setTimeout(function () { resolve({ ok: false, error: "加载超时" }); }, 20000);
+      img.onload = function () {
+        clearTimeout(timer);
+        var bytes = null;
+        try {
+          var entries = performance.getEntriesByName(img.currentSrc || url);
+          var hit = entries.length ? entries[entries.length - 1] : null;
+          if (hit && hit.decodedBodySize) bytes = hit.decodedBodySize;
+        } catch (e) {}
+        resolve({
+          ok: img.naturalWidth > 0,
+          width: img.naturalWidth,
+          height: img.naturalHeight,
+          bytes: bytes,
+          bytesKnown: bytes != null,
+          error: img.naturalWidth > 0 ? "" : "读不到尺寸"
+        });
+      };
+      img.onerror = function () {
+        clearTimeout(timer);
+        resolve({ ok: false, error: "加载失败" });
+      };
+      img.referrerPolicy = "no-referrer";
+      img.src = url;
+    });
+  }
+
+  function dimsFromBlob(blob) {
+    return new Promise(function (resolve) {
+      var local = URL.createObjectURL(blob);
+      objectUrls.push(local);
+      var img = new Image();
+      var timer = setTimeout(function () {
+        resolve({ ok: false, error: "读取尺寸超时", preview: local });
+      }, 15000);
+      img.onload = function () {
+        clearTimeout(timer);
+        resolve({
+          ok: img.naturalWidth > 0,
+          width: img.naturalWidth,
+          height: img.naturalHeight,
+          preview: local,
+          error: img.naturalWidth > 0 ? "" : "不是有效图片"
+        });
+      };
+      img.onerror = function () {
+        clearTimeout(timer);
+        resolve({ ok: false, error: "不是有效图片", preview: "" });
+      };
+      img.src = local;
+    });
+  }
+
+  function probe(url) {
+    var ctrl = new AbortController();
+    var timer = setTimeout(function () { ctrl.abort(); }, 20000);
+    return fetch(url, { mode: "cors", signal: ctrl.signal, referrerPolicy: "no-referrer" })
+      .then(function (res) {
+        if (!res.ok) throw new Error("http");
+        var mime = res.headers.get("content-type") || "";
+        return res.blob().then(function (blob) {
+          return dimsFromBlob(blob).then(function (dim) {
+            return {
+              ok: dim.ok,
+              width: dim.width,
+              height: dim.height,
+              bytes: blob.size,
+              bytesKnown: true,
+              type: typeLabel(blob.type || mime, url),
+              preview: dim.preview || "",
+              error: dim.error || ""
+            };
+          });
+        });
+      })
+      .catch(function () {
+        return loadRemote(url).then(function (dim) {
+          return {
+            ok: dim.ok,
+            width: dim.width,
+            height: dim.height,
+            bytes: dim.bytes,
+            bytesKnown: !!dim.bytesKnown,
+            type: typeLabel("", url),
+            preview: dim.ok ? url : "",
+            error: dim.error || ""
+          };
+        });
+      })
+      .then(function (row) {
+        clearTimeout(timer);
+        row.url = url;
+        row.name = fileName(url);
+        return row;
+      });
+  }
+
+  function pool(list, limit, fn) {
+    var cursor = 0;
+    var workers = [];
+    function next() {
+      if (cursor >= list.length) return Promise.resolve();
+      var index = cursor++;
+      return fn(list[index], index).then(next);
+    }
+    var n = Math.min(limit, list.length);
+    for (var i = 0; i < n; i++) workers.push(next());
+    return Promise.all(workers);
+  }
+
+  function esc(s) {
+    return String(s).replace(/[&<>"']/g, function (c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+    });
+  }
+
+  function sizeClass(bytes) {
+    if (bytes == null) return "";
+    if (bytes >= 5 * 1048576) return "bad";
+    if (bytes >= 1048576) return "warn";
+    return "";
+  }
+
+  function sorted() {
+    var list = rows.slice();
+    var mode = $sort.value;
+    if (mode === "bytes") {
+      list.sort(function (a, b) { return (b.bytesKnown ? b.bytes : -1) - (a.bytesKnown ? a.bytes : -1); });
+    } else if (mode === "area") {
+      list.sort(function (a, b) {
+        var aa = a.ok ? a.width * a.height : -1;
+        var bb = b.ok ? b.width * b.height : -1;
+        return bb - aa;
+      });
+    }
+    return list;
+  }
+
+  function paintSummary() {
+    var ok = 0, fail = 0, bytes = 0, known = 0;
+    rows.forEach(function (r) {
+      if (!r.done) return;
+      if (r.ok) ok++; else fail++;
+      if (r.bytesKnown) { bytes += r.bytes; known++; }
+    });
+    var done = ok + fail;
+    $sTotal.textContent = rows.length ? (done + " / " + rows.length) : "0";
+    $sOk.textContent = String(ok);
+    $sFail.textContent = String(fail);
+    $sBytes.textContent = known ? fmtSize(bytes) + (known < done ? "（" + known + " 张）" : "") : "—";
+    $progress.textContent = rows.length && done < rows.length ? ("检测中 " + done + " / " + rows.length) : "";
+  }
+
+  function render() {
+    if (!rows.length) {
+      $box.innerHTML = "";
+      $box.appendChild($empty);
+      $empty.style.display = "block";
+      paintSummary();
+      return;
+    }
+    var html = '<table class="size-table"><thead><tr>' +
+      '<th>预览</th><th>图片</th><th class="num">尺寸</th><th class="num">体积</th><th>类型</th><th>状态</th>' +
+      '</tr></thead><tbody>';
+    sorted().forEach(function (r) {
+      var thumb = r.preview
+        ? '<img class="thumb" alt="" src="' + esc(r.preview) + '">'
+        : '<div class="thumb"></div>';
+      var dim = r.ok
+        ? '<div class="dim">' + r.width + ' × ' + r.height + '</div><span class="sub">' + ratioText(r.width, r.height) + ' · ' + orient(r.width, r.height) + '</span>'
+        : '<span class="muted">—</span>';
+      var vol = !r.done
+        ? '<span class="muted">读取中</span>'
+        : (r.bytesKnown
+            ? '<span class="dim">' + fmtSize(r.bytes) + '</span>'
+            : '<span class="muted">跨域不可读</span>');
+      var status;
+      if (!r.done) status = '<span class="pill">检测中</span>';
+      else if (!r.ok) status = '<span class="pill bad">' + esc(r.error || "失败") + '</span>';
+      else if (sizeClass(r.bytes) === "bad") status = '<span class="pill bad">超过 5 MB</span>';
+      else if (sizeClass(r.bytes) === "warn") status = '<span class="pill warn">超过 1 MB</span>';
+      else if (!r.bytesKnown) status = '<span class="pill">仅尺寸</span>';
+      else status = '<span class="pill">完成</span>';
+      html += '<tr><td>' + thumb + '</td><td><div class="name" title="' + esc(r.name) + '">' + esc(r.name) +
+        '</div><div class="url" title="' + esc(r.url) + '">' + esc(r.url) + '</div></td><td class="num">' +
+        dim + '</td><td class="num">' + vol + '</td><td>' + esc(r.type || "—") + '</td><td>' + status + '</td></tr>';
+    });
+    html += '</tbody></table>';
+    $box.innerHTML = html;
+    paintSummary();
+  }
+
+  function copyText() {
+    var lines = sorted().filter(function (r) { return r.done; }).map(function (r) {
+      if (!r.ok) return r.url + "\t失败\t" + (r.error || "");
+      var size = r.bytesKnown ? fmtSize(r.bytes) : "体积不可读";
+      return r.url + "\t" + r.width + "x" + r.height + "\t" + ratioText(r.width, r.height) + "\t" + size + "\t" + (r.type || "");
+    });
+    return lines.join("\n");
+  }
+
+  function copy(text, btn) {
+    if (!text) { btn.textContent = "没有结果"; setTimeout(function () { btn.textContent = "复制结果"; }, 1200); return; }
+    var done = function () {
+      var old = btn.textContent;
+      btn.textContent = "已复制";
+      setTimeout(function () { btn.textContent = old; }, 1200);
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(done).catch(function () { fallback(); });
+    } else fallback();
+    function fallback() {
+      var ta = document.createElement("textarea");
+      ta.value = text;
+      document.body.appendChild(ta);
+      ta.select();
+      try { document.execCommand("copy"); done(); } catch (e) {}
+      document.body.removeChild(ta);
+    }
+  }
+
+  function start() {
+    var parsed = parse($urls.value);
+    refreshCount();
+    if (!parsed.urls.length) {
+      rows = [];
+      revokeAll();
+      render();
+      $empty.textContent = "没有识别到 http(s) 图片链接。";
+      return;
+    }
+    var id = ++runId;
+    revokeAll();
+    rows = parsed.urls.map(function (url) {
+      return { url: url, name: fileName(url), done: false, ok: false, preview: "", type: "—", bytesKnown: false };
+    });
+    $run.disabled = true;
+    render();
+    pool(rows, 4, function (row) {
+      if (id !== runId) return Promise.resolve();
+      return probe(row.url).then(function (result) {
+        if (id !== runId) {
+          if (result.preview && result.preview.indexOf("blob:") === 0) {
+            URL.revokeObjectURL(result.preview);
+            objectUrls = objectUrls.filter(function (u) { return u !== result.preview; });
+          }
+          return;
+        }
+        Object.assign(row, result, { done: true });
+        render();
+      });
+    }).then(function () {
+      if (id !== runId) return;
+      $run.disabled = false;
+      render();
+    });
+  }
+
+  $urls.addEventListener("input", refreshCount);
+  document.getElementById("run").addEventListener("click", start);
+  document.getElementById("demo").addEventListener("click", function () {
+    $urls.value = DEMO.join("\n");
+    refreshCount();
+    start();
+  });
+  document.getElementById("clear").addEventListener("click", function () {
+    runId++;
+    $urls.value = "";
+    rows = [];
+    revokeAll();
+    $run.disabled = false;
+    $empty.textContent = "还没有结果。把 URL 贴到上面，点「检测大小」。";
+    refreshCount();
+    render();
+  });
+  document.getElementById("copy").addEventListener("click", function () {
+    copy(copyText(), this);
+  });
+  $sort.addEventListener("change", render);
+  refreshCount();
+})();
+</script>
+<script>
+(function () {
+  if (!window._hmt) return;
+  function track(a) { _hmt.push(['_trackEvent', "图片大小检测", a, location.pathname]); }
+  var el = document.getElementById("run");
+  if (el) el.addEventListener('click', function () { track("检测大小"); });
+})();
+</script>
+</body>
+</html>
