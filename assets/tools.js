@@ -447,5 +447,17 @@ const TOOLS = [
     badge: "NEW",
     date: "2026-10-16",
     pop: 8
+  },
+  {
+    id: "four-mirrors",
+    name: "四镜·回声之城",
+    desc: "穿过四座镜门，在有代价的选择里练习容纳未知、听懂异见、诚实复盘与拆解机制。",
+    icon: "🪞",
+    href: "tools/four-mirrors.html",
+    tags: ["游戏", "四镜", "回声之城", "叙事", "选择", "离线"],
+    category: "game",
+    badge: "NEW",
+    date: "2026-10-21",
+    pop: 8
   }
 ];
