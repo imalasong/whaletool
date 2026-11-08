@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="zh-CN">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>霓虹失窃 · WhaleTool</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#0a0b16;color:#eef1ff;font:16px system-ui}main{max-width:820px;margin:auto;padding:18px}a{color:#8edfea}h1{margin:12px 0 4px;font-size:clamp(32px,7vw,60px)}p{color:#bbc3e0}#arena{position:relative;border:1px solid #404b75;border-radius:16px;overflow:hidden}canvas{display:block;width:100%;touch-action:none}#overlay{position:absolute;inset:0;display:grid;place-content:center;text-align:center;background:#080b1ad9;padding:16px}#overlay[hidden]{display:none}button{font:inherit;font-weight:700;background:#80f6e2;color:#111528;border:0;border-radius:10px;padding:10px 18px;cursor:pointer}#dash{margin-top:10px;touch-action:manipulation}#hud{margin:12px 0;font-variant-numeric:tabular-nums}
+</style>
+<main>
+<a href="../">← WhaleTool</a>
+<h1>霓虹失窃</h1>
+<p>偷走芯片，甩开无人机。连续拾取翻倍，冲刺穿过追兵还能反杀。</p>
+<div id="hud" aria-live="off">分数 0 · 最高 0</div>
+<div id="arena">
+<canvas id="field" width="760" height="490" aria-label="霓虹失窃游戏场地"></canvas>
+<div id="overlay"><h2 id="headline">你有 45 秒</h2><button id="start">开始潜入</button></div>
+</div>
+<button id="dash">冲刺 / Space</button>
+<p>方向键或 WASD 移动。触屏拖动来控制方向。碰到无人机三次就出局。</p>
+</main>
+<script>
+const canvas = document.querySelector('canvas');
+const ctx = canvas.getContext('2d');
+const hud = document.querySelector('#hud');
+const overlay = document.querySelector('#overlay');
+const keys = new Set();
+const W = canvas.width, H = canvas.height;
+let best = 0;
+try { best = Number(localStorage.getItem('neon-heist-best')) || 0; } catch {}
+let game, target, pointer, previous;
+const between = (min, max) => min + Math.random() * (max - min);
+const distance = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+const chip = () => ({x: between(45, W - 45), y: between(45, H - 45)});
+function start() {
+  game = {player: {x: W / 2, y: H / 2}, chip: chip(), enemies: [], sparks: [],
+    time: 45, spawn: 0.5, score: 0, hp: 3, combo: 0, chain: 0, cooldown: 0,
+    boost: 0, shield: 0, dx: 1, dy: 0, running: true};
+  target = pointer = null;
+  overlay.hidden = true;
+  document.querySelector('#dash').focus({preventScroll: true});
+}
+function dash() {
+  if (!game?.running || game.cooldown > 0) return;
+  game.cooldown = 2;
+  game.boost = 0.22;
+}
+function finish() {
+  game.running = false;
+  best = Math.max(best, game.score);
+  try { localStorage.setItem('neon-heist-best', String(best)); } catch {}
+  document.querySelector('#headline').textContent = (game.hp ? '成功撤离' : '被无人机截获') + ' · ' + game.score + ' 分';
+  document.querySelector('#start').textContent = '再来一局';
+  overlay.hidden = false;
+  document.querySelector('#start').focus();
+}
+function burst(point, color) {
+  for (let i = 0; i < 14; i++) {
+    game.sparks.push({...point, vx: between(-220, 220), vy: between(-220, 220), life: between(.16, .42), color});
+  }
+}
+function tick(dt) {
+  const g = game, p = g.player;
+  g.time = Math.max(0, g.time - dt);
+  g.chain -= dt;
+  g.cooldown = Math.max(0, g.cooldown - dt);
+  g.shield -= dt;
+  let x = Number(keys.has('ArrowRight') || keys.has('d')) - Number(keys.has('ArrowLeft') || keys.has('a'));
+  let y = Number(keys.has('ArrowDown') || keys.has('s')) - Number(keys.has('ArrowUp') || keys.has('w'));
+  if (target && distance(p, target) > 9) { x = target.x - p.x; y = target.y - p.y; }
+  if (x || y) {
+    const length = Math.hypot(x, y);
+    g.dx = x / length;
+    g.dy = y / length;
+  }
+  if (x || y || g.boost > 0) {
+    const speed = g.boost > 0 ? 640 : 245;
+    p.x = Math.max(14, Math.min(W - 14, p.x + g.dx * speed * dt));
+    p.y = Math.max(14, Math.min(H - 14, p.y + g.dy * speed * dt));
+  }
+  if (distance(p, g.chip) < 25) {
+    g.combo = g.chain > 0 ? Math.min(5, g.combo + 1) : 1;
+    g.chain = 3;
+    g.score += 100 * g.combo;
+    burst(g.chip, '#80f6e2');
+    g.chip = chip();
+  }
+  g.spawn -= dt;
+  if (g.spawn <= 0) {
+    const side = Math.floor(Math.random() * 4);
+    g.enemies.push({x: side < 2 ? side * W : between(0, W), y: side < 2 ? between(0, H) : (side - 2) * H,
+      speed: between(70, 105) + (45 - g.time) * 2});
+    g.spawn = 1.8 + g.time / 45;
+  }
+  g.enemies = g.enemies.filter(enemy => {
+    const angle = Math.atan2(p.y - enemy.y, p.x - enemy.x);
+    enemy.x += Math.cos(angle) * enemy.speed * dt;
+    enemy.y += Math.sin(angle) * enemy.speed * dt;
+    if (distance(p, enemy) > 25) return true;
+    if (g.boost > 0) {
+      g.score += 75;
+      burst(enemy, '#ff708e');
+      return false;
+    }
+    if (g.shield <= 0) {
+      g.hp--;
+      g.shield = 1.3;
+      g.chain = 0;
+      burst(p, '#ff708e');
+    }
+    return true;
+  });
+  g.boost -= dt;
+  g.sparks = g.sparks.filter(spark => {
+    spark.x += spark.vx * dt;
+    spark.y += spark.vy * dt;
+    spark.life -= dt;
+    return spark.life > 0;
+  });
+  if (!g.hp || !g.time) finish();
+  hud.textContent = '剩余 ' + Math.ceil(g.time) + ' 秒 · 生命 ' + g.hp + ' · 分数 ' + g.score +
+    ' · 最高 ' + Math.max(best, g.score) + (g.chain > 0 ? ' · ×' + g.combo : '');
+  document.querySelector('#dash').textContent = g.cooldown > 0 ? '冲刺 ' + g.cooldown.toFixed(1) + ' 秒' : '冲刺 / Space';
+}
+function dot(point, size, color) {
+  ctx.fillStyle = ctx.shadowColor = color;
+  ctx.shadowBlur = 15;
+  ctx.beginPath();
+  ctx.arc(point.x, point.y, size, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.shadowBlur = 0;
+}
+function frame(now) {
+  const dt = Math.min(0.03, (now - (previous ?? now)) / 1000);
+  previous = now;
+  if (game?.running) tick(dt);
+  ctx.fillStyle = '#12162c';
+  ctx.fillRect(0, 0, W, H);
+  ctx.fillStyle = '#303859';
+  for (let x = 18; x < W; x += 32) {
+    for (let y = 18; y < H; y += 32) ctx.fillRect(x, y, 2, 2);
+  }
+  if (game) {
+    dot(game.chip, 9 + 2 * Math.sin(now / 110), '#80f6e2');
+    for (const enemy of game.enemies) dot(enemy, 12, '#ff708e');
+    for (const spark of game.sparks) dot(spark, 2, spark.color);
+    if (game.shield <= 0 || Math.floor(now / 90) % 2) dot(game.player, 13, game.boost > 0 ? '#fff8a0' : '#8bb2ff');
+  }
+  requestAnimationFrame(frame);
+}
+function aim(event) {
+  const rect = canvas.getBoundingClientRect();
+  target = {x: (event.clientX - rect.left) * W / rect.width, y: (event.clientY - rect.top) * H / rect.height};
+}
+canvas.onpointerdown = event => {
+  if (!game?.running || pointer != null) return;
+  pointer = event.pointerId;
+  canvas.setPointerCapture(pointer);
+  aim(event);
+};
+canvas.onpointermove = event => { if (pointer === event.pointerId) aim(event); };
+canvas.onlostpointercapture = event => { if (pointer === event.pointerId) target = pointer = null; };
+window.addEventListener('keydown', event => {
+  if (!game?.running) return;
+  const key = event.key.toLowerCase();
+  if (key === ' ' || key.startsWith('arrow')) event.preventDefault();
+  if (key === ' ' && !event.repeat) dash();
+  keys.add(key === ' ' ? key : event.key.length === 1 ? key : event.key);
+});
+window.addEventListener('keyup', event => keys.delete(event.key.length === 1 ? event.key.toLowerCase() : event.key));
+window.addEventListener('blur', () => keys.clear());
+document.querySelector('#start').onclick = start;
+document.querySelector('#dash').onclick = dash;
+requestAnimationFrame(frame);
+</script>

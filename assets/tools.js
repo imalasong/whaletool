@@ -459,5 +459,17 @@ const TOOLS = [
     badge: "NEW",
     date: "2026-10-21",
     pop: 8
+  },
+  {
+    id: "neon-heist",
+    name: "霓虹失窃",
+    desc: "45 秒街机追逐。偷芯片叠连击，用冲刺击落无人机，挑战最高分。",
+    icon: "💎",
+    href: "tools/seed-reply.html",
+    tags: ["游戏", "街机", "追逐", "连击", "离线"],
+    category: "game",
+    badge: "NEW",
+    date: "2026-11-08",
+    pop: 8
   }
 ];
