@@ -471,5 +471,17 @@ const TOOLS = [
     badge: "NEW",
     date: "2026-11-08",
     pop: 8
+  },
+  {
+    id: "tide-post",
+    name: "潮汐邮差",
+    desc: "驾驶小艇穿过三条群岛航线，借潮流、绕暗礁，把信送到灯塔。",
+    icon: "⛵",
+    href: "tools/tide-post.html",
+    tags: ["游戏", "航海", "探索", "关卡", "离线"],
+    category: "game",
+    badge: "NEW",
+    date: "2026-11-08",
+    pop: 8
   }
 ];

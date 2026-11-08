@@ -1,0 +1,197 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>潮汐邮差 · WhaleTool</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#143e48;color:#fff7db;font:16px system-ui;overflow:hidden}canvas{position:fixed;inset:0;width:100%;height:100%;touch-action:none}header,footer{position:fixed;left:0;right:0;display:flex;align-items:center;justify-content:space-between;gap:8px;padding:12px max(12px,env(safe-area-inset-left));pointer-events:none}header{top:0}footer{bottom:0;justify-content:center}button,a{pointer-events:auto;color:inherit}button{border:1px solid #fff6cb66;background:#173f45;color:#fff7db;padding:10px 14px;border-radius:8px;font:600 15px system-ui;cursor:pointer}.gold{background:#f4d28d;color:#253c38}.glass{background:#102e36e8;border:1px solid #fff6cb44;border-radius:12px;padding:9px 13px}#panel{position:fixed;inset:0;display:grid;place-items:center;padding:18px;background:#081f29a8}#panel[hidden]{display:none}article{width:min(480px,100%);max-height:90dvh;overflow:auto;background:#fcf0d1;color:#203b3b;border:2px solid #ead19f;outline:1px solid #8c7354;outline-offset:-9px;border-radius:14px;padding:clamp(22px,5vw,44px);box-shadow:0 20px 80px #09242c}h1{font:700 clamp(36px,8vw,65px) Georgia,serif;margin:.15em 0}small{letter-spacing:.18em}p{line-height:1.55}#actions{display:flex;flex-wrap:wrap;gap:8px}#dock{touch-action:none}#notice{position:fixed;top:66px;left:50%;transform:translateX(-50%);pointer-events:none;text-align:center;max-width:85vw}
+</style></head>
+<body><canvas aria-label="潮汐邮差航海地图"></canvas>
+<header><a class="glass" href="../">← WhaleTool</a><span class="glass" id="hud"></span><button id="full">全屏</button></header>
+<div id="notice" role="status"></div>
+<footer><button id="dock">减速靠岸 · 空格</button><button id="pause">暂停 · Esc</button></footer>
+<div id="panel"><article><small id="kicker"></small><h1 id="title"></h1><p id="brief"></p><div id="actions"></div></article></div>
+<script>
+const levels = [
+  {name:'雾湾初航',brief:'灯塔在海湾尽头。绕过沙洲，靠近码头后按住减速键，把第一封信送到。',start:[95,350],dock:[820,150],time:85,bottle:[474,409],islands:[[300,245,106,100],[595,120,87,57],[740,390,113,66]],reefs:[]},
+  {name:'顺流来信',brief:'中间水道向东流，北边向西流。借顺流靠近灯塔，也可以逆流去找漂流瓶。',start:[93,400],dock:[820,130],time:75,bottle:[284,111],islands:[[288,331,110,68],[549,177,100,68],[744,368,77,84]],reefs:[[465,392,59,23]]},
+  {name:'落潮之前',brief:'虚线水域藏着暗礁。开局水深可以抄近路，18 秒后礁石露出。绕南边航道也能送到。',start:[90,240],dock:[822,224],time:70,bottle:[510,112],islands:[[331,101,109,70],[642,333,115,58],[850,420,59,56]],reefs:[[330,236,57,27],[451,235,57,27],[571,225,54,27]]}
+];
+const el=id=>document.getElementById(id);
+const canvas=document.querySelector('canvas'), ctx=canvas.getContext('2d');
+const W=920,H=500, keys=new Set();
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+const distance=(x,y,point)=>Math.hypot(x-point[0],y-point[1]);
+let records=[];
+try {const data=JSON.parse(localStorage.getItem('tide-post-v1'));if(Array.isArray(data)) records=data;} catch {}
+let index=0, state='menu', boat, target, finger, brake=false, last=0, view;
+function screen(kicker,title,brief,actions){
+  el('kicker').textContent=kicker;el('title').textContent=title;el('brief').textContent=brief;
+  el('actions').replaceChildren(...actions.map(([label,run],i)=>{
+    const b=document.createElement('button');b.textContent=label;b.onclick=run;
+    if(!i)b.className='gold';return b;
+  }));
+  el('panel').hidden=false;
+}
+function menu(){
+  state='menu'; index=0;boat=null;
+  screen('群岛邮局 / ISLAND MAIL','潮汐邮差','三座灯塔，三封信。WASD 或方向键驾船，触屏按住海面引航。靠近码头后按住空格或「减速靠岸」。漂流瓶可以顺路收集。',levels.map((l,i)=>[
+    (records[i]?.bottle?'✦ ':'')+l.name+(records[i]?' · '+records[i].time+'秒':''),
+    ()=>brief(i)
+  ]));
+}
+function brief(i){
+  index=i;state='brief';boat=null;
+  screen('航线 '+(i+1)+' / '+levels.length,levels[i].name,levels[i].brief,[
+    ['解缆出发',start],['返回航线图',menu]
+  ]);
+}
+function start(){
+  const [x,y]=levels[index].start;
+  boat={x,y,vx:0,vy:0,angle:0,time:0,hp:3,bottle:false,hit:0,wake:[],trail:0};
+  resume();
+}
+function resume(){
+  state='play';keys.clear();target=finger=null;brake=false;el('panel').hidden=true;
+}
+function pause(){
+  if(state==='pause'){resume();return;}
+  if(state!=='play')return;
+  state='pause';
+  screen('航行暂停','歇一会儿','潮水和倒计时已暂停。',[
+    ['继续航行',resume],['重新出发',start],['返回航线图',menu]
+  ]);
+}
+function finish(won, reason){
+  state='result';
+  const time=Math.ceil(boat.time);
+  if(won){
+    records[index]={time:Math.min(records[index]?.time??time,time),bottle:Boolean(records[index]?.bottle||boat.bottle)};
+    try{localStorage.setItem('tide-post-v1',JSON.stringify(records));}catch{}
+  }
+  const actions=[];
+  if(won&&index<levels.length-1)actions.push(['下一座灯塔',()=>brief(index+1)]);
+  actions.push(['再跑一次',start],['返回航线图',menu]);
+  screen('航线 '+(index+1)+' / '+levels.length,won?'信已送达':reason,
+    won?'用时 '+time+' 秒 · 船体 '+boat.hp+'/3 · '+(boat.bottle?'带回了漂流瓶':'漂流瓶留待下次'):'可以重试这条航线。',actions);
+}
+function ellipseHit(x,y,[cx,cy,rx,ry]){
+  return ((x-cx)/(rx+9))**2+((y-cy)/(ry+9))**2<1;
+}
+function exposed(){return index!==2||boat?.time>=18;}
+function current(y){
+  if(index===0)return 0;
+  return y>255&&y<365?58:y<170?-32:0;
+}
+function update(dt){
+  const l=levels[index], b=boat;
+  b.time+=dt;b.hit=Math.max(0,b.hit-dt);
+  const slowing=brake||keys.has(' ');
+  let dx=Number(keys.has('d')||keys.has('arrowright'))-Number(keys.has('a')||keys.has('arrowleft'));
+  let dy=Number(keys.has('s')||keys.has('arrowdown'))-Number(keys.has('w')||keys.has('arrowup'));
+  if(target){dx=target.x-b.x;dy=target.y-b.y;if(Math.hypot(dx,dy)<12)dx=dy=0;}
+  const len=Math.hypot(dx,dy), thrust=slowing?24:143;
+  const factor=1-Math.exp(-dt*(slowing?9:3));
+  b.vx+=((len?dx/len*thrust:0)-b.vx)*factor;
+  b.vy+=((len?dy/len*thrust:0)-b.vy)*factor;
+  if(len&&!slowing)b.angle=Math.atan2(dy,dx);
+  const nx=clamp(b.x+(b.vx+current(b.y)*(slowing?.18:1))*dt,15,W-15);
+  const ny=clamp(b.y+b.vy*dt,15,H-15);
+  if(l.islands.some(o=>ellipseHit(nx,ny,o))||(exposed()&&l.reefs.some(o=>ellipseHit(nx,ny,o)&&!ellipseHit(b.x,b.y,o)))){
+    b.vx=b.vy=0;
+    if(!b.hit){b.hit=1.2;b.hp--;el('notice').textContent='擦碰！注意沙洲和礁石';}
+  }else{b.x=nx;b.y=ny;}
+  if(distance(b.x,b.y,l.bottle)<25)b.bottle=true;
+  b.trail-=dt;
+  if(b.trail<=0&&Math.hypot(b.vx,b.vy)>20){
+    b.wake.push({x:b.x,y:b.y,life:.8});b.trail=.06;
+  }
+  b.wake=b.wake.filter(w=>(w.life-=dt)>0);
+  const close=distance(b.x,b.y,l.dock)<32;
+  el('hud').textContent='第 '+(index+1)+' 关 · '+Math.max(0,Math.ceil(l.time-b.time))+' 秒 · 船体 '+b.hp+'/3';
+  if(close)el('notice').textContent='按住减速键停船投递';
+  else if(!b.hit)el('notice').textContent=index===2?(exposed()?'暗礁已露出':'距暗礁露出 '+Math.ceil(18-b.time)+' 秒'):'';
+  if(b.hp<=0)finish(false,'船体受损');
+  else if(b.time>=l.time)finish(false,'错过投递');
+  else if(close&&slowing&&Math.hypot(b.vx,b.vy)<40)finish(true);
+}
+function oval(x,y,rx,ry,color){
+  ctx.beginPath();ctx.ellipse(x,y,rx,ry,0,0,Math.PI*2);ctx.fillStyle=color;ctx.fill();
+}
+function draw(now){
+  const dpr=Math.min(devicePixelRatio,2), width=innerWidth*dpr,height=innerHeight*dpr;
+  if(canvas.width!==Math.round(width)||canvas.height!==Math.round(height)){
+    canvas.width=Math.round(width);canvas.height=Math.round(height);
+  }
+  const scale=Math.min(width/W,height/H), x=(width-W*scale)/2,y=(height-H*scale)/2;
+  view={scale,x,y,dpr};
+  ctx.setTransform(1,0,0,1,0,0);
+  ctx.fillStyle='#103946';ctx.fillRect(0,0,canvas.width,canvas.height);
+  ctx.setTransform(scale,0,0,scale,x,y);
+  const sea=ctx.createLinearGradient(0,0,W,H);
+  sea.addColorStop(0,'#20505d');sea.addColorStop(.57,'#236773');sea.addColorStop(1,'#193c50');
+  ctx.fillStyle=sea;ctx.fillRect(0,0,W,H);
+  const l=levels[index], t=now/1000;
+  ctx.strokeStyle='#def8d52a';ctx.lineWidth=1.3;
+  for(let i=0;i<144;i++){
+    const yy=(i*67)%H,xx=((i*137+t*current(yy)*.35)%W+W)%W;
+    ctx.beginPath();ctx.moveTo(xx,yy);ctx.quadraticCurveTo(xx+7,yy-3,xx+17,yy);ctx.stroke();
+  }
+  for(const [cx,cy,rx,ry] of l.islands){
+    oval(cx,cy,rx+12,ry+11,'#66a897');oval(cx,cy,rx,ry,'#e5c18b');
+    oval(cx-5,cy-5,rx*.8,ry*.75,'#567659');
+    for(let i=0;i<8;i++){
+      const a=i*2.4;
+      oval(cx+Math.cos(a)*rx*.55,cy+Math.sin(a)*ry*.48,8+i%3,8,'#315d51');
+    }
+  }
+  for(const [cx,cy,rx,ry] of l.reefs){
+    oval(cx,cy,rx,ry,exposed()?'#926c61':'#64afb966');
+    ctx.strokeStyle='#f1d3a6';ctx.setLineDash([4,5]);ctx.stroke();ctx.setLineDash([]);
+  }
+  const [dx,dy]=l.dock;
+  ctx.save();ctx.translate(dx,dy-16);ctx.rotate(t*.65);
+  const ray=ctx.createLinearGradient(0,0,125,0);ray.addColorStop(0,'#ffe3a4b0');ray.addColorStop(1,'#ffe3a400');
+  ctx.fillStyle=ray;ctx.beginPath();ctx.moveTo(0,0);ctx.lineTo(125,-24);ctx.lineTo(125,24);ctx.fill();ctx.restore();
+  oval(dx,dy,31,22,'#edcf98');oval(dx,dy,24,15,'#715446');
+  ctx.fillStyle='#fff3cb';ctx.fillRect(dx-6,dy-19,12,22);
+  ctx.fillStyle='#a64a4a';ctx.fillRect(dx-8,dy-21,16,6);
+  if(!boat?.bottle){const [bx,by]=l.bottle;oval(bx,by+Math.sin(t*3)*4,8,5,'#ffd991');}
+  ctx.fillStyle='#dbf4db';ctx.font='600 14px system-ui';ctx.fillText('灯塔邮站',dx-30,dy+39);
+  ctx.font='14px Georgia';ctx.fillText('N ↑',W-52,27);
+  if(!boat)return;
+  for(const w of boat.wake)oval(w.x,w.y,7,4,'rgba(212,251,229,'+w.life*.47+')');
+  ctx.save();ctx.translate(boat.x,boat.y);ctx.rotate(boat.angle);
+  ctx.globalAlpha=boat.hit&&Math.floor(t*13)%2?.42:1;
+  ctx.fillStyle='#442d2b';ctx.beginPath();ctx.moveTo(-14,-9);ctx.lineTo(4,-10);
+  ctx.quadraticCurveTo(16,-6,20,0);ctx.quadraticCurveTo(16,6,4,10);ctx.lineTo(-14,9);ctx.fill();
+  ctx.fillStyle='#ecab69';ctx.fillRect(-11,-6,19,12);ctx.fillStyle='#fff3d1';ctx.fillRect(-6,-5,9,10);
+  ctx.restore();
+}
+function frame(now){
+  if(state==='play')update(Math.min(.04,(now-last)/1000));
+  last=now;draw(now);requestAnimationFrame(frame);
+}
+function aim(e){target={x:(e.clientX*view.dpr-view.x)/view.scale,y:(e.clientY*view.dpr-view.y)/view.scale};}
+canvas.onpointerdown=e=>{if(state!=='play'||finger!=null||!view)return;finger=e.pointerId;canvas.setPointerCapture(finger);aim(e);};
+canvas.onpointermove=e=>{if(e.pointerId===finger)aim(e);};
+canvas.onlostpointercapture=e=>{if(e.pointerId===finger)target=finger=null;};
+el('dock').onpointerdown=e=>{el('dock').setPointerCapture(e.pointerId);brake=true;};
+el('dock').onlostpointercapture=()=>{brake=false;};
+el('pause').onclick=pause;
+el('full').onclick=async()=>{
+  try{
+    if(document.fullscreenElement)await document.exitFullscreen();
+    else if(document.documentElement.requestFullscreen)await document.documentElement.requestFullscreen();
+    else throw Error();
+  }catch{el('full').textContent='已铺满窗口';}
+};
+document.onfullscreenchange=()=>{el('full').textContent=document.fullscreenElement?'退出全屏':'全屏';};
+window.addEventListener('keydown',e=>{
+  const k=e.key.toLowerCase();
+  if(k==='escape'&&!e.repeat)pause();
+  if(state!=='play')return;
+  if(k===' '||k.startsWith('arrow'))e.preventDefault();
+  keys.add(k);
+});
+window.addEventListener('keyup',e=>keys.delete(e.key.toLowerCase()));
+document.addEventListener('visibilitychange',()=>{if(document.hidden&&state==='play')pause();});
+menu();requestAnimationFrame(frame);
+</script></body></html>

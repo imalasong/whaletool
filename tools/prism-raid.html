@@ -1,0 +1,236 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>棱镜突围 · WhaleTool</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(ellipse at top,#222344,#080913 70%);color:#f3f1ff;font:16px system-ui;min-height:100vh}main{max-width:740px;margin:auto;padding:20px}a,small{color:#a9b4e1}header{display:flex;align-items:end;justify-content:space-between;gap:8px;margin:14px 0}h1{font-size:clamp(32px,7vw,54px);margin:0;letter-spacing:.08em}small{letter-spacing:.12em}#arena{position:relative;border:1px solid #525681;border-radius:20px;overflow:hidden;box-shadow:0 16px 80px #060616}canvas{width:100%;display:block;touch-action:none}#cover{position:absolute;inset:0;display:grid;align-content:center;justify-items:center;text-align:center;padding:20px;background:#090b1bcc;backdrop-filter:blur(3px)}#cover[hidden]{display:none}h2{margin:0;font-size:clamp(24px,5vw,42px)}p{line-height:1.55;color:#c9cbe7}button{padding:10px 16px;border:1px solid #7779a6;border-radius:12px;background:#222647;color:white;font:700 15px system-ui;cursor:pointer;touch-action:manipulation}button.primary{background:#8bf0f8;color:#141833;border-color:#8bf0f8}nav{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}#hud{margin:10px 0;font-variant-numeric:tabular-nums}
+</style>
+</head>
+<body><main>
+<a href="../">← WhaleTool</a>
+<header><div><small>PRISM RAID / 01</small><h1>棱镜突围</h1></div><small>双色弹幕</small></header>
+<div id="hud">生命 3 · 能量 0/8 · 分数 0</div>
+<div id="arena">
+<canvas width="640" height="520" aria-label="棱镜突围战场"></canvas>
+<div id="cover"><h2 id="title">敌人的子弹，就是你的弹药</h2><p id="message">切换青色与粉色，吸收同色弹。<br>集满 8 格能量，用爆发击穿敌阵。</p><button class="primary" id="start">进入战场</button></div>
+</div>
+<nav><button id="swap">切色 · 空格</button><button id="pulse">爆发 · X</button><button id="pause">暂停 · P</button></nav>
+<p>WASD / 方向键或触屏拖动，自动射击。青色圆弹、粉色菱形弹，同色吸收，异色伤害。撑过三段战斗，击破核心。</p>
+</main>
+<script>
+const el = id => document.getElementById(id);
+const canvas = document.querySelector('canvas');
+const ctx = canvas.getContext('2d');
+const W = canvas.width, H = canvas.height;
+const colors = ['#58edff', '#ff76c8'];
+const keys = new Set();
+const stars = Array.from({length: 95}, () => [Math.random()*W, Math.random()*H, Math.random()*2+1]);
+let best = 0;
+try { best = Number(localStorage.getItem('prism-raid-best')) || 0; } catch {}
+let game, target, finger, last = 0;
+const clamp = (n, low, high) => Math.max(low, Math.min(high, n));
+const near = (a,b,r) => (a.x-b.x)**2+(a.y-b.y)**2 < r*r;
+
+function cover(title, message, action) {
+  el('title').textContent = title;
+  el('message').textContent = message;
+  el('start').textContent = action;
+  el('cover').hidden = false;
+}
+function start() {
+  if (game?.state === 'paused') {
+    game.state = 'playing';
+  } else {
+    game = {state:'playing', time:0, hp:3, charge:0, score:0, color:0, x:W/2, y:H-65,
+      shot:0, next:1, boss:null, flash:0, invincible:0, enemies:[], shots:[], bullets:[], sparks:[]};
+  }
+  keys.clear();
+  target = finger = null;
+  el('cover').hidden = true;
+  canvas.focus();
+}
+function end(won) {
+  game.state = 'ended';
+  best = Math.max(best, game.score);
+  try { localStorage.setItem('prism-raid-best', String(best)); } catch {}
+  cover(won ? '核心击破' : '战机失联', '得分 '+game.score+' · 最高 '+best, '再战一局');
+}
+function swap() {
+  if (game?.state === 'playing') game.color ^= 1;
+}
+function pause() {
+  if (game?.state === 'paused') start();
+  else if (game?.state === 'playing') {
+    game.state = 'paused';
+    cover('战斗暂停', '准备好再继续。', '继续战斗');
+  }
+}
+function sparks(x,y,color) {
+  for(let i=0;i<10;i++){
+    const a=Math.random()*Math.PI*2, speed=45+Math.random()*140;
+    game.sparks.push({x,y,vx:Math.cos(a)*speed,vy:Math.sin(a)*speed,life:.42,color});
+  }
+}
+function pulse() {
+  if (game?.state !== 'playing' || game.charge < 8) return;
+  game.charge = 0;
+  game.flash = .35;
+  game.score += game.bullets.length * 5;
+  game.bullets.length = 0;
+  for(const enemy of game.enemies) enemy.hp -= enemy.boss ? 18 : 6;
+  sparks(game.x,game.y,colors[game.color]);
+}
+function spawn(g) {
+  if(g.time >= 32){
+    if(!g.boss){
+      g.boss = {boss:true,x:W/2,y:-50,hp:72,fire:1,volley:0};
+      g.enemies.push(g.boss);
+    }
+    return;
+  }
+  if(g.time<g.next) return;
+  const hard=g.time>=15;
+  const x=90+Math.random()*(W-180);
+  g.enemies.push({x,y:-20,hp:hard?5:3,fire:.75,volley:Math.floor(g.next)%2});
+  if(hard) g.enemies.push({x:W-x,y:-65,hp:4,fire:1.2,volley:1});
+  g.next=g.time+(hard?2.2:2.5);
+}
+function fire(enemy,g) {
+  const aimed = Math.atan2(g.y-enemy.y,g.x-enemy.x);
+  const count=enemy.boss?13:g.time>=15?5:3;
+  for(let i=0;i<count;i++){
+    const angle=aimed+(i-(count-1)/2)*(enemy.boss?.23:.18);
+    const speed=enemy.boss?155:125;
+    g.bullets.push({x:enemy.x,y:enemy.y,vx:Math.cos(angle)*speed,vy:Math.sin(angle)*speed,
+      color:(enemy.volley+(enemy.boss?Math.floor(i/3):0))%2});
+  }
+  enemy.volley++;
+}
+function update(dt) {
+  const g=game;
+  g.time+=dt;
+  g.flash=Math.max(0,g.flash-dt);
+  g.invincible=Math.max(0,g.invincible-dt);
+  const dx=target ? target.x-g.x : Number(keys.has('arrowright')||keys.has('d'))-Number(keys.has('arrowleft')||keys.has('a'));
+  const dy=target ? target.y-g.y : Number(keys.has('arrowdown')||keys.has('s'))-Number(keys.has('arrowup')||keys.has('w'));
+  const length=Math.hypot(dx,dy);
+  if(length>0){
+    const step=target?Math.min(length,320*dt):320*dt;
+    g.x=clamp(g.x+dx/length*step,15,W-15);
+    g.y=clamp(g.y+dy/length*step,110,H-16);
+  }
+  g.shot-=dt;
+  if(g.shot<=0){g.shots.push({x:g.x,y:g.y-16});g.shot=.15;}
+  spawn(g);
+  for(const e of g.enemies){
+    if(e.hp<=0) continue;
+    e.y=Math.min(e.boss?90:160,e.y+dt*(e.boss?60:39));
+    if(e.boss) e.x=W/2+Math.sin(g.time*1.4)*145;
+    e.fire-=dt;
+    if(e.fire<=0 && e.y>20){fire(e,g);e.fire=e.boss?.72:1.4;}
+  }
+  g.shots=g.shots.filter(s=>{
+    s.y-=dt*470;
+    const enemy=g.enemies.find(e=>e.hp>0&&near(s,e,e.boss?34:17));
+    if(enemy) enemy.hp--;
+    return !enemy && s.y>0;
+  });
+  g.enemies=g.enemies.filter(e=>{
+    if(e.hp>0) return true;
+    g.score+=e.boss?1500:120;
+    sparks(e.x,e.y,'#ffc591');
+    return false;
+  });
+  g.bullets=g.bullets.filter(b=>{
+    b.x+=b.vx*dt;b.y+=b.vy*dt;
+    if(near(b,g,15)){
+      if(b.color===g.color){
+        g.charge=Math.min(8,g.charge+1);g.score+=25;
+        sparks(b.x,b.y,colors[b.color]);
+      } else if(!g.invincible){
+        g.hp--;g.invincible=1.1;
+        sparks(g.x,g.y,'#fff');
+      }
+      return false;
+    }
+    return b.x>-20&&b.x<W+20&&b.y>-20&&b.y<H+20;
+  });
+  g.sparks=g.sparks.filter(s=>{s.x+=s.vx*dt;s.y+=s.vy*dt;s.life-=dt;return s.life>0;});
+  el('hud').textContent='第 '+(g.boss?3:g.time>=15?2:1)+' 波 · 生命 '+g.hp+' · 能量 '+g.charge+'/8 · 分数 '+g.score+' · 最高 '+best;
+  el('pulse').classList.toggle('primary',g.charge===8);
+  if(g.hp<=0) end(false);
+  else if(g.boss?.hp<=0) end(true);
+}
+function shape(x,y,r,color,sides,angle=0) {
+  ctx.fillStyle=ctx.shadowColor=color;
+  ctx.shadowBlur=14;
+  ctx.beginPath();
+  if(!sides) ctx.arc(x,y,r,0,Math.PI*2);
+  else for(let i=0;i<sides;i++){
+    const a=angle+2*Math.PI*i/sides;
+    ctx.lineTo(x+r*Math.cos(a),y+r*Math.sin(a));
+  }
+  ctx.closePath();ctx.fill();ctx.shadowBlur=0;
+}
+function draw(now) {
+  const bg=ctx.createLinearGradient(0,0,W,H);
+  bg.addColorStop(0,'#201637');bg.addColorStop(.55,'#111731');bg.addColorStop(1,'#0c2633');
+  ctx.fillStyle=bg;ctx.fillRect(0,0,W,H);
+  ctx.fillStyle='#8589c0';
+  for(const [x,y,size] of stars) ctx.fillRect(x,(y+now*.025*size)%H,size,size);
+  if(!game) return;
+  const g=game;
+  for(const e of g.enemies){
+    shape(e.x,e.y,e.boss?36:17,e.boss?'#ffaf72':'#a891fa',6);
+    shape(e.x,e.y,e.boss?16:7,'#232049',4);
+  }
+  for(const s of g.shots) shape(s.x,s.y,3,'#dfe5ff',0);
+  for(const b of g.bullets) shape(b.x,b.y,6,colors[b.color],b.color?4:0);
+  for(const s of g.sparks){ctx.globalAlpha=s.life/.42;shape(s.x,s.y,2,s.color,0);}
+  ctx.globalAlpha=g.invincible&&Math.floor(now/85)%2?.4:1;
+  shape(g.x,g.y+6,9,'#d2ccff',3,Math.PI/2);
+  shape(g.x,g.y,17,colors[g.color],3,-Math.PI/2);
+  ctx.globalAlpha=1;
+  if(g.boss){
+    ctx.fillStyle='#362c4c';ctx.fillRect(140,14,360,5);
+    ctx.fillStyle='#ffaf72';ctx.fillRect(140,14,360*clamp(g.boss.hp/72,0,1),5);
+  }
+  if(g.flash){ctx.fillStyle='rgba(150,240,255,'+g.flash+')';ctx.fillRect(0,0,W,H);}
+}
+function frame(now){
+  const dt=Math.min(.033,(now-last)/1000);
+  last=now;
+  if(game?.state==='playing') update(dt);
+  draw(now);
+  requestAnimationFrame(frame);
+}
+function aim(event){
+  const box=canvas.getBoundingClientRect();
+  target={x:(event.clientX-box.left)*W/box.width,y:(event.clientY-box.top)*H/box.height};
+}
+canvas.onpointerdown=event=>{
+  if(game?.state!=='playing'||finger!=null) return;
+  finger=event.pointerId;canvas.setPointerCapture(finger);aim(event);
+};
+canvas.onpointermove=event=>{if(finger===event.pointerId) aim(event);};
+canvas.onlostpointercapture=event=>{if(finger===event.pointerId) target=finger=null;};
+window.addEventListener('keydown',event=>{
+  const key=event.key.toLowerCase();
+  if(key==='p'&&!event.repeat) pause();
+  if(game?.state!=='playing') return;
+  if(key===' '||key.startsWith('arrow')) event.preventDefault();
+  keys.add(key);
+  if(!event.repeat && key===' ') swap();
+  if(!event.repeat && key==='x') pulse();
+});
+window.addEventListener('keyup',event=>keys.delete(event.key.toLowerCase()));
+window.addEventListener('blur',()=>{keys.clear();if(game?.state==='playing') pause();});
+el('start').onclick=start;
+el('swap').onclick=swap;
+el('pulse').onclick=pulse;
+el('pause').onclick=pause;
+requestAnimationFrame(frame);
+</script>
+</body></html>
