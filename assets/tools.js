@@ -407,6 +407,18 @@ const TOOLS = [
 
   /* ---------------- 游戏 ---------------- */
   {
+    id: "pelican-bicycle",
+    name: "鹈鹕环岛",
+    desc: "三维海岛骑行游戏，跟随鹈鹕骑车探索环岛风景，离线可玩。",
+    icon: "🚲",
+    href: "tools/pelican-bicycle.html",
+    tags: ["游戏", "鹈鹕", "骑行", "海岛", "三维", "离线"],
+    category: "game",
+    badge: "NEW",
+    date: "2026-11-26",
+    pop: 10
+  },
+  {
     id: "jimao-3a",
     name: "几猫国产3A大作",
     desc: "三维港区突击游戏，切断三处中继、突破封锁并登船撤离，支持键鼠与触屏操作。",
