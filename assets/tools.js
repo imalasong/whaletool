@@ -25,6 +25,12 @@ const CATEGORIES = [
 ];
 
 const TOOLS = [
+  {
+    id: "websocket", name: "WebSocket 测试", icon: "🔌",
+    desc: "连接 ws / wss 服务，实时收发消息，支持定时发送和 JSON 格式化。",
+    href: "tools/websocket.html", tags: ["WebSocket", "WS", "调试", "接口"],
+    category: "dev", badge: "NEW", date: "2026-11-26"
+  },
   /* ---------------- 图片 ---------------- */
   {
     id: "image-tool",
